@@ -1,0 +1,56 @@
+name: laudo_tech
+description: "Ferramenta para geração automatizada de laudos periciais. Aplicativo profissional para documentação de ocorrências com precisão e eficiência."
+publish_to: 'none'
+
+version: 1.0.0+8
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  cupertino_icons: ^1.0.8
+  file_picker: ^10.3.8
+  path_provider: ^2.1.5
+  permission_handler: ^12.0.1
+  shared_preferences: ^2.5.4
+  syncfusion_flutter_pdf: ^32.1.21
+  open_filex: ^4.7.0
+  provider: ^6.1.5+1
+  intl: ^0.20.2
+  geolocator: ^13.0.1
+  archive: ^4.0.7
+  xml: ^6.6.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/images/logo.png"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "assets/images/logo.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/images/logo.png"
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/templates/
+    - assets/images/
