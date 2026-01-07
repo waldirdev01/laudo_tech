@@ -34,7 +34,11 @@ class PdfExtractionService {
       }
 
       final bytes = await arquivo.readAsBytes();
-      return extrairTextoBytes(bytes);
+      final texto = extrairTextoBytes(bytes);
+      if (texto.trim().isEmpty) {
+        throw Exception('Não foi possível extrair texto do PDF (texto vazio).');
+      }
+      return texto;
     } catch (e) {
       throw Exception('Erro ao extrair texto do PDF: $e');
     }
@@ -61,6 +65,29 @@ class PdfExtractionService {
     }
   }
 
+  /// Extrai texto de um PDF a partir de bytes, tentando método nativo no Android primeiro.
+  Future<String> extrairTextoBytesAsync(Uint8List bytes) async {
+    // Android: tentar PDFBox via MethodChannel (mais confiável que alguns casos do Syncfusion)
+    if (Platform.isAndroid) {
+      try {
+        final resultado = await _channel.invokeMethod<String>('extractText', {
+          'bytes': bytes,
+        });
+        if (resultado != null && resultado.trim().isNotEmpty) {
+          return resultado;
+        }
+      } catch (_) {
+        // fallback abaixo
+      }
+    }
+
+    final texto = extrairTextoBytes(bytes);
+    if (texto.trim().isEmpty) {
+      throw Exception('Não foi possível extrair texto do PDF (texto vazio).');
+    }
+    return texto;
+  }
+
   /// Extrai dados estruturados de uma solicitação de perícia
   Future<SolicitacaoModel> extrairDadosSolicitacao(
     String caminhoArquivo,
@@ -79,6 +106,19 @@ class PdfExtractionService {
   /// Extrai dados estruturados a partir de bytes do PDF
   SolicitacaoModel extrairDadosSolicitacaoBytes(Uint8List bytes) {
     final texto = extrairTextoBytes(bytes);
+
+    // Debug: mostrar texto extraído (primeiros 2000 caracteres)
+    print('=== TEXTO EXTRAÍDO DO PDF (primeiros 2000 chars) ===');
+    print(texto.length > 2000 ? texto.substring(0, 2000) : texto);
+    print('=== FIM DO TEXTO EXTRAÍDO ===');
+
+    return _parsearSolicitacao(texto);
+  }
+
+  Future<SolicitacaoModel> extrairDadosSolicitacaoBytesAsync(
+    Uint8List bytes,
+  ) async {
+    final texto = await extrairTextoBytesAsync(bytes);
 
     // Debug: mostrar texto extraído (primeiros 2000 caracteres)
     print('=== TEXTO EXTRAÍDO DO PDF (primeiros 2000 chars) ===');

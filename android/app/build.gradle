@@ -71,3 +71,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Extração de texto de PDF no Android (equivalente ao PDFKit do iOS)
+    implementation 'com.tom_roush:pdfbox-android:2.0.27.0'
+}

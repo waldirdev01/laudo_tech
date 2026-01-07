@@ -76,7 +76,7 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
     try {
       final SolicitacaoModel dados;
       if (_pdfBytes != null) {
-        dados = _pdfService.extrairDadosSolicitacaoBytes(_pdfBytes!);
+        dados = await _pdfService.extrairDadosSolicitacaoBytesAsync(_pdfBytes!);
       } else {
         dados = await _pdfService.extrairDadosSolicitacao(_caminhoPdf!);
       }
