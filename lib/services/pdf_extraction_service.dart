@@ -34,6 +34,15 @@ class PdfExtractionService {
       }
 
       final bytes = await arquivo.readAsBytes();
+      return extrairTextoBytes(bytes);
+    } catch (e) {
+      throw Exception('Erro ao extrair texto do PDF: $e');
+    }
+  }
+
+  /// Extrai texto de um PDF a partir de bytes (suporta Android quando o FilePicker retorna content URI)
+  String extrairTextoBytes(Uint8List bytes) {
+    try {
       final PdfDocument documento = PdfDocument(inputBytes: bytes);
 
       final StringBuffer textoCompleto = StringBuffer();
@@ -64,6 +73,18 @@ class PdfExtractionService {
     print('=== FIM DO TEXTO EXTRAÍDO ===');
 
     // Parsear campos específicos do PDF de solicitação
+    return _parsearSolicitacao(texto);
+  }
+
+  /// Extrai dados estruturados a partir de bytes do PDF
+  SolicitacaoModel extrairDadosSolicitacaoBytes(Uint8List bytes) {
+    final texto = extrairTextoBytes(bytes);
+
+    // Debug: mostrar texto extraído (primeiros 2000 caracteres)
+    print('=== TEXTO EXTRAÍDO DO PDF (primeiros 2000 chars) ===');
+    print(texto.length > 2000 ? texto.substring(0, 2000) : texto);
+    print('=== FIM DO TEXTO EXTRAÍDO ===');
+
     return _parsearSolicitacao(texto);
   }
 
@@ -217,77 +238,77 @@ class PdfExtractionService {
     } else {
       // Formato tradicional com "Campo: Valor"
       // Extrair RAI (vários formatos possíveis)
-      final raiMatch1 = RegExp(
-        r'RAI\s*n[.:°º]?\s*:?\s*(\d+)',
-        caseSensitive: false,
-      ).firstMatch(textoNormalizado);
-      final raiMatch2 = RegExp(
-        r'RAI[:\s]+(\d+)',
-        caseSensitive: false,
-      ).firstMatch(textoNormalizado);
-      raiNumero = raiMatch1?.group(1) ?? raiMatch2?.group(1);
+    final raiMatch1 = RegExp(
+      r'RAI\s*n[.:°º]?\s*:?\s*(\d+)',
+      caseSensitive: false,
+    ).firstMatch(textoNormalizado);
+    final raiMatch2 = RegExp(
+      r'RAI[:\s]+(\d+)',
+      caseSensitive: false,
+    ).firstMatch(textoNormalizado);
+    raiNumero = raiMatch1?.group(1) ?? raiMatch2?.group(1);
 
       // Extrair Data de Criação / Data/Hora Comunicação
-      final dataCriacaoMatch = RegExp(
+    final dataCriacaoMatch = RegExp(
         r'Data\s+de\s+cria[çc][ãa]o\s*:?\s*(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?)',
-        caseSensitive: false,
-      ).firstMatch(textoNormalizado);
-      dataHoraComunicacao = dataCriacaoMatch?.group(1)?.trim();
+      caseSensitive: false,
+    ).firstMatch(textoNormalizado);
+    dataHoraComunicacao = dataCriacaoMatch?.group(1)?.trim();
 
-      if (dataHoraComunicacao == null) {
-        final dataHoraComunicacaoMatch = RegExp(
+    if (dataHoraComunicacao == null) {
+      final dataHoraComunicacaoMatch = RegExp(
           r'Data/Hora\s+(?:da\s+)?Comunica[çc][ãa]o\s*:?\s*(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?)',
-          caseSensitive: false,
-        ).firstMatch(textoNormalizado);
-        dataHoraComunicacao = dataHoraComunicacaoMatch?.group(1)?.trim();
-      }
-
-      // Extrair Responsável
-      final responsavelMatch = RegExp(
-        r'Respons[áa]vel\s*:?\s*([^\n]+)',
         caseSensitive: false,
       ).firstMatch(textoNormalizado);
-      peritoCriminal = responsavelMatch?.group(1)?.trim();
+      dataHoraComunicacao = dataHoraComunicacaoMatch?.group(1)?.trim();
+    }
+
+    // Extrair Responsável
+    final responsavelMatch = RegExp(
+      r'Respons[áa]vel\s*:?\s*([^\n]+)',
+      caseSensitive: false,
+    ).firstMatch(textoNormalizado);
+    peritoCriminal = responsavelMatch?.group(1)?.trim();
 
       // Extrair Natureza da Ocorrência
-      final naturezaMatch = RegExp(
-        r'Natureza\s+da\s+Ocorr[êe]ncia\s*:?\s*([^\n]+)',
+    final naturezaMatch = RegExp(
+      r'Natureza\s+da\s+Ocorr[êe]ncia\s*:?\s*([^\n]+)',
+      caseSensitive: false,
+    ).firstMatch(textoNormalizado);
+    naturezaOcorrencia = naturezaMatch?.group(1)?.trim();
+
+    if (naturezaOcorrencia == null) {
+      final conteudoMatch = RegExp(
+        r'Conte[úu]do\s*:?\s*([^\n]+)',
         caseSensitive: false,
       ).firstMatch(textoNormalizado);
-      naturezaOcorrencia = naturezaMatch?.group(1)?.trim();
+      naturezaOcorrencia = conteudoMatch?.group(1)?.trim();
+    }
 
-      if (naturezaOcorrencia == null) {
-        final conteudoMatch = RegExp(
-          r'Conte[úu]do\s*:?\s*([^\n]+)',
-          caseSensitive: false,
-        ).firstMatch(textoNormalizado);
-        naturezaOcorrencia = conteudoMatch?.group(1)?.trim();
-      }
+    // Extrair Número da Ocorrência
+    final ocorrenciaMatch = RegExp(
+      r'Ocorr[êe]ncia\s+n[º°]?\s*:?\s*([^\n]+)',
+      caseSensitive: false,
+    ).firstMatch(textoNormalizado);
+    numeroOcorrencia = ocorrenciaMatch?.group(1)?.trim();
 
-      // Extrair Número da Ocorrência
-      final ocorrenciaMatch = RegExp(
-        r'Ocorr[êe]ncia\s+n[º°]?\s*:?\s*([^\n]+)',
-        caseSensitive: false,
-      ).firstMatch(textoNormalizado);
-      numeroOcorrencia = ocorrenciaMatch?.group(1)?.trim();
-
-      // Extrair Cidade
-      final cidadeMatch = RegExp(
+    // Extrair Cidade
+    final cidadeMatch = RegExp(
         r'Cidade\s*:?\s*([^\n:]+)',
+      caseSensitive: false,
+    ).firstMatch(textoNormalizado);
+    municipio = cidadeMatch?.group(1)?.trim();
+
+    if (municipio == null) {
+      final municipioMatch = RegExp(
+          r'Munic[íi]pio\s*:?\s*([^\n:]+)',
         caseSensitive: false,
       ).firstMatch(textoNormalizado);
-      municipio = cidadeMatch?.group(1)?.trim();
-
-      if (municipio == null) {
-        final municipioMatch = RegExp(
-          r'Munic[íi]pio\s*:?\s*([^\n:]+)',
-          caseSensitive: false,
-        ).firstMatch(textoNormalizado);
-        municipio = municipioMatch?.group(1)?.trim();
-      }
+      municipio = municipioMatch?.group(1)?.trim();
+    }
 
       // Extrair Endereço
-      final enderecoMatch = RegExp(
+    final enderecoMatch = RegExp(
         r'Endere[çc]o\s*:?\s*([^\n]+)',
         caseSensitive: false,
       ).firstMatch(textoNormalizado);

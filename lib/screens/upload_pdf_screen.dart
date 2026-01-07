@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../models/solicitacao_model.dart';
 import '../models/pessoa_envolvida_model.dart';
@@ -20,6 +21,8 @@ class UploadPdfScreen extends StatefulWidget {
 
 class _UploadPdfScreenState extends State<UploadPdfScreen> {
   String? _caminhoPdf;
+  Uint8List? _pdfBytes;
+  String? _nomePdf;
   bool _processando = false;
   SolicitacaoModel? _dadosExtraidos;
   String? _erro;
@@ -32,11 +35,15 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
         type: FileType.custom,
         allowedExtensions: ['pdf'],
         allowMultiple: false,
+        withData: true,
       );
 
-      if (result != null && result.files.single.path != null) {
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.single;
         setState(() {
-          _caminhoPdf = result.files.single.path;
+          _caminhoPdf = file.path; // pode ser null no Android (content URI)
+          _pdfBytes = file.bytes;
+          _nomePdf = file.name;
           _dadosExtraidos = null;
           _erro = null;
         });
@@ -51,7 +58,7 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
   }
 
   Future<void> _extrairDados() async {
-    if (_caminhoPdf == null) {
+    if (_pdfBytes == null && _caminhoPdf == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Por favor, selecione um arquivo PDF'),
@@ -67,7 +74,12 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
     });
 
     try {
-      final dados = await _pdfService.extrairDadosSolicitacao(_caminhoPdf!);
+      final SolicitacaoModel dados;
+      if (_pdfBytes != null) {
+        dados = _pdfService.extrairDadosSolicitacaoBytes(_pdfBytes!);
+      } else {
+        dados = await _pdfService.extrairDadosSolicitacao(_caminhoPdf!);
+      }
       
       // Debug: verificar dados extraídos
       print('Dados extraídos do PDF:');
@@ -178,7 +190,7 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                 padding: const EdgeInsets.all(16),
               ),
             ),
-            if (_caminhoPdf != null) ...[
+            if (_pdfBytes != null || _caminhoPdf != null) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -193,7 +205,10 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _caminhoPdf!.split('/').last,
+                        _nomePdf ??
+                            (_caminhoPdf != null
+                                ? _caminhoPdf!.split('/').last
+                                : 'arquivo.pdf'),
                         style: TextStyle(color: Colors.blue.shade700),
                         overflow: TextOverflow.ellipsis,
                       ),

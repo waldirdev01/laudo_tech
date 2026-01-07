@@ -2,7 +2,7 @@ name: laudo_tech
 description: "Ferramenta para geração automatizada de laudos periciais. Aplicativo profissional para documentação de ocorrências com precisão e eficiência."
 publish_to: 'none'
 
-version: 1.0.0+10
+version: 1.0.1+11
 
 environment:
   sdk: ^3.8.1
