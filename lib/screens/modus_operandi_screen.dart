@@ -21,6 +21,7 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
   final _fichaService = FichaService();
   final _modusOperandiController = TextEditingController();
   bool _salvando = false;
+  bool? _conclusaoPositiva;
 
   @override
   void initState() {
@@ -33,6 +34,8 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
     if (widget.ficha.modusOperandi != null) {
       _modusOperandiController.text = widget.ficha.modusOperandi!;
     }
+    // Carregar conclusão já escolhida
+    _conclusaoPositiva = widget.ficha.conclusaoPositiva;
   }
 
   @override
@@ -68,6 +71,7 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
         modusOperandi: _modusOperandiController.text.trim().isEmpty
             ? null
             : _modusOperandiController.text.trim(),
+        conclusaoPositiva: _conclusaoPositiva,
         dataHoraTermino: dataHoraTermino,
         dataUltimaAtualizacao: DateTime.now(),
         equipe: widget.ficha.equipe,
@@ -170,6 +174,80 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
                   minLines: 8,
                   textInputAction: TextInputAction.newline,
                   keyboardType: TextInputType.multiline,
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            // Seção de Conclusão
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade700,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'CONCLUSÃO DO LAUDO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Escolha o tipo de conclusão para o laudo:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    RadioListTile<bool>(
+                      title: const Text('Conclusão Positiva'),
+                      subtitle: const Text(
+                        'Os vestígios coletados permitiram análise e forneceram subsídios técnicos suficientes.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: true,
+                      groupValue: _conclusaoPositiva,
+                      onChanged: (value) {
+                        setState(() {
+                          _conclusaoPositiva = value;
+                        });
+                      },
+                    ),
+                    RadioListTile<bool>(
+                      title: const Text('Conclusão Negativa (Exiguidade de Vestígios)'),
+                      subtitle: const Text(
+                        'A ausência ou insuficiência de vestígios não permitiu conclusões mais detalhadas.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: false,
+                      groupValue: _conclusaoPositiva,
+                      onChanged: (value) {
+                        setState(() {
+                          _conclusaoPositiva = value;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -54,6 +54,14 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
       _pedidoDilacaoController.text =
           widget.fichaExistente!.pedidoDilacao ?? '';
     }
+    
+    // Debug: verificar dados recebidos
+    print('Dados recebidos na tela de preenchimento:');
+    print('RAI: ${widget.dadosSolicitacao.raiNumero}');
+    print('Data/Hora Comunicação: ${widget.dadosSolicitacao.dataHoraComunicacao}');
+    print('Natureza: ${widget.dadosSolicitacao.naturezaOcorrencia}');
+    print('Município: ${widget.dadosSolicitacao.municipio}');
+    print('Endereço: ${widget.dadosSolicitacao.endereco}');
   }
 
   @override
@@ -284,7 +292,45 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                       ),
                     ]),
                     const Divider(height: 1),
-                    // Linha 4: Pedido de Dilação (largura total)
+                    // Linha 4: Unidade Requisitante e Número da Ocorrência
+                    _buildTableRow([
+                      _buildTableCell(
+                        'Unidade Requisitante:',
+                        widget.dadosSolicitacao.unidadeOrigem ?? '',
+                        isReadOnly: true,
+                      ),
+                      _buildTableCell(
+                        'Número da Ocorrência:',
+                        widget.dadosSolicitacao.numeroOcorrencia ?? '',
+                        isReadOnly: true,
+                      ),
+                    ]),
+                    const Divider(height: 1),
+                    // Linha 5: Unidade Afeta (largura total)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Unidade Afeta:',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.dadosSolicitacao.unidadeAfeta?.isEmpty ?? true
+                                ? '-'
+                                : widget.dadosSolicitacao.unidadeAfeta!,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    // Linha 6: Pedido de Dilação (largura total)
                     Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(

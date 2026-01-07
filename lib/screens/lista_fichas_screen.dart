@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
@@ -305,6 +307,130 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       return;
     }
 
+    // Perguntar se deseja incluir fotos (reutilizando fotos persistidas na ficha)
+    final fichaService = FichaService();
+    var fichaAtual = await fichaService.obterFicha(ficha.id) ?? ficha;
+
+    // Limpar paths inexistentes (se o usuário apagou do app via sistema)
+    final fotosExistentes = <String>[];
+    for (final p in fichaAtual.fotosLevantamento) {
+      final f = File(p);
+      if (await f.exists()) fotosExistentes.add(p);
+    }
+
+    // Se teve limpeza, persistir de volta
+    if (fotosExistentes.length != fichaAtual.fotosLevantamento.length) {
+      await fichaService.salvarFicha(
+        fichaAtual.copyWith(fotosLevantamento: fotosExistentes),
+      );
+    }
+
+    List<File>? fotosSelecionadas;
+    if (!mounted) return;
+
+    // Se já existem fotos, oferecer usar/adicionar/nenhuma
+    if (fotosExistentes.isNotEmpty) {
+      final acao = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Levantamento Fotográfico'),
+          content: Text(
+            'Esta ficha já possui ${fotosExistentes.length} foto(s) salva(s). O que deseja fazer?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('nao'),
+              child: const Text('Não incluir'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('adicionar'),
+              child: const Text('Adicionar mais'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop('usar'),
+              child: const Text('Usar salvas'),
+            ),
+          ],
+        ),
+      );
+
+      if (acao == 'usar') {
+        fotosSelecionadas = fotosExistentes.map((p) => File(p)).toList();
+      } else if (acao == 'adicionar') {
+        final novas = await _selecionarFotos();
+        if (novas != null && novas.isNotEmpty) {
+          final novosPaths = await _persistirFotosDaFicha(ficha.id, novas);
+          final atualizadas = [...fotosExistentes, ...novosPaths];
+          await fichaService.salvarFicha(
+            fichaAtual.copyWith(fotosLevantamento: atualizadas),
+          );
+          fotosSelecionadas = atualizadas.map((p) => File(p)).toList();
+        } else {
+          fotosSelecionadas = fotosExistentes.map((p) => File(p)).toList();
+        }
+      } else {
+        fotosSelecionadas = null;
+      }
+    } else {
+      final incluirFotos = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Incluir Fotos'),
+        content: const Text('Deseja incluir fotos no laudo?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Não'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sim'),
+          ),
+        ],
+      ),
+    );
+
+      if (incluirFotos == true) {
+        final novas = await _selecionarFotos();
+        if (novas != null && novas.isNotEmpty) {
+          final paths = await _persistirFotosDaFicha(ficha.id, novas);
+          await fichaService.salvarFicha(
+            fichaAtual.copyWith(fotosLevantamento: paths),
+          );
+          fotosSelecionadas = paths.map((p) => File(p)).toList();
+        }
+      }
+    }
+
+    // Permitir reordenar/excluir fotos antes de gerar o laudo (isso altera "Fotografia 01/02..." e a contagem)
+    if (fotosSelecionadas != null && fotosSelecionadas.isNotEmpty) {
+      final pathsAtuais = fotosSelecionadas.map((f) => f.path).toList();
+      final novosPaths = await _gerenciarFotosLevantamento(pathsAtuais);
+      if (!mounted) return;
+
+      if (novosPaths != null) {
+        final removidas = pathsAtuais.toSet().difference(novosPaths.toSet());
+        for (final p in removidas) {
+          try {
+            final f = File(p);
+            if (await f.exists()) {
+              await f.delete();
+            }
+          } catch (_) {
+            // Ignorar falhas de remoção (permissão/arquivo em uso etc.)
+          }
+        }
+
+        await fichaService.salvarFicha(
+          fichaAtual.copyWith(fotosLevantamento: novosPaths),
+        );
+        fichaAtual = fichaAtual.copyWith(fotosLevantamento: novosPaths);
+
+        fotosSelecionadas =
+            novosPaths.isEmpty ? null : novosPaths.map((p) => File(p)).toList();
+      }
+    }
+
     // Mostrar diálogo de carregamento
     if (!mounted) return;
     showDialog(
@@ -330,9 +456,10 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
     try {
       final laudoService = LaudoGeneratorService();
       final arquivo = await laudoService.gerarLaudo(
-        ficha: ficha,
+        ficha: fichaAtual,
         perito: perito,
         templatePath: templatePath,
+        fotos: fotosSelecionadas,
       );
 
       if (!mounted) return;
@@ -363,6 +490,74 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         ),
       );
     }
+  }
+
+  Future<List<File>?> _selecionarFotos() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: true,
+      );
+
+      if (result == null || result.files.isEmpty) return null;
+
+      final fotos = result.paths
+          .where((path) => path != null)
+          .map((path) => File(path!))
+          .toList();
+
+      if (!mounted) return fotos;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${fotos.length} foto(s) selecionada(s)'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return fotos;
+    } catch (e) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao selecionar fotos: $e'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return null;
+    }
+  }
+
+  Future<List<String>> _persistirFotosDaFicha(
+    String fichaId,
+    List<File> fotos,
+  ) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final pasta = Directory('${dir.path}/levantamento_fotografico/$fichaId');
+    if (!await pasta.exists()) {
+      await pasta.create(recursive: true);
+    }
+
+    final paths = <String>[];
+    for (final foto in fotos) {
+      if (!await foto.exists()) continue;
+      final ext = foto.path.split('.').last.toLowerCase();
+      final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.$ext';
+      final destino = File('${pasta.path}/$nome');
+      await foto.copy(destino.path);
+      paths.add(destino.path);
+    }
+    return paths;
+  }
+
+  Future<List<String>?> _gerenciarFotosLevantamento(List<String> paths) async {
+    if (paths.isEmpty) return paths;
+
+    return showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _GerenciarFotosLevantamentoSheet(pathsIniciais: paths),
+    );
   }
 
   Future<void> _navegarParaTela(FichaCompletaModel ficha, String tela) async {
@@ -668,6 +863,134 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                 },
               ),
             ),
+    );
+  }
+}
+
+class _GerenciarFotosLevantamentoSheet extends StatefulWidget {
+  const _GerenciarFotosLevantamentoSheet({required this.pathsIniciais});
+
+  final List<String> pathsIniciais;
+
+  @override
+  State<_GerenciarFotosLevantamentoSheet> createState() =>
+      _GerenciarFotosLevantamentoSheetState();
+}
+
+class _GerenciarFotosLevantamentoSheetState
+    extends State<_GerenciarFotosLevantamentoSheet> {
+  late final List<String> _paths = [...widget.pathsIniciais];
+
+  String _basename(String path) {
+    final idx = path.lastIndexOf(Platform.pathSeparator);
+    if (idx == -1) return path;
+    return path.substring(idx + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final altura = MediaQuery.of(context).size.height * 0.85;
+
+    return SafeArea(
+      child: SizedBox(
+        height: altura,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Organizar fotos do Anexo (${_paths.length})',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(_paths),
+                    child: const Text('Salvar'),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: _paths.isEmpty
+                  ? const Center(child: Text('Nenhuma foto selecionada.'))
+                  : ReorderableListView.builder(
+                      buildDefaultDragHandles: false,
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _paths.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) newIndex -= 1;
+                          final item = _paths.removeAt(oldIndex);
+                          _paths.insert(newIndex, item);
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        final path = _paths[index];
+                        final titulo =
+                            'Fotografia ${(index + 1).toString().padLeft(2, '0')}';
+
+                        return Card(
+                          key: ValueKey(path),
+                          child: ReorderableDelayedDragStartListener(
+                            index: index,
+                            child: ListTile(
+                              leading: SizedBox(
+                                width: 56,
+                                height: 56,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    File(path),
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest,
+                                      child: const Icon(Icons.broken_image),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              title: Text(titulo),
+                              subtitle: Text(_basename(path)),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Excluir',
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () {
+                                      setState(() {
+                                        _paths.removeAt(index);
+                                      });
+                                    },
+                                  ),
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: const Icon(Icons.drag_handle),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

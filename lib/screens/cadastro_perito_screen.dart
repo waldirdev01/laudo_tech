@@ -19,6 +19,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
   final _nomeController = TextEditingController();
   final _matriculaController = TextEditingController();
   final _unidadeController = TextEditingController();
+  final _cidadeController = TextEditingController();
   
   String? _caminhoTemplate;
   bool _carregando = false;
@@ -43,6 +44,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
         _nomeController.text = perito.nome;
         _matriculaController.text = perito.matricula;
         _unidadeController.text = perito.unidadePericial;
+        _cidadeController.text = perito.cidade;
         _caminhoTemplate = perito.caminhoTemplate;
         _carregandoDados = false;
       });
@@ -58,6 +60,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
     _nomeController.dispose();
     _matriculaController.dispose();
     _unidadeController.dispose();
+    _cidadeController.dispose();
     super.dispose();
   }
 
@@ -89,7 +92,8 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
           await diretorioTemplates.create(recursive: true);
         }
 
-        final nomeArquivo = 'template_${DateTime.now().millisecondsSinceEpoch}.docx';
+        // Nome estável (evita acumular vários e facilita recuperar automaticamente)
+        final nomeArquivo = 'template_laudo.docx';
         final arquivoDestino = File('${diretorioTemplates.path}/$nomeArquivo');
         
         await arquivoOriginal.copy(arquivoDestino.path);
@@ -173,6 +177,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
         nome: _nomeController.text.trim(),
         matricula: _matriculaController.text.trim(),
         unidadePericial: _unidadeController.text.trim(),
+        cidade: _cidadeController.text.trim(),
         caminhoTemplate: _caminhoTemplate,
       );
 
@@ -288,6 +293,21 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Por favor, informe a unidade pericial';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _cidadeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Cidade',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.location_city),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Por favor, informe a cidade';
                     }
                     return null;
                   },

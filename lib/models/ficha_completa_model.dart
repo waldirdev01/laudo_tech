@@ -40,6 +40,12 @@ class FichaCompletaModel {
   // Modus Operandi
   final String? modusOperandi;
   
+  // Conclusão do laudo (true = positiva, false = negativa, null = não escolhido)
+  final bool? conclusaoPositiva;
+
+  // Levantamento fotográfico (caminhos persistidos no diretório do app)
+  final List<String> fotosLevantamento;
+  
   // Dados específicos para investigação de dano (art. 163 - CP/1940)
   final DanoModel? dano;
   
@@ -62,6 +68,8 @@ class FichaCompletaModel {
     this.localFurto,
     this.evidenciasFurto,
     this.modusOperandi,
+    this.conclusaoPositiva,
+    this.fotosLevantamento = const [],
     this.dano,
     required this.dataCriacao,
     this.dataUltimaAtualizacao,
@@ -83,6 +91,8 @@ class FichaCompletaModel {
         'localFurto': localFurto?.toJson(),
         'evidenciasFurto': evidenciasFurto?.toJson(),
         'modusOperandi': modusOperandi,
+        'conclusaoPositiva': conclusaoPositiva,
+        'fotosLevantamento': fotosLevantamento,
         'dano': dano?.toJson(),
         'dataCriacao': dataCriacao.toIso8601String(),
         'dataUltimaAtualizacao': dataUltimaAtualizacao?.toIso8601String(),
@@ -132,6 +142,11 @@ class FichaCompletaModel {
             )
           : null,
       modusOperandi: json['modusOperandi'] as String?,
+      conclusaoPositiva: json['conclusaoPositiva'] as bool?,
+      fotosLevantamento: (json['fotosLevantamento'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       dano: json['dano'] != null
           ? DanoModel.fromJson(json['dano'] as Map<String, dynamic>)
           : null,
@@ -158,6 +173,8 @@ class FichaCompletaModel {
     LocalFurtoModel? localFurto,
     EvidenciasFurtoModel? evidenciasFurto,
     String? modusOperandi,
+    bool? conclusaoPositiva,
+    List<String>? fotosLevantamento,
     DanoModel? dano,
     DateTime? dataCriacao,
     DateTime? dataUltimaAtualizacao,
@@ -178,6 +195,8 @@ class FichaCompletaModel {
       localFurto: localFurto ?? this.localFurto,
       evidenciasFurto: evidenciasFurto ?? this.evidenciasFurto,
       modusOperandi: modusOperandi ?? this.modusOperandi,
+      conclusaoPositiva: conclusaoPositiva ?? this.conclusaoPositiva,
+      fotosLevantamento: fotosLevantamento ?? this.fotosLevantamento,
       dano: dano ?? this.dano,
       dataCriacao: dataCriacao ?? this.dataCriacao,
       dataUltimaAtualizacao: dataUltimaAtualizacao ?? this.dataUltimaAtualizacao,

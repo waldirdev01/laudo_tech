@@ -69,6 +69,14 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
     try {
       final dados = await _pdfService.extrairDadosSolicitacao(_caminhoPdf!);
       
+      // Debug: verificar dados extraídos
+      print('Dados extraídos do PDF:');
+      print('RAI: ${dados.raiNumero}');
+      print('Data/Hora Comunicação: ${dados.dataHoraComunicacao}');
+      print('Natureza: ${dados.naturezaOcorrencia}');
+      print('Município: ${dados.municipio}');
+      print('Endereço: ${dados.endereco}');
+      
       if (mounted) {
         setState(() {
           _dadosExtraidos = dados;

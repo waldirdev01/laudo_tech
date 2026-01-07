@@ -49,5 +49,9 @@
 	<string>Este aplicativo precisa acessar sua localização para registrar as coordenadas do local da ocorrência.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Este aplicativo precisa acessar sua localização para registrar as coordenadas do local da ocorrência.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Este aplicativo precisa acessar suas fotos para incluir imagens no levantamento fotográfico do laudo pericial.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Este aplicativo pode precisar salvar fotos relacionadas aos laudos periciais.</string>
 </dict>
 </plist>
