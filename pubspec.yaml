@@ -2,7 +2,7 @@ name: laudo_tech
 description: "Ferramenta para geração automatizada de laudos periciais. Aplicativo profissional para documentação de ocorrências com precisão e eficiência."
 publish_to: 'none'
 
-version: 1.0.1+11
+version: 1.0.2+12
 
 environment:
   sdk: ^3.8.1
@@ -18,6 +18,7 @@ dependencies:
   shared_preferences: ^2.5.4
   syncfusion_flutter_pdf: ^32.1.21
   open_filex: ^4.7.0
+  share_plus: ^10.0.0
   provider: ^6.1.5+1
   intl: ^0.20.2
   geolocator: ^13.0.1

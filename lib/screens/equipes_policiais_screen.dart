@@ -148,6 +148,7 @@ class _EquipesPoliciaisScreenState extends State<EquipesPoliciaisScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Demais Equipes Policiais/De Salvamento'),
@@ -353,45 +354,53 @@ class _EquipesPoliciaisScreenState extends State<EquipesPoliciaisScreen> {
                         ),
                 ),
                 // Botão de salvar sempre visível
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
+                SafeArea(
+                  top: false,
+                  minimum: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 12 + bottomInset,
                   ),
-                  child: Row(
-                    children: [
-                      if (!_naoHaviaEquipes)
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        if (!_naoHaviaEquipes)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _adicionarEquipe,
+                              child: const Text('Adicionar Equipe'),
+                            ),
+                          ),
+                        if (!_naoHaviaEquipes) const SizedBox(width: 12),
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: _adicionarEquipe,
-                            child: const Text('Adicionar Equipe'),
+                          flex: _naoHaviaEquipes ? 1 : 2,
+                          child: FilledButton(
+                            onPressed: _salvando ? null : _salvarEquipes,
+                            child: _salvando
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Text('Salvar e Continuar'),
                           ),
                         ),
-                      if (!_naoHaviaEquipes) const SizedBox(width: 12),
-                      Expanded(
-                        flex: _naoHaviaEquipes ? 1 : 2,
-                        child: FilledButton(
-                          onPressed: _salvando ? null : _salvarEquipes,
-                          child: _salvando
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Text('Salvar e Continuar'),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

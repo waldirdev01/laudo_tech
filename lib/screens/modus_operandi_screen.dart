@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
+import '../main.dart';
 import 'dano_screen.dart';
 
 class ModusOperandiScreen extends StatefulWidget {
@@ -93,8 +94,11 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
         );
 
         if (fecharTela) {
-          // Retornar true para atualizar lista
-          Navigator.of(context).pop(true);
+          // Limpar pilha de navegação e navegar para a tela inicial
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
           return null;
         } else {
           return fichaAtualizada;
@@ -300,6 +304,7 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
                     )
                   : const Text('Salvar e Finalizar'),
             ),
+            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),

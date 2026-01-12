@@ -7,6 +7,7 @@ import '../models/ficha_completa_model.dart';
 import '../models/perito_model.dart';
 import '../models/membro_equipe_model.dart';
 import '../models/tipo_ocorrencia.dart';
+import '../models/evidencia_model.dart';
 import '../services/perito_service.dart';
 import '../services/equipe_service.dart';
 
@@ -563,34 +564,146 @@ $conteudo
       buffer.writeln(_gerarParagrafoVazio());
     }
     
-    // Evidências
-    final linhasEvidencias = <List<String>>[];
-    for (final evidencia in ev.evidencias) {
-      if (evidencia.descricao != null && evidencia.descricao!.isNotEmpty) {
-        String info = evidencia.descricao!;
-        if (evidencia.coordenada1 != null) info += '\nCoord 1: ${evidencia.coordenada1}';
-        if (evidencia.coordenada2 != null) info += '\nCoord 2: ${evidencia.coordenada2}';
-        
-        String recolhido = '';
-        if (evidencia.recolhidoSim == true) recolhido = 'Sim';
-        if (evidencia.recolhidoNao == true) recolhido = 'Não';
-        info += '\nRecolhido: $recolhido';
-        
-        if (evidencia.observacoesEspeciais != null) {
-          info += '\nObs: ${evidencia.observacoesEspeciais}';
-        }
-        
-        linhasEvidencias.add([evidencia.identificacao, info]);
+    // Funções auxiliares (mesma lógica do laudo)
+    bool _evidenciaPresente(EvidenciaModel e) {
+      final coord1 = (e.coordenada1 ?? '').trim();
+      final coord2 = (e.coordenada2 ?? '').trim();
+      final desc = (e.descricao ?? '').trim();
+      final obs = (e.observacoesEspeciais ?? '').trim();
+      final recolhidoSim = e.recolhidoSim == true;
+      return coord1.isNotEmpty ||
+          coord2.isNotEmpty ||
+          desc.isNotEmpty ||
+          obs.isNotEmpty ||
+          recolhidoSim;
+    }
+
+    String _detalhesEvidencia(EvidenciaModel e) {
+      final partes = <String>[];
+      final obs = (e.observacoesEspeciais ?? '').trim();
+      final desc = (e.descricao ?? '').trim();
+      if (obs.isNotEmpty) partes.add(obs);
+      if (desc.isNotEmpty) partes.add(desc);
+      if (partes.isEmpty) return '';
+      return partes.join('. ');
+    }
+
+    EvidenciaModel? _getEvidenciaPorId(List<EvidenciaModel> evids, String id) {
+      for (final e in evids) {
+        if (e.id == id) return e;
       }
+      return null;
+    }
+
+    String _textoFixoNatural(EvidenciaModel? e, String simBase, String naoBase) {
+      if (e == null) return naoBase;
+      if (_evidenciaPresente(e)) {
+        final detalhes = _detalhesEvidencia(e);
+        return detalhes.isEmpty ? simBase : '$simBase $detalhes.';
+      }
+      return naoBase;
     }
     
-    if (linhasEvidencias.isNotEmpty) {
-      buffer.writeln(_gerarTabela(
-        cabecalho: 'EVIDÊNCIAS',
-        linhas: linhasEvidencias,
-      ));
-      buffer.writeln(_gerarParagrafoVazio());
+    // Evidências - sempre mostrar EV01-EV07 (mesma lógica do laudo)
+    final evidencias = ev.evidencias;
+    final linhasEvidencias = <List<String>>[];
+    
+    // Buscar evidências fixas (EV01-EV07)
+    final ev01 = _getEvidenciaPorId(evidencias, 'EV01');
+    final ev02 = _getEvidenciaPorId(evidencias, 'EV02');
+    final ev03 = _getEvidenciaPorId(evidencias, 'EV03');
+    final ev04 = _getEvidenciaPorId(evidencias, 'EV04');
+    final ev05 = _getEvidenciaPorId(evidencias, 'EV05');
+    final ev06 = _getEvidenciaPorId(evidencias, 'EV06');
+    final ev07 = _getEvidenciaPorId(evidencias, 'EV07');
+    
+    // Adicionar evidências fixas sempre (com textos padrão quando vazias)
+    linhasEvidencias.add([
+      'EV01',
+      _textoFixoNatural(
+        ev01,
+        'Houve destruição ou rompimento de obstáculo à subtração da coisa.',
+        'Não foram observados vestígios de destruição ou rompimento de obstáculo à subtração da coisa.',
+      ),
+    ]);
+    linhasEvidencias.add([
+      'EV02',
+      _textoFixoNatural(
+        ev02,
+        'Houve indícios compatíveis com escalada ou destreza.',
+        'Não foram observados vestígios compatíveis com escalada ou destreza.',
+      ),
+    ]);
+    linhasEvidencias.add([
+      'EV03',
+      _textoFixoNatural(
+        ev03,
+        'Houve indícios de uso de instrumentos.',
+        'Não foram observados vestígios de uso de instrumentos.',
+      ),
+    ]);
+    linhasEvidencias.add([
+      'EV04',
+      _textoFixoNatural(
+        ev04,
+        'Houve indícios de emprego de chave falsa.',
+        'Não foram observados vestígios de emprego de chave falsa.',
+      ),
+    ]);
+    linhasEvidencias.add([
+      'EV05',
+      _textoFixoNatural(
+        ev05,
+        'Houve indícios compatíveis com concurso de duas ou mais pessoas.',
+        'Os vestígios detectados não foram suficientes para concluir acerca do concurso de duas ou mais pessoas.',
+      ),
+    ]);
+    linhasEvidencias.add([
+      'EV06',
+      _textoFixoNatural(
+        ev06,
+        'Constatou-se ausência de fechaduras (ou similares).',
+        'Não foi constatada ausência de fechaduras (ou similares).',
+      ),
+    ]);
+    linhasEvidencias.add([
+      'EV07',
+      _textoFixoNatural(
+        ev07,
+        'Foram observados vestígios de recenticidade.',
+        'Não foram observados vestígios de recenticidade.',
+      ),
+    ]);
+    
+    // Evidências dinâmicas (EV08+)
+    final dinamicas = <EvidenciaModel>[];
+    for (final e in evidencias) {
+      final numId = int.tryParse(e.id.replaceAll('EV', '')) ?? 0;
+      final isFixa = numId > 0 && numId <= 7;
+      if (!isFixa) dinamicas.add(e);
     }
+    dinamicas.sort((a, b) {
+      final numA = int.tryParse(a.id.replaceAll('EV', '')) ?? 0;
+      final numB = int.tryParse(b.id.replaceAll('EV', '')) ?? 0;
+      return numA.compareTo(numB);
+    });
+    
+    // Adicionar evidências dinâmicas
+    for (final evidencia in dinamicas) {
+      final desc = (evidencia.descricao ?? '').trim();
+      final base = evidencia.identificacao.trim().isEmpty
+          ? 'Evidência'
+          : evidencia.identificacao.trim();
+      final textoItem = desc.isEmpty ? base : '$base: $desc';
+      linhasEvidencias.add([evidencia.id, textoItem]);
+    }
+    
+    // Sempre mostrar a tabela de evidências (mesmo que todas estejam vazias)
+    buffer.writeln(_gerarTabela(
+      cabecalho: 'EVIDÊNCIAS',
+      linhas: linhasEvidencias,
+    ));
+    buffer.writeln(_gerarParagrafoVazio());
     
     // Materiais Apreendidos
     if (ev.materiaisApreendidos.isNotEmpty) {

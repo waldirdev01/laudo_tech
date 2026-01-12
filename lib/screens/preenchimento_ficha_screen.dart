@@ -43,7 +43,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
         widget.fichaExistente?.id ??
         DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Se está editando, preencher campos
+    // Se está editando, preencher campos da ficha existente
     if (widget.fichaExistente != null) {
       _dataHoraDeslocamentoController.text =
           widget.fichaExistente!.dataHoraDeslocamento ?? '';
@@ -53,6 +53,16 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
           widget.fichaExistente!.dataHoraTermino ?? '';
       _pedidoDilacaoController.text =
           widget.fichaExistente!.pedidoDilacao ?? '';
+    } else {
+      // Se é uma nova ficha, preencher com dados extraídos do PDF (se disponíveis)
+      _dataHoraDeslocamentoController.text =
+          widget.dadosSolicitacao.dataHoraDeslocamento ?? '';
+      _dataHoraInicioController.text =
+          widget.dadosSolicitacao.dataHoraInicio ?? '';
+      _dataHoraTerminoController.text =
+          widget.dadosSolicitacao.dataHoraTermino ?? '';
+      _pedidoDilacaoController.text =
+          widget.dadosSolicitacao.pedidoDilacao ?? '';
     }
     
     // Debug: verificar dados recebidos
@@ -62,6 +72,8 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
     print('Natureza: ${widget.dadosSolicitacao.naturezaOcorrencia}');
     print('Município: ${widget.dadosSolicitacao.municipio}');
     print('Endereço: ${widget.dadosSolicitacao.endereco}');
+    print('Unidade Origem: ${widget.dadosSolicitacao.unidadeOrigem}');
+    print('Unidade Afeta: ${widget.dadosSolicitacao.unidadeAfeta}');
   }
 
   @override
@@ -375,6 +387,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                       )
                     : const Text('Salvar e Continuar'),
               ),
+              const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
             ],
           ),
         ),

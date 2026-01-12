@@ -621,6 +621,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     )
                   : const Text('Salvar e Continuar'),
             ),
+            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/dano_model.dart';
 import '../services/ficha_service.dart';
+import '../main.dart';
 
 class DanoScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -174,8 +175,11 @@ class _DanoScreenState extends State<DanoScreen> {
           ),
         );
 
-        // Retornar true para atualizar lista
-        Navigator.of(context).pop(true);
+        // Limpar pilha de navegação e navegar para a tela inicial
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -581,6 +585,7 @@ class _DanoScreenState extends State<DanoScreen> {
                     )
                   : const Text('Salvar e Finalizar'),
             ),
+            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),

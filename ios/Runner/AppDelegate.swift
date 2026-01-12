@@ -28,17 +28,27 @@ import PDFKit
         return
       }
       
-      guard let args = call.arguments as? [String: Any],
-            let path = args["path"] as? String else {
+      guard let args = call.arguments as? [String: Any] else {
         result(FlutterError(
           code: "ARG_ERROR",
-          message: "path is required",
+          message: "arguments required",
           details: nil
         ))
         return
       }
       
-      self?.extractTextFromPDF(path: path, result: result)
+      // Suportar extração por path OU por bytes
+      if let path = args["path"] as? String {
+        self?.extractTextFromPDF(path: path, result: result)
+      } else if let bytes = args["bytes"] as? FlutterStandardTypedData {
+        self?.extractTextFromPDFBytes(bytes: bytes.data, result: result)
+      } else {
+        result(FlutterError(
+          code: "ARG_ERROR",
+          message: "path or bytes is required",
+          details: nil
+        ))
+      }
     }
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -67,6 +77,24 @@ import PDFKit
       return
     }
     
+    extractTextFromPDFDocument(pdfDocument: pdfDocument, result: result)
+  }
+  
+  private func extractTextFromPDFBytes(bytes: Data, result: @escaping FlutterResult) {
+    // Usar PDFKit para extrair texto a partir de bytes
+    guard let pdfDocument = PDFDocument(data: bytes) else {
+      result(FlutterError(
+        code: "LOAD_ERROR",
+        message: "Failed to load PDF from bytes",
+        details: nil
+      ))
+      return
+    }
+    
+    extractTextFromPDFDocument(pdfDocument: pdfDocument, result: result)
+  }
+  
+  private func extractTextFromPDFDocument(pdfDocument: PDFDocument, result: @escaping FlutterResult) {
     var fullText = ""
     
     // Extrair texto de todas as páginas

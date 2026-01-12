@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
@@ -237,17 +238,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar diálogo de carregamento
 
-      // Abrir o arquivo gerado
-      await OpenFilex.open(arquivo.path);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Documento gerado com sucesso!\n${arquivo.path}'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      // Tentar abrir o arquivo gerado
+      await _abrirOuCompartilharArquivo(arquivo, 'Ficha');
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar diálogo de carregamento
@@ -465,19 +457,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar diálogo de carregamento
 
-      // Abrir o arquivo gerado
-      final result = await OpenFilex.open(arquivo.path);
-
-      if (result.type != ResultType.done) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Laudo gerado: ${arquivo.path}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
+      // Tentar abrir o arquivo gerado
+      await _abrirOuCompartilharArquivo(arquivo, 'Laudo');
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar diálogo de carregamento
@@ -489,6 +470,62 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           duration: const Duration(seconds: 5),
         ),
       );
+    }
+  }
+
+  /// Tenta abrir o arquivo; se falhar, oferece compartilhar
+  Future<void> _abrirOuCompartilharArquivo(File arquivo, String tipo) async {
+    final result = await OpenFilex.open(arquivo.path);
+
+    if (result.type == ResultType.done) {
+      // Abriu com sucesso
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$tipo gerado com sucesso!'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } else {
+      // Não conseguiu abrir - mostrar opções
+      if (!mounted) return;
+      final acao = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('$tipo Gerado'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('O documento foi gerado com sucesso!'),
+              const SizedBox(height: 12),
+              Text(
+                'Não foi possível abrir automaticamente.\n\nArquivo: ${arquivo.path.split('/').last}',
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'fechar'),
+              child: const Text('Fechar'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, 'compartilhar'),
+              icon: const Icon(Icons.share),
+              label: const Text('Compartilhar'),
+            ),
+          ],
+        ),
+      );
+
+      if (acao == 'compartilhar' && mounted) {
+        await Share.shareXFiles(
+          [XFile(arquivo.path)],
+          text: '$tipo - Laudo Tech',
+        );
+      }
     }
   }
 

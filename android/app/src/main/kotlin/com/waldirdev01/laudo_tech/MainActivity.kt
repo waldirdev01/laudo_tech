@@ -1,5 +1,8 @@
 package com.waldirdev01.laudo_tech
 
+import android.os.Build
+import android.os.Bundle
+import androidx.core.view.WindowCompat
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
@@ -10,6 +13,12 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
   private val CHANNEL = "laudo_tech/pdf"
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    // Habilitar Edge-to-Edge para compatibilidade com Android 15+
+    WindowCompat.setDecorFitsSystemWindows(window, false)
+  }
 
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
