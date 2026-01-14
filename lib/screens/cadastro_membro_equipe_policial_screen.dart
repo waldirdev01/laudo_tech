@@ -50,9 +50,8 @@ class _CadastroMembroEquipePolicialScreenState
     final id = widget.membroExistente?.id ??
         DateTime.now().millisecondsSinceEpoch.toString();
 
-    // PM e Bombeiros precisam de posto/graduação
-    final precisaPostoGraduacao = widget.tipoEquipe == TipoEquipePolicial.policiaMilitar ||
-        widget.tipoEquipe == TipoEquipePolicial.bombeiros;
+    // PM precisa de posto/graduação
+    final precisaPostoGraduacao = widget.tipoEquipe == TipoEquipePolicial.policiaMilitar;
 
     final membro = MembroEquipePolicialModel(
       id: id,
@@ -70,9 +69,8 @@ class _CadastroMembroEquipePolicialScreenState
 
   @override
   Widget build(BuildContext context) {
-    // PM e Bombeiros precisam de posto/graduação
-    final precisaPostoGraduacao = widget.tipoEquipe == TipoEquipePolicial.policiaMilitar ||
-        widget.tipoEquipe == TipoEquipePolicial.bombeiros;
+    // PM precisa de posto/graduação
+    final precisaPostoGraduacao = widget.tipoEquipe == TipoEquipePolicial.policiaMilitar;
 
     return Scaffold(
       appBar: AppBar(
@@ -91,14 +89,10 @@ class _CadastroMembroEquipePolicialScreenState
                 TextFormField(
                   controller: _postoGraduacaoController,
                   decoration: InputDecoration(
-                    labelText: widget.tipoEquipe == TipoEquipePolicial.bombeiros
-                        ? 'Posto/Graduação (Bombeiro)'
-                        : 'Posto/Graduação',
+                    labelText: 'Posto/Graduação',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.badge),
-                    hintText: widget.tipoEquipe == TipoEquipePolicial.bombeiros
-                        ? 'Ex: Major, Capitão, Tenente'
-                        : 'Ex: Capitão, Tenente, Sargento',
+                    hintText: 'Ex: Capitão, Tenente, Sargento',
                   ),
                 ),
                 const SizedBox(height: 16),

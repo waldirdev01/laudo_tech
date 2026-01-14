@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import '../models/ficha_completa_model.dart';
+
 import '../models/evidencia_model.dart';
+import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
 import 'modus_operandi_screen.dart';
 
 class EvidenciasFurtoScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
 
-  const EvidenciasFurtoScreen({
-    super.key,
-    required this.ficha,
-  });
+  const EvidenciasFurtoScreen({super.key, required this.ficha});
 
   @override
   State<EvidenciasFurtoScreen> createState() => _EvidenciasFurtoScreenState();
@@ -30,7 +28,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
   final Map<String, TextEditingController> _coord1Controllers = {};
   final Map<String, TextEditingController> _coord2Controllers = {};
   final Map<String, TextEditingController> _observacoesControllers = {};
-  
+
   // Mapa para armazenar controllers dos materiais
   final Map<String, TextEditingController> _materialDescricaoControllers = {};
   final Map<String, TextEditingController> _materialQuantidadeControllers = {};
@@ -45,7 +43,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
     'Ausência de Fechaduras (ou similares)',
     'Vestígios de Recenticidade',
   ];
-  
+
   // Número de evidências fixas (EV01 a EV07)
   static const int _numeroEvidenciasFixas = 7;
 
@@ -119,11 +117,11 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
         final numB = int.tryParse(b.id.replaceAll('EV', '')) ?? 0;
         return numA.compareTo(numB);
       });
-      
+
       // Garantir que todas as evidências fixas existam
       final evidenciasFixas = <EvidenciaModel>[];
       final evidenciasDinamicas = <EvidenciaModel>[];
-      
+
       for (final evidencia in _evidencias) {
         if (_isEvidenciaFixa(evidencia)) {
           evidenciasFixas.add(evidencia);
@@ -131,7 +129,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
           evidenciasDinamicas.add(evidencia);
         }
       }
-      
+
       // Preencher evidências fixas faltantes
       for (int i = 0; i < _identificacoesPredefinidas.length; i++) {
         final idEsperado = 'EV${(i + 1).toString().padLeft(2, '0')}';
@@ -146,23 +144,23 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
           );
         }
       }
-      
+
       // Ordenar evidências fixas por ID
       evidenciasFixas.sort((a, b) {
         final numA = int.tryParse(a.id.replaceAll('EV', '')) ?? 0;
         final numB = int.tryParse(b.id.replaceAll('EV', '')) ?? 0;
         return numA.compareTo(numB);
       });
-      
+
       _evidencias = [...evidenciasFixas, ...evidenciasDinamicas];
     }
   }
-  
+
   bool _isEvidenciaFixa(EvidenciaModel evidencia) {
     final numero = int.tryParse(evidencia.id.replaceAll('EV', '')) ?? 0;
     return numero <= _numeroEvidenciasFixas;
   }
-  
+
   String _gerarProximoIdEvidencia() {
     if (_evidencias.isEmpty) {
       return 'EV08';
@@ -177,7 +175,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
     }
     return 'EV${(maxNum + 1).toString().padLeft(2, '0')}';
   }
-  
+
   void _adicionarEvidencia() {
     final controller = TextEditingController();
     showDialog(
@@ -218,7 +216,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
       ),
     );
   }
-  
+
   void _editarEvidencia(EvidenciaModel evidencia, int index) {
     final controller = TextEditingController(text: evidencia.identificacao);
     showDialog(
@@ -255,7 +253,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
       ),
     );
   }
-  
+
   void _removerEvidencia(int index) {
     showDialog(
       context: context,
@@ -282,14 +280,12 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                 _coord1Controllers.remove(evidenciaId);
                 _coord2Controllers.remove(evidenciaId);
                 _observacoesControllers.remove(evidenciaId);
-                
+
                 _evidencias.removeAt(index);
               });
               Navigator.pop(context);
             },
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Remover'),
           ),
         ],
@@ -351,17 +347,27 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
     _materialDescricaoControllers.clear();
     _materialQuantidadeControllers.clear();
   }
-  
-  TextEditingController _getMaterialDescricaoController(String id, String? value) {
+
+  TextEditingController _getMaterialDescricaoController(
+    String id,
+    String? value,
+  ) {
     if (!_materialDescricaoControllers.containsKey(id)) {
-      _materialDescricaoControllers[id] = TextEditingController(text: value ?? '');
+      _materialDescricaoControllers[id] = TextEditingController(
+        text: value ?? '',
+      );
     }
     return _materialDescricaoControllers[id]!;
   }
-  
-  TextEditingController _getMaterialQuantidadeController(String id, String? value) {
+
+  TextEditingController _getMaterialQuantidadeController(
+    String id,
+    String? value,
+  ) {
     if (!_materialQuantidadeControllers.containsKey(id)) {
-      _materialQuantidadeControllers[id] = TextEditingController(text: value ?? '');
+      _materialQuantidadeControllers[id] = TextEditingController(
+        text: value ?? '',
+      );
     }
     return _materialQuantidadeControllers[id]!;
   }
@@ -375,7 +381,11 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
     super.dispose();
   }
 
-  void _adicionarMaterial(String descricao, {String? quantidade, String? descricaoDetalhada}) {
+  void _adicionarMaterial(
+    String descricao, {
+    String? quantidade,
+    String? descricaoDetalhada,
+  }) {
     setState(() {
       final novoId = DateTime.now().millisecondsSinceEpoch.toString();
       _materiaisApreendidos.add(
@@ -408,12 +418,17 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
     });
   }
 
-  void _atualizarDescricaoDetalhadaMaterial(String id, String? descricaoDetalhada) {
+  void _atualizarDescricaoDetalhadaMaterial(
+    String id,
+    String? descricaoDetalhada,
+  ) {
     setState(() {
       final index = _materiaisApreendidos.indexWhere((m) => m.id == id);
       if (index != -1) {
         _materiaisApreendidos[index] = _materiaisApreendidos[index].copyWith(
-          descricaoDetalhada: descricaoDetalhada?.isEmpty ?? true ? null : descricaoDetalhada,
+          descricaoDetalhada: descricaoDetalhada?.isEmpty ?? true
+              ? null
+              : descricaoDetalhada,
         );
       }
     });
@@ -449,7 +464,10 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
       );
 
       final evidenciasFurto = EvidenciasFurtoModel(
-        marcoZero: marcoZero.descricao != null || marcoZero.coordenadaX != null || marcoZero.coordenadaY != null
+        marcoZero:
+            marcoZero.descricao != null ||
+                marcoZero.coordenadaX != null ||
+                marcoZero.coordenadaY != null
             ? marcoZero
             : null,
         evidencias: _evidencias,
@@ -475,7 +493,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Navegar para tela de Modus Operandi
         if (!mounted) return;
         final resultado = await Navigator.of(context).push(
@@ -593,15 +611,28 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
   }
 
   Widget _buildEvidenciaRow(EvidenciaModel evidencia, int index) {
-    final descricaoController = _getDescricaoController(evidencia.id, evidencia.descricao);
-    final coord1Controller = _getCoord1Controller(evidencia.id, evidencia.coordenada1);
-    final coord2Controller = _getCoord2Controller(evidencia.id, evidencia.coordenada2);
-    final observacoesController = _getObservacoesController(evidencia.id, evidencia.observacoesEspeciais);
+    final descricaoController = _getDescricaoController(
+      evidencia.id,
+      evidencia.descricao,
+    );
+    final coord1Controller = _getCoord1Controller(
+      evidencia.id,
+      evidencia.coordenada1,
+    );
+    final coord2Controller = _getCoord2Controller(
+      evidencia.id,
+      evidencia.coordenada2,
+    );
+    final observacoesController = _getObservacoesController(
+      evidencia.id,
+      evidencia.observacoesEspeciais,
+    );
 
     // Verificar se precisa de campo especial
-    final precisaCampoEspecial = evidencia.identificacao.contains('altura') ||
+    final precisaCampoEspecial =
+        evidencia.identificacao.contains('altura') ||
         evidencia.identificacao.contains('especificar');
-    
+
     final isFixa = _isEvidenciaFixa(evidencia);
 
     return Card(
@@ -614,7 +645,10 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade100,
                     borderRadius: BorderRadius.circular(4),
@@ -666,7 +700,9 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                   isDense: true,
                 ),
                 onChanged: (value) {
-                  final updated = evidencia.copyWith(observacoesEspeciais: value.isEmpty ? null : value);
+                  final updated = evidencia.copyWith(
+                    observacoesEspeciais: value.isEmpty ? null : value,
+                  );
                   setState(() {
                     _evidencias[index] = updated;
                   });
@@ -678,13 +714,16 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
               controller: descricaoController,
               decoration: const InputDecoration(
                 labelText: 'Descrição',
-                hintText: '(tamanho, cor, recenticidade, sentido de produção, área)',
+                hintText:
+                    '(tamanho, cor, recenticidade, sentido de produção, área)',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
               maxLines: 2,
               onChanged: (value) {
-                final updated = evidencia.copyWith(descricao: value.isEmpty ? null : value);
+                final updated = evidencia.copyWith(
+                  descricao: value.isEmpty ? null : value,
+                );
                 setState(() {
                   _evidencias[index] = updated;
                 });
@@ -703,7 +742,9 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
-                      final updated = evidencia.copyWith(coordenada1: value.isEmpty ? null : value);
+                      final updated = evidencia.copyWith(
+                        coordenada1: value.isEmpty ? null : value,
+                      );
                       setState(() {
                         _evidencias[index] = updated;
                       });
@@ -721,7 +762,9 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
-                      final updated = evidencia.copyWith(coordenada2: value.isEmpty ? null : value);
+                      final updated = evidencia.copyWith(
+                        coordenada2: value.isEmpty ? null : value,
+                      );
                       setState(() {
                         _evidencias[index] = updated;
                       });
@@ -732,10 +775,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Recolhido:',
-                      style: TextStyle(fontSize: 12),
-                    ),
+                    const Text('Recolhido:', style: TextStyle(fontSize: 12)),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -744,7 +784,9 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                           onChanged: (value) {
                             final updated = evidencia.copyWith(
                               recolhidoSim: value ?? false,
-                              recolhidoNao: value == true ? false : evidencia.recolhidoNao,
+                              recolhidoNao: value == true
+                                  ? false
+                                  : evidencia.recolhidoNao,
                             );
                             setState(() {
                               _evidencias[index] = updated;
@@ -757,7 +799,9 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                           onChanged: (value) {
                             final updated = evidencia.copyWith(
                               recolhidoNao: value ?? false,
-                              recolhidoSim: value == true ? false : evidencia.recolhidoSim,
+                              recolhidoSim: value == true
+                                  ? false
+                                  : evidencia.recolhidoSim,
                             );
                             setState(() {
                               _evidencias[index] = updated;
@@ -824,20 +868,24 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: _materiaisEncontrados.map((material) {
-                    final jaSelecionado = _materiaisApreendidos.any((m) => m.descricao == material);
+                    final jaSelecionado = _materiaisApreendidos.any(
+                      (m) => m.descricao == material,
+                    );
                     return FilterChip(
                       label: Text(material),
                       selected: jaSelecionado,
                       onSelected: (selected) {
                         if (selected && !jaSelecionado) {
                           // Verificar se tem descrição pré-definida
-                          final descricaoPredefinida = _descricoesPredefinidas[material];
+                          final descricaoPredefinida =
+                              _descricoesPredefinidas[material];
                           _adicionarMaterial(
                             material,
                             descricaoDetalhada: descricaoPredefinida,
                           );
                         } else if (!selected && jaSelecionado) {
-                          final materialModel = _materiaisApreendidos.firstWhere((m) => m.descricao == material);
+                          final materialModel = _materiaisApreendidos
+                              .firstWhere((m) => m.descricao == material);
                           _removerMaterial(materialModel.id);
                         }
                       },
@@ -855,7 +903,9 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: _meiosEncaminhamento.map((material) {
-                    final jaSelecionado = _materiaisApreendidos.any((m) => m.descricao == material);
+                    final jaSelecionado = _materiaisApreendidos.any(
+                      (m) => m.descricao == material,
+                    );
                     return FilterChip(
                       label: Text(material),
                       selected: jaSelecionado,
@@ -883,10 +933,13 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                                 ),
                                 FilledButton(
                                   onPressed: () {
-                                    final quantidade = quantidadeController.text.trim();
+                                    final quantidade = quantidadeController.text
+                                        .trim();
                                     _adicionarMaterial(
                                       material,
-                                      quantidade: quantidade.isEmpty ? null : quantidade,
+                                      quantidade: quantidade.isEmpty
+                                          ? null
+                                          : quantidade,
                                     );
                                     Navigator.pop(context);
                                   },
@@ -896,7 +949,8 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                             ),
                           );
                         } else if (!selected && jaSelecionado) {
-                          final materialModel = _materiaisApreendidos.firstWhere((m) => m.descricao == material);
+                          final materialModel = _materiaisApreendidos
+                              .firstWhere((m) => m.descricao == material);
                           _removerMaterial(materialModel.id);
                         }
                       },
@@ -912,15 +966,29 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                 if (_materiaisApreendidos.isEmpty)
                   const Text(
                     'Nenhum material selecionado',
-                    style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
                   )
                 else
                   ..._materiaisApreendidos.map((material) {
-                    final isMaterialEncontrado = _materiaisEncontrados.contains(material.descricao);
-                    final isMeioEncaminhamento = _meiosEncaminhamento.contains(material.descricao);
-                    final quantidadeController = _getMaterialQuantidadeController(material.id, material.quantidade);
-                    final descricaoController = _getMaterialDescricaoController(material.id, material.descricaoDetalhada);
-                    
+                    final isMaterialEncontrado = _materiaisEncontrados.contains(
+                      material.descricao,
+                    );
+                    final isMeioEncaminhamento = _meiosEncaminhamento.contains(
+                      material.descricao,
+                    );
+                    final quantidadeController =
+                        _getMaterialQuantidadeController(
+                          material.id,
+                          material.quantidade,
+                        );
+                    final descricaoController = _getMaterialDescricaoController(
+                      material.id,
+                      material.descricaoDetalhada,
+                    );
+
                     return Card(
                       key: ValueKey(material.id),
                       margin: const EdgeInsets.only(bottom: 8),
@@ -934,12 +1002,15 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                                 Expanded(
                                   child: Text(
                                     material.descricao,
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline),
-                                  onPressed: () => _removerMaterial(material.id),
+                                  onPressed: () =>
+                                      _removerMaterial(material.id),
                                 ),
                               ],
                             ),
@@ -950,25 +1021,33 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                                 key: ValueKey('${material.id}_descricao'),
                                 controller: descricaoController,
                                 decoration: InputDecoration(
-                                  labelText: material.descricao == 'Sangue humano'
+                                  labelText:
+                                      material.descricao == 'Sangue humano'
                                       ? 'Superfície onde estava a mancha'
                                       : material.descricao ==
-                                              'Fragmentos de impressões papilares'
-                                          ? 'Superfície onde houve a coleta'
+                                            'Fragmentos de impressões papilares'
+                                      ? 'Superfície onde houve a coleta'
                                       : 'Descrição',
-                                  hintText: material.descricao == 'Sangue humano'
+                                  hintText:
+                                      material.descricao == 'Sangue humano'
                                       ? 'Ex: sobre a superfície do vidro'
                                       : material.descricao ==
-                                              'Fragmentos de impressões papilares'
-                                          ? 'Ex: no vidro da janela da sala'
+                                            'Fragmentos de impressões papilares'
+                                      ? 'Ex: no vidro da janela da sala'
                                       : null,
                                   border: const OutlineInputBorder(),
                                   isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                 ),
                                 maxLines: 3,
                                 onChanged: (value) {
-                                  _atualizarDescricaoDetalhadaMaterial(material.id, value);
+                                  _atualizarDescricaoDetalhadaMaterial(
+                                    material.id,
+                                    value,
+                                  );
                                 },
                               ),
                             ],
@@ -984,11 +1063,17 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                                     labelText: 'Quantidade',
                                     border: OutlineInputBorder(),
                                     isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                   ),
                                   keyboardType: TextInputType.text,
                                   onChanged: (value) {
-                                    _atualizarQuantidadeMaterial(material.id, value);
+                                    _atualizarQuantidadeMaterial(
+                                      material.id,
+                                      value,
+                                    );
                                   },
                                 ),
                               ),
@@ -1060,14 +1145,24 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
               const SizedBox(height: 12),
               const Text('• Marcas de escalada (fazer medições da altura);'),
               const Text('• Rompimento/destruição de obstáculos;'),
-              const Text('• Aberturas em janelas, paredes ou outros obstáculos (fazer medições);'),
-              const Text('• Marcas de pegadas visíveis (quando possível, diferenciar se a pessoa estava calçada ou descalça);'),
+              const Text(
+                '• Aberturas em janelas, paredes ou outros obstáculos (fazer medições);',
+              ),
+              const Text(
+                '• Marcas de pegadas visíveis (quando possível, diferenciar se a pessoa estava calçada ou descalça);',
+              ),
               const Text('• Impressões Papilares visíveis;'),
-              const Text('• Manchas de sangue/material biológico visíveis (material de contato, escarro, urina e outras substâncias);'),
+              const Text(
+                '• Manchas de sangue/material biológico visíveis (material de contato, escarro, urina e outras substâncias);',
+              ),
               const Text('• Objetos deixados por autores;'),
-              const Text('• Sinais indicativos de subtração de objetos (p. ex.: marcas de poeira);'),
+              const Text(
+                '• Sinais indicativos de subtração de objetos (p. ex.: marcas de poeira);',
+              ),
               const Text('• Danos em objetos;'),
-              const Text('• Desorganização de objetos e móveis (compatível com luta corporal; e/ou hábitos dos próprios moradores; e/ou busca por objetos de valor/interesse);'),
+              const Text(
+                '• Desorganização de objetos e móveis (compatível com luta corporal; e/ou hábitos dos próprios moradores; e/ou busca por objetos de valor/interesse);',
+              ),
               const Text('• Outros elementos materiais relevantes.'),
               const SizedBox(height: 16),
               const Text(
@@ -1077,7 +1172,10 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
               const SizedBox(height: 12),
               const Text(
                 'OBS.: é obrigatória a identificação numérica dos vestígios no local, nas fotos e no Laudo.',
-                style: TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -1113,7 +1211,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
           children: [
             // Marco Zero
             _buildMarcoZeroSection(),
-            
+
             // Título EVIDÊNCIAS
             Container(
               padding: const EdgeInsets.all(12),
@@ -1180,24 +1278,27 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                 children: [
                   ..._evidencias.asMap().entries.map((entry) {
                     return _buildEvidenciaRow(entry.value, entry.key);
-                  }).toList(),
+                  }),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: _adicionarEvidencia,
                     icon: const Icon(Icons.add),
                     label: const Text('Adicionar Evidência'),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Materiais Apreendidos
             _buildMateriaisSection(),
-            
+
             // Observação sobre croqui
             Container(
               margin: const EdgeInsets.only(top: 16),
@@ -1218,13 +1319,11 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 32),
             FilledButton(
               onPressed: _salvando ? null : _salvarEvidencias,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.all(16),
-              ),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
               child: _salvando
                   ? const SizedBox(
                       height: 20,
@@ -1236,11 +1335,12 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                     )
                   : const Text('Salvar e Continuar'),
             ),
-            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+            const SizedBox(
+              height: 80,
+            ), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),
     );
   }
 }
-

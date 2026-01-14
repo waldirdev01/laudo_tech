@@ -1,19 +1,17 @@
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import '../models/tipo_ocorrencia.dart';
-import '../models/solicitacao_model.dart';
+import 'package:flutter/material.dart';
+
 import '../models/pessoa_envolvida_model.dart';
+import '../models/solicitacao_model.dart';
+import '../models/tipo_ocorrencia.dart';
 import '../services/pdf_extraction_service.dart';
 import 'preenchimento_ficha_screen.dart';
 
 class UploadPdfScreen extends StatefulWidget {
   final TipoOcorrencia tipoOcorrencia;
 
-  const UploadPdfScreen({
-    super.key,
-    required this.tipoOcorrencia,
-  });
+  const UploadPdfScreen({super.key, required this.tipoOcorrencia});
 
   @override
   State<UploadPdfScreen> createState() => _UploadPdfScreenState();
@@ -60,9 +58,7 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
   Future<void> _extrairDados() async {
     if (_pdfBytes == null && _caminhoPdf == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, selecione um arquivo PDF'),
-        ),
+        const SnackBar(content: Text('Por favor, selecione um arquivo PDF')),
       );
       return;
     }
@@ -80,15 +76,9 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
       } else {
         dados = await _pdfService.extrairDadosSolicitacao(_caminhoPdf!);
       }
-      
+
       // Debug: verificar dados extraídos
-      print('Dados extraídos do PDF:');
-      print('RAI: ${dados.raiNumero}');
-      print('Data/Hora Comunicação: ${dados.dataHoraComunicacao}');
-      print('Natureza: ${dados.naturezaOcorrencia}');
-      print('Município: ${dados.municipio}');
-      print('Endereço: ${dados.endereco}');
-      
+
       if (mounted) {
         setState(() {
           _dadosExtraidos = dados;
@@ -146,9 +136,9 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
             const SizedBox(height: 16),
             Text(
               'Tipo de Ocorrência:',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Container(
@@ -168,18 +158,12 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
             const SizedBox(height: 32),
             const Text(
               'PDF de Solicitação de Perícia',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
               'Selecione o arquivo PDF da solicitação de perícia para extrair os dados automaticamente',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -225,7 +209,9 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Icon(Icons.auto_awesome),
@@ -285,7 +271,8 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                           const SizedBox(width: 8),
                           Text(
                             'Dados Extraídos',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
@@ -305,11 +292,20 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                         if (_dadosExtraidos!.raiNumero != null)
                           _buildInfoRow('RAI:', _dadosExtraidos!.raiNumero!),
                         if (_dadosExtraidos!.numeroOcorrencia != null)
-                          _buildInfoRow('Ocorrência nº:', _dadosExtraidos!.numeroOcorrencia!),
+                          _buildInfoRow(
+                            'Ocorrência nº:',
+                            _dadosExtraidos!.numeroOcorrencia!,
+                          ),
                         if (_dadosExtraidos!.naturezaOcorrencia != null)
-                          _buildInfoRow('Natureza:', _dadosExtraidos!.naturezaOcorrencia!),
+                          _buildInfoRow(
+                            'Natureza:',
+                            _dadosExtraidos!.naturezaOcorrencia!,
+                          ),
                         if (_dadosExtraidos!.dataHoraComunicacao != null)
-                          _buildInfoRow('Data/Hora Comunicação:', _dadosExtraidos!.dataHoraComunicacao!),
+                          _buildInfoRow(
+                            'Data/Hora Comunicação:',
+                            _dadosExtraidos!.dataHoraComunicacao!,
+                          ),
                         const SizedBox(height: 16),
                       ],
                       // UNIDADES
@@ -318,9 +314,15 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                         _buildSectionTitle('UNIDADES'),
                         const SizedBox(height: 8),
                         if (_dadosExtraidos!.unidadeOrigem != null)
-                          _buildInfoRow('Unidade Requisitante:', _dadosExtraidos!.unidadeOrigem!),
+                          _buildInfoRow(
+                            'Unidade Requisitante:',
+                            _dadosExtraidos!.unidadeOrigem!,
+                          ),
                         if (_dadosExtraidos!.unidadeAfeta != null)
-                          _buildInfoRow('Unidade Afeta:', _dadosExtraidos!.unidadeAfeta!),
+                          _buildInfoRow(
+                            'Unidade Afeta:',
+                            _dadosExtraidos!.unidadeAfeta!,
+                          ),
                         const SizedBox(height: 16),
                       ],
                       // PESSOAS ENVOLVIDAS
@@ -358,9 +360,15 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                         _buildSectionTitle('LOCAL'),
                         const SizedBox(height: 8),
                         if (_dadosExtraidos!.endereco != null)
-                          _buildInfoRow('Endereço:', _dadosExtraidos!.endereco!),
+                          _buildInfoRow(
+                            'Endereço:',
+                            _dadosExtraidos!.endereco!,
+                          ),
                         if (_dadosExtraidos!.municipio != null)
-                          _buildInfoRow('Município:', _dadosExtraidos!.municipio!),
+                          _buildInfoRow(
+                            'Município:',
+                            _dadosExtraidos!.municipio!,
+                          ),
                         if (_dadosExtraidos!.coordenadasS != null ||
                             _dadosExtraidos!.coordenadasW != null) ...[
                           const SizedBox(height: 4),
@@ -371,9 +379,12 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                                 width: 100,
                                 child: Text(
                                   'Coordenadas:',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
                                         fontWeight: FontWeight.w500,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                                       ),
                                 ),
                               ),
@@ -384,12 +395,16 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                                     if (_dadosExtraidos!.coordenadasS != null)
                                       Text(
                                         'S: ${_dadosExtraidos!.coordenadasS}',
-                                        style: Theme.of(context).textTheme.bodyMedium,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium,
                                       ),
                                     if (_dadosExtraidos!.coordenadasW != null)
                                       Text(
                                         'W: ${_dadosExtraidos!.coordenadasW}',
-                                        style: Theme.of(context).textTheme.bodyMedium,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium,
                                       ),
                                   ],
                                 ),
@@ -420,17 +435,17 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
         ],
@@ -442,11 +457,10 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
-            letterSpacing: 0.5,
-          ),
+        fontWeight: FontWeight.bold,
+        color: Theme.of(context).colorScheme.primary,
+        letterSpacing: 0.5,
+      ),
     );
   }
 }
-

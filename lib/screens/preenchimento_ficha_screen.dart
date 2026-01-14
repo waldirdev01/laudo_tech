@@ -64,16 +64,8 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
       _pedidoDilacaoController.text =
           widget.dadosSolicitacao.pedidoDilacao ?? '';
     }
-    
+
     // Debug: verificar dados recebidos
-    print('Dados recebidos na tela de preenchimento:');
-    print('RAI: ${widget.dadosSolicitacao.raiNumero}');
-    print('Data/Hora Comunicação: ${widget.dadosSolicitacao.dataHoraComunicacao}');
-    print('Natureza: ${widget.dadosSolicitacao.naturezaOcorrencia}');
-    print('Município: ${widget.dadosSolicitacao.municipio}');
-    print('Endereço: ${widget.dadosSolicitacao.endereco}');
-    print('Unidade Origem: ${widget.dadosSolicitacao.unidadeOrigem}');
-    print('Unidade Afeta: ${widget.dadosSolicitacao.unidadeAfeta}');
   }
 
   @override
@@ -331,12 +323,12 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            widget.dadosSolicitacao.unidadeAfeta?.isEmpty ?? true
+                            widget.dadosSolicitacao.unidadeAfeta?.isEmpty ??
+                                    true
                                 ? '-'
                                 : widget.dadosSolicitacao.unidadeAfeta!,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -387,7 +379,9 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                       )
                     : const Text('Salvar e Continuar'),
               ),
-              const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+              const SizedBox(
+                height: 80,
+              ), // Padding extra no final para garantir que o botão fique visível
             ],
           ),
         ),

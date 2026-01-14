@@ -82,7 +82,6 @@ class PdfExtractionService {
         }
       } catch (e) {
         // fallback abaixo
-        print('Erro na extração nativa: $e');
       }
     }
 
@@ -100,9 +99,6 @@ class PdfExtractionService {
     final texto = await extrairTexto(caminhoArquivo);
 
     // Debug: mostrar texto extraído (primeiros 2000 caracteres)
-    print('=== TEXTO EXTRAÍDO DO PDF (primeiros 2000 chars) ===');
-    print(texto.length > 2000 ? texto.substring(0, 2000) : texto);
-    print('=== FIM DO TEXTO EXTRAÍDO ===');
 
     // Parsear campos específicos do PDF de solicitação
     return _parsearSolicitacao(texto);
@@ -113,9 +109,6 @@ class PdfExtractionService {
     final texto = extrairTextoBytes(bytes);
 
     // Debug: mostrar texto extraído (primeiros 2000 caracteres)
-    print('=== TEXTO EXTRAÍDO DO PDF (primeiros 2000 chars) ===');
-    print(texto.length > 2000 ? texto.substring(0, 2000) : texto);
-    print('=== FIM DO TEXTO EXTRAÍDO ===');
 
     return _parsearSolicitacao(texto);
   }
@@ -126,9 +119,6 @@ class PdfExtractionService {
     final texto = await extrairTextoBytesAsync(bytes);
 
     // Debug: mostrar texto extraído (primeiros 2000 caracteres)
-    print('=== TEXTO EXTRAÍDO DO PDF (primeiros 2000 chars) ===');
-    print(texto.length > 2000 ? texto.substring(0, 2000) : texto);
-    print('=== FIM DO TEXTO EXTRAÍDO ===');
 
     return _parsearSolicitacao(texto);
   }
@@ -589,15 +579,59 @@ class PdfExtractionService {
 
     if (unidadeAfeta == null || unidadeAfeta.isEmpty) {
       final mAfeta = RegExp(
-        r'\(AFETA\)\s*(.*?)(?=\(ORIGEM\)|\(DESTINO\)|Conteudo:|Pericia vinculada:|$)',
+        r'\(AFETA\)\s*(.*?)(?=\(ORIGEM\)|\(DESTINO\)|Conteudo:|Pericia vinculada:|Ocorrencia\s+de|Histórico|$)',
         caseSensitive: false,
         dotAll: true,
       ).firstMatch(raw);
       if (mAfeta != null) {
-        unidadeAfeta = descolarTextoColado(mAfeta.group(1) ?? '');
-        unidadeAfeta = unidadeAfeta
+        var unidadeAfetaTemp = descolarTextoColado(mAfeta.group(1) ?? '');
+        unidadeAfetaTemp = unidadeAfetaTemp
             .replaceAll(RegExp(r'\s*\[[^\]]+\]\s*'), ' ')
             .trim();
+
+        // Limpar texto descritivo que pode ter sido capturado
+        // Parar antes de "Ocorrencia de" ou outras palavras-chave
+        if (unidadeAfetaTemp.isNotEmpty) {
+          final stopWords = [
+            RegExp(r'(.+?)(?:\s+Ocorrencia\s+de)', caseSensitive: false),
+            RegExp(r'(.+?)(?:\s+Histórico)', caseSensitive: false),
+            RegExp(r'(.+?)(?:\s+vitima)', caseSensitive: false),
+            RegExp(r'(.+?)(?:\s+individuo)', caseSensitive: false),
+          ];
+
+          for (final pattern in stopWords) {
+            final match = pattern.firstMatch(unidadeAfetaTemp);
+            final group1 = match?.group(1);
+            if (match != null && group1 != null) {
+              final candidato = group1.trim();
+              // Validar que o candidato parece um nome de unidade (não muito curto, não contém palavras descritivas)
+              if (candidato.length > 10 &&
+                  !candidato.toLowerCase().contains('vitima') &&
+                  !candidato.toLowerCase().contains('individuo') &&
+                  !candidato.toLowerCase().contains('atingido')) {
+                unidadeAfetaTemp = candidato;
+                break;
+              }
+            }
+          }
+
+          // Se ainda contém palavras descritivas, dividir e pegar apenas a primeira parte
+          if (unidadeAfetaTemp.toLowerCase().contains('ocorrencia') ||
+              unidadeAfetaTemp.toLowerCase().contains('vitima') ||
+              unidadeAfetaTemp.toLowerCase().contains('individuo')) {
+            final partes = unidadeAfetaTemp.split(
+              RegExp(
+                r'\s+Ocorrencia\s+de|\s+Histórico|\s+vitima',
+                caseSensitive: false,
+              ),
+            );
+            if (partes.isNotEmpty && partes[0].trim().length > 10) {
+              unidadeAfetaTemp = partes[0].trim();
+            }
+          }
+        }
+
+        unidadeAfeta = unidadeAfetaTemp;
       }
     }
 

@@ -15,11 +15,13 @@ import '../services/perito_service.dart';
 import '../services/word_generator_service.dart';
 import 'condicoes_observacoes_screen.dart';
 import 'dano_screen.dart';
+import 'detalhes_local_screen.dart';
 import 'equipes_policiais_screen.dart';
 import 'evidencias_furto_screen.dart';
 import 'historico_screen.dart';
 import 'isolamento_screen.dart';
-import 'local_furto_screen.dart';
+import 'lista_cadaveres_screen.dart';
+import 'lista_veiculos_screen.dart';
 import 'local_screen.dart';
 import 'modus_operandi_screen.dart';
 import 'preenchimento_ficha_screen.dart';
@@ -112,7 +114,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.location_on),
-                title: const Text('4. Local'),
+                title: const Text('4. Local - Coordenadas GPS'),
                 onTap: () => Navigator.of(context).pop('local'),
               ),
               ListTile(
@@ -135,28 +137,41 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                 title: const Text('8. Condições Ambientais'),
                 onTap: () => Navigator.of(context).pop('condicoes'),
               ),
-              if (ficha.tipoOcorrencia ==
-                  TipoOcorrencia.furtoDanoExameLocal) ...[
+              if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
+                  ficha.tipoOcorrencia == TipoOcorrencia.cvli) ...[
                 ListTile(
                   leading: const Icon(Icons.home),
-                  title: const Text('9. Local (Furto)'),
+                  title: const Text('9. Local - Detalhes do Local'),
                   onTap: () => Navigator.of(context).pop('local_furto'),
                 ),
+              ],
+              if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal)
                 ListTile(
                   leading: const Icon(Icons.search),
                   title: const Text('10. Evidências'),
                   onTap: () => Navigator.of(context).pop('evidencias'),
                 ),
+              if (ficha.tipoOcorrencia == TipoOcorrencia.cvli) ...[
+                ListTile(
+                  leading: const Icon(Icons.directions_car),
+                  title: const Text('10. Veículos'),
+                  onTap: () => Navigator.of(context).pop('veiculos'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.person),
+                  title: const Text('11. Cadáveres'),
+                  onTap: () => Navigator.of(context).pop('cadaveres'),
+                ),
               ],
               ListTile(
                 leading: const Icon(Icons.psychology),
-                title: const Text('11. Modus Operandi'),
+                title: const Text('12. Modus Operandi'),
                 onTap: () => Navigator.of(context).pop('modus_operandi'),
               ),
               if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal)
                 ListTile(
                   leading: const Icon(Icons.warning),
-                  title: const Text('12. Dano'),
+                  title: const Text('13. Dano'),
                   onTap: () => Navigator.of(context).pop('dano'),
                 ),
             ],
@@ -365,22 +380,22 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       }
     } else {
       final incluirFotos = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Incluir Fotos'),
-        content: const Text('Deseja incluir fotos no laudo?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Não'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sim'),
-          ),
-        ],
-      ),
-    );
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Incluir Fotos'),
+          content: const Text('Deseja incluir fotos no laudo?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Não'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Sim'),
+            ),
+          ],
+        ),
+      );
 
       if (incluirFotos == true) {
         final novas = await _selecionarFotos();
@@ -418,8 +433,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         );
         fichaAtual = fichaAtual.copyWith(fotosLevantamento: novosPaths);
 
-        fotosSelecionadas =
-            novosPaths.isEmpty ? null : novosPaths.map((p) => File(p)).toList();
+        fotosSelecionadas = novosPaths.isEmpty
+            ? null
+            : novosPaths.map((p) => File(p)).toList();
       }
     }
 
@@ -521,10 +537,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       );
 
       if (acao == 'compartilhar' && mounted) {
-        await Share.shareXFiles(
-          [XFile(arquivo.path)],
-          text: '$tipo - Laudo Tech',
-        );
+        await Share.shareXFiles([
+          XFile(arquivo.path),
+        ], text: '$tipo - Laudo Tech');
       }
     }
   }
@@ -593,7 +608,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => _GerenciarFotosLevantamentoSheet(pathsIniciais: paths),
+      builder: (context) =>
+          _GerenciarFotosLevantamentoSheet(pathsIniciais: paths),
     );
   }
 
@@ -630,13 +646,24 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         telaDestino = CondicoesObservacoesScreen(ficha: ficha);
         break;
       case 'local_furto':
-        if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal) {
+        if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
+            ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
           telaDestino = LocalFurtoScreen(ficha: ficha);
         }
         break;
       case 'evidencias':
         if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal) {
           telaDestino = EvidenciasFurtoScreen(ficha: ficha);
+        }
+        break;
+      case 'veiculos':
+        if (ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
+          telaDestino = ListaVeiculosScreen(ficha: ficha);
+        }
+        break;
+      case 'cadaveres':
+        if (ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
+          telaDestino = ListaCadaveresScreen(ficha: ficha);
         }
         break;
       case 'modus_operandi':
@@ -787,7 +814,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                             'Criada em: ${DateFormat('dd/MM/yyyy HH:mm').format(ficha.dataCriacao)}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          if (ficha.dataHoraTermino == null) ...[
+                          if (ficha.dataHoraTermino == null ||
+                              ficha.dataHoraTermino!.isEmpty) ...[
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -798,13 +826,24 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                                 color: Colors.orange.shade100,
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(
-                                'Em andamento',
-                                style: TextStyle(
-                                  color: Colors.orange.shade900,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 14,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Em atendimento',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -989,13 +1028,16 @@ class _GerenciarFotosLevantamentoSheetState
                                     File(path),
                                     fit: BoxFit.cover,
                                     errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Container(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerHighest,
-                                      child: const Icon(Icons.broken_image),
-                                    ),
+                                        (
+                                          context,
+                                          error,
+                                          stackTrace,
+                                        ) => Container(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.surfaceContainerHighest,
+                                          child: const Icon(Icons.broken_image),
+                                        ),
                                   ),
                                 ),
                               ),

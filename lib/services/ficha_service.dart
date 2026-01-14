@@ -13,9 +13,8 @@ class FichaService {
     // Se já existe, atualiza. Senão, adiciona nova
     final index = fichas.indexWhere((f) => f.id == ficha.id);
     if (index >= 0) {
-      fichas[index] = ficha.copyWith(
-        dataUltimaAtualizacao: DateTime.now(),
-      );
+      // Usar a ficha passada diretamente (já vem com dataUltimaAtualizacao atualizada)
+      fichas[index] = ficha;
     } else {
       fichas.add(ficha);
     }

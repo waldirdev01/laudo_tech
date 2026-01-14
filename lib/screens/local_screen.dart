@@ -272,7 +272,7 @@ class _LocalScreenState extends State<LocalScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Local'), centerTitle: true),
+      appBar: AppBar(title: const Text('Local - Coordenadas GPS'), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

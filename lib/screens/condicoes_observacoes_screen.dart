@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
-import '../models/ficha_completa_model.dart';
+
 import '../models/ficha_base_model.dart';
+import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
-import 'local_furto_screen.dart';
+import 'detalhes_local_screen.dart';
 
 class CondicoesObservacoesScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
 
-  const CondicoesObservacoesScreen({
-    super.key,
-    required this.ficha,
-  });
+  const CondicoesObservacoesScreen({super.key, required this.ficha});
 
   @override
-  State<CondicoesObservacoesScreen> createState() => _CondicoesObservacoesScreenState();
+  State<CondicoesObservacoesScreen> createState() =>
+      _CondicoesObservacoesScreenState();
 }
 
-class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen> {
+class _CondicoesObservacoesScreenState
+    extends State<CondicoesObservacoesScreen> {
   final _fichaService = FichaService();
   final _demaisObservacoesController = TextEditingController();
   bool _salvando = false;
@@ -39,7 +39,8 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
     if (dados != null) {
       _condicoesEstavel = dados.condicoesEstavel ?? false;
       _condicoesNublado = dados.condicoesNublado ?? false;
-      _condicoesParcialmenteNublado = dados.condicoesParcialmenteNublado ?? false;
+      _condicoesParcialmenteNublado =
+          dados.condicoesParcialmenteNublado ?? false;
       _condicoesChuvoso = dados.condicoesChuvoso ?? false;
       _demaisObservacoesController.text = dados.demaisObservacoes ?? '';
     }
@@ -97,7 +98,8 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
 
     try {
       // Criar ou atualizar dados da ficha base
-      final fichaBase = widget.ficha.dadosFichaBase?.copyWith(
+      final fichaBase =
+          widget.ficha.dadosFichaBase?.copyWith(
             historico: widget.ficha.dadosFichaBase?.historico,
             // Preservar isolamento
             isolamentoSim: widget.ficha.dadosFichaBase?.isolamentoSim,
@@ -106,22 +108,35 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
             isolamentoParcial: widget.ficha.dadosFichaBase?.isolamentoParcial,
             isolamentoViatura: widget.ficha.dadosFichaBase?.isolamentoViatura,
             isolamentoCones: widget.ficha.dadosFichaBase?.isolamentoCones,
-            isolamentoFitaZebrada: widget.ficha.dadosFichaBase?.isolamentoFitaZebrada,
-            isolamentoPresencaFisica: widget.ficha.dadosFichaBase?.isolamentoPresencaFisica,
-            isolamentoCuriososVoltaCorpo: widget.ficha.dadosFichaBase?.isolamentoCuriososVoltaCorpo,
-            isolamentoCorpoCobertoMovimentado: widget.ficha.dadosFichaBase?.isolamentoCorpoCobertoMovimentado,
-            isolamentoDocumentosManuseados: widget.ficha.dadosFichaBase?.isolamentoDocumentosManuseados,
-            isolamentoVestigiosRecolhidos: widget.ficha.dadosFichaBase?.isolamentoVestigiosRecolhidos,
-            isolamentoAmpliacaoPerimetro: widget.ficha.dadosFichaBase?.isolamentoAmpliacaoPerimetro,
-            isolamentoObservacoes: widget.ficha.dadosFichaBase?.isolamentoObservacoes,
+            isolamentoFitaZebrada:
+                widget.ficha.dadosFichaBase?.isolamentoFitaZebrada,
+            isolamentoPresencaFisica:
+                widget.ficha.dadosFichaBase?.isolamentoPresencaFisica,
+            isolamentoCuriososVoltaCorpo:
+                widget.ficha.dadosFichaBase?.isolamentoCuriososVoltaCorpo,
+            isolamentoCorpoCobertoMovimentado:
+                widget.ficha.dadosFichaBase?.isolamentoCorpoCobertoMovimentado,
+            isolamentoDocumentosManuseados:
+                widget.ficha.dadosFichaBase?.isolamentoDocumentosManuseados,
+            isolamentoVestigiosRecolhidos:
+                widget.ficha.dadosFichaBase?.isolamentoVestigiosRecolhidos,
+            isolamentoAmpliacaoPerimetro:
+                widget.ficha.dadosFichaBase?.isolamentoAmpliacaoPerimetro,
+            isolamentoObservacoes:
+                widget.ficha.dadosFichaBase?.isolamentoObservacoes,
             // Preservar preservação
             preservacaoSim: widget.ficha.dadosFichaBase?.preservacaoSim,
             preservacaoNao: widget.ficha.dadosFichaBase?.preservacaoNao,
-            preservacaoInidoneo: widget.ficha.dadosFichaBase?.preservacaoInidoneo,
-            preservacaoParcialmenteIdoneo: widget.ficha.dadosFichaBase?.preservacaoParcialmenteIdoneo,
-            preservacaoCuriososNoPerimetro: widget.ficha.dadosFichaBase?.preservacaoCuriososNoPerimetro,
-            preservacaoPessoasAcessaram: widget.ficha.dadosFichaBase?.preservacaoPessoasAcessaram,
-            preservacaoAlteracoesDetectadas: widget.ficha.dadosFichaBase?.preservacaoAlteracoesDetectadas,
+            preservacaoInidoneo:
+                widget.ficha.dadosFichaBase?.preservacaoInidoneo,
+            preservacaoParcialmenteIdoneo:
+                widget.ficha.dadosFichaBase?.preservacaoParcialmenteIdoneo,
+            preservacaoCuriososNoPerimetro:
+                widget.ficha.dadosFichaBase?.preservacaoCuriososNoPerimetro,
+            preservacaoPessoasAcessaram:
+                widget.ficha.dadosFichaBase?.preservacaoPessoasAcessaram,
+            preservacaoAlteracoesDetectadas:
+                widget.ficha.dadosFichaBase?.preservacaoAlteracoesDetectadas,
             // Atualizar condições meteorológicas
             condicoesEstavel: _condicoesEstavel,
             condicoesNublado: _condicoesNublado,
@@ -162,8 +177,9 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
           ),
         );
 
-        // Se for FURTO/DANO, navegar para tela de Local Furto
-        if (widget.ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal) {
+        // Navegar para tela de Local Furto (tela 9) para FURTO/DANO e CVLI
+        if (widget.ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
+            widget.ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
           if (!mounted) return;
           final resultado = await Navigator.of(context).push(
             MaterialPageRoute(
@@ -266,7 +282,8 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
                                 children: [
                                   Checkbox(
                                     value: _condicoesEstavel,
-                                    onChanged: (value) => _onCondicaoChanged(value, 'estavel'),
+                                    onChanged: (value) =>
+                                        _onCondicaoChanged(value, 'estavel'),
                                   ),
                                   const Text('Estável'),
                                 ],
@@ -276,7 +293,8 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
                                 children: [
                                   Checkbox(
                                     value: _condicoesNublado,
-                                    onChanged: (value) => _onCondicaoChanged(value, 'nublado'),
+                                    onChanged: (value) =>
+                                        _onCondicaoChanged(value, 'nublado'),
                                   ),
                                   const Text('Nublado'),
                                 ],
@@ -286,7 +304,10 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
                                 children: [
                                   Checkbox(
                                     value: _condicoesParcialmenteNublado,
-                                    onChanged: (value) => _onCondicaoChanged(value, 'parcialmenteNublado'),
+                                    onChanged: (value) => _onCondicaoChanged(
+                                      value,
+                                      'parcialmenteNublado',
+                                    ),
                                   ),
                                   const Text('Parcialmente Nublado'),
                                 ],
@@ -296,7 +317,8 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
                                 children: [
                                   Checkbox(
                                     value: _condicoesChuvoso,
-                                    onChanged: (value) => _onCondicaoChanged(value, 'chuvoso'),
+                                    onChanged: (value) =>
+                                        _onCondicaoChanged(value, 'chuvoso'),
                                   ),
                                   const Text('Chuvoso'),
                                 ],
@@ -366,9 +388,7 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
             ),
             FilledButton(
               onPressed: _salvando ? null : _salvarCondicoesObservacoes,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.all(16),
-              ),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
               child: _salvando
                   ? const SizedBox(
                       height: 20,
@@ -380,11 +400,12 @@ class _CondicoesObservacoesScreenState extends State<CondicoesObservacoesScreen>
                     )
                   : const Text('Salvar e Continuar'),
             ),
-            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+            const SizedBox(
+              height: 80,
+            ), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),
     );
   }
 }
-

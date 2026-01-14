@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+import '../main.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
-import '../main.dart';
 import 'dano_screen.dart';
 
 class ModusOperandiScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
 
-  const ModusOperandiScreen({
-    super.key,
-    required this.ficha,
-  });
+  const ModusOperandiScreen({super.key, required this.ficha});
 
   @override
   State<ModusOperandiScreen> createState() => _ModusOperandiScreenState();
@@ -45,7 +43,9 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
     super.dispose();
   }
 
-  Future<FichaCompletaModel?> _salvarModusOperandi({bool fecharTela = true}) async {
+  Future<FichaCompletaModel?> _salvarModusOperandi({
+    bool fecharTela = true,
+  }) async {
     setState(() {
       _salvando = true;
     });
@@ -55,7 +55,8 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
       String? dataHoraTermino;
       if (fecharTela) {
         // Salvar e Finalizar - preencher data/hora de término apenas se estiver vazio
-        if (widget.ficha.dataHoraTermino == null || widget.ficha.dataHoraTermino!.isEmpty) {
+        if (widget.ficha.dataHoraTermino == null ||
+            widget.ficha.dataHoraTermino!.isEmpty) {
           final agora = DateTime.now();
           dataHoraTermino = DateFormat('dd/MM/yyyy HH:mm').format(agora);
         } else {
@@ -66,7 +67,7 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
         // Se não for finalizar, preservar o valor existente
         dataHoraTermino = widget.ficha.dataHoraTermino;
       }
-      
+
       // Preservar todos os dados existentes
       final fichaAtualizada = widget.ficha.copyWith(
         modusOperandi: _modusOperandiController.text.trim().isEmpty
@@ -127,10 +128,7 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Modus Operandi'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Modus Operandi'), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -223,33 +221,45 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    RadioListTile<bool>(
-                      title: const Text('Conclusão Positiva'),
-                      subtitle: const Text(
-                        'Os vestígios coletados permitiram análise e forneceram subsídios técnicos suficientes.',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      value: true,
+                    RadioGroup<bool>(
                       groupValue: _conclusaoPositiva,
                       onChanged: (value) {
                         setState(() {
                           _conclusaoPositiva = value;
                         });
                       },
-                    ),
-                    RadioListTile<bool>(
-                      title: const Text('Conclusão Negativa (Exiguidade de Vestígios)'),
-                      subtitle: const Text(
-                        'A ausência ou insuficiência de vestígios não permitiu conclusões mais detalhadas.',
-                        style: TextStyle(fontSize: 12),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: Radio<bool>(value: true),
+                            title: const Text('Conclusão Positiva'),
+                            subtitle: const Text(
+                              'Os vestígios coletados permitiram análise e forneceram subsídios técnicos suficientes.',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            onTap: () {
+                              setState(() {
+                                _conclusaoPositiva = true;
+                              });
+                            },
+                          ),
+                          ListTile(
+                            leading: Radio<bool>(value: false),
+                            title: const Text(
+                              'Conclusão Negativa (Exiguidade de Vestígios)',
+                            ),
+                            subtitle: const Text(
+                              'A ausência ou insuficiência de vestígios não permitiu conclusões mais detalhadas.',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            onTap: () {
+                              setState(() {
+                                _conclusaoPositiva = false;
+                              });
+                            },
+                          ),
+                        ],
                       ),
-                      value: false,
-                      groupValue: _conclusaoPositiva,
-                      onChanged: (value) {
-                        setState(() {
-                          _conclusaoPositiva = value;
-                        });
-                      },
                     ),
                   ],
                 ),
@@ -257,22 +267,28 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
             ),
             const SizedBox(height: 32),
             // Verificar se é tipo que inclui dano
-            if (widget.ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal) ...[
+            if (widget.ficha.tipoOcorrencia ==
+                TipoOcorrencia.furtoDanoExameLocal) ...[
               FilledButton(
-                onPressed: _salvando ? null : () async {
-                  final navigator = Navigator.of(context);
-                  final fichaAtualizada = await _salvarModusOperandi(fecharTela: false);
-                  if (!mounted || fichaAtualizada == null) return;
-                  final resultado = await navigator.push(
-                    MaterialPageRoute(
-                      builder: (context) => DanoScreen(ficha: fichaAtualizada),
-                    ),
-                  );
-                  if (!mounted) return;
-                  if (resultado == true) {
-                    navigator.pop(true);
-                  }
-                },
+                onPressed: _salvando
+                    ? null
+                    : () async {
+                        final navigator = Navigator.of(context);
+                        final fichaAtualizada = await _salvarModusOperandi(
+                          fecharTela: false,
+                        );
+                        if (!mounted || fichaAtualizada == null) return;
+                        final resultado = await navigator.push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                DanoScreen(ficha: fichaAtualizada),
+                          ),
+                        );
+                        if (!mounted) return;
+                        if (resultado == true) {
+                          navigator.pop(true);
+                        }
+                      },
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.all(16),
                 ),
@@ -282,7 +298,9 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Text('Salvar e Ir para Dano'),
@@ -290,7 +308,9 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
               const SizedBox(height: 12),
             ],
             OutlinedButton(
-              onPressed: _salvando ? null : () => _salvarModusOperandi(fecharTela: true),
+              onPressed: _salvando
+                  ? null
+                  : () => _salvarModusOperandi(fecharTela: true),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.all(16),
               ),
@@ -298,17 +318,16 @@ class _ModusOperandiScreenState extends State<ModusOperandiScreen> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Salvar e Finalizar'),
             ),
-            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+            const SizedBox(
+              height: 80,
+            ), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),
     );
   }
 }
-

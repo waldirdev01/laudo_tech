@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/theme_provider.dart';
 import 'cadastro_perito_screen.dart';
+import 'cadastro_unidades_laboratorios_screen.dart';
 import 'equipe_screen.dart';
 
 class ConfiguracoesScreen extends StatelessWidget {
@@ -90,6 +91,34 @@ class ConfiguracoesScreen extends StatelessWidget {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => const EquipeScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          const Text(
+            'Vestígios',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.science),
+                  title: const Text('Unidades e Laboratórios'),
+                  subtitle: const Text(
+                    'Cadastrar destinos para vestígios coletados',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const CadastroUnidadesLaboratoriosScreen(),
                       ),
                     );
                   },

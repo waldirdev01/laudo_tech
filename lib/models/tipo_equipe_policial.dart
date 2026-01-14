@@ -1,10 +1,8 @@
-/// Tipos de equipes policiais/de salvamento
+/// Tipos de equipes policiais (SAMU e Bombeiros foram movidos para EquipeResgateModel)
 enum TipoEquipePolicial {
   policiaMilitar('Polícia Militar'),
   policiaCivil('Polícia Civil'),
   prf('PRF'),
-  bombeiros('Bombeiros'),
-  samu('SAMU'),
   outros('Outros');
 
   final String label;
