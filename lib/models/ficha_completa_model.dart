@@ -1,4 +1,5 @@
 import 'cadaver_model.dart';
+import 'crime_transito_model.dart';
 import 'dano_model.dart';
 import 'detatlhes_local.dart';
 import 'equipe_ficha_model.dart';
@@ -60,6 +61,10 @@ class FichaCompletaModel {
 
   // Dados específicos para CVLI - Veículos
   final List<VeiculoModel>? veiculos;
+  // Dados específicos para Crime de Trânsito
+  final CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes;
+  final List<CrimeTransitoEnvolvidoModel>? envolvidosTransito;
+  final CrimeTransitoNaturezaModel? crimeTransitoNatureza;
 
   final DateTime dataCriacao;
   final DateTime? dataUltimaAtualizacao;
@@ -86,35 +91,42 @@ class FichaCompletaModel {
     this.dano,
     this.cadaveres,
     this.veiculos,
+    this.crimeTransitoCondicoes,
+    this.envolvidosTransito,
+    this.crimeTransitoNatureza,
     required this.dataCriacao,
     this.dataUltimaAtualizacao,
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'tipoOcorrencia': tipoOcorrencia.name,
-    'dadosSolicitacao': dadosSolicitacao.toJson(),
-    'dataHoraDeslocamento': dataHoraDeslocamento,
-    'dataHoraInicio': dataHoraInicio,
-    'dataHoraTermino': dataHoraTermino,
-    'pedidoDilacao': pedidoDilacao,
-    'equipe': equipe?.toJson(),
-    'equipesPoliciais': equipesPoliciais?.map((e) => e.toJson()).toList(),
-    'naoHaviaEquipesPoliciais': naoHaviaEquipesPoliciais,
-    'equipesResgate': equipesResgate?.map((e) => e.toJson()).toList(),
-    'local': local?.toJson(),
-    'dadosFichaBase': dadosFichaBase?.toJson(),
-    'localFurto': localFurto?.toJson(),
-    'evidenciasFurto': evidenciasFurto?.toJson(),
-    'modusOperandi': modusOperandi,
-    'conclusaoPositiva': conclusaoPositiva,
-    'fotosLevantamento': fotosLevantamento,
-    'dano': dano?.toJson(),
-    'cadaveres': cadaveres?.map((c) => c.toJson()).toList(),
-    'veiculos': veiculos?.map((v) => v.toJson()).toList(),
-    'dataCriacao': dataCriacao.toIso8601String(),
-    'dataUltimaAtualizacao': dataUltimaAtualizacao?.toIso8601String(),
-  };
+        'id': id,
+        'tipoOcorrencia': tipoOcorrencia.name,
+        'dadosSolicitacao': dadosSolicitacao.toJson(),
+        'dataHoraDeslocamento': dataHoraDeslocamento,
+        'dataHoraInicio': dataHoraInicio,
+        'dataHoraTermino': dataHoraTermino,
+        'pedidoDilacao': pedidoDilacao,
+        'equipe': equipe?.toJson(),
+        'equipesPoliciais': equipesPoliciais?.map((e) => e.toJson()).toList(),
+        'naoHaviaEquipesPoliciais': naoHaviaEquipesPoliciais,
+        'equipesResgate': equipesResgate?.map((e) => e.toJson()).toList(),
+        'local': local?.toJson(),
+        'dadosFichaBase': dadosFichaBase?.toJson(),
+        'localFurto': localFurto?.toJson(),
+        'evidenciasFurto': evidenciasFurto?.toJson(),
+        'modusOperandi': modusOperandi,
+        'conclusaoPositiva': conclusaoPositiva,
+        'fotosLevantamento': fotosLevantamento,
+        'dano': dano?.toJson(),
+        'cadaveres': cadaveres?.map((c) => c.toJson()).toList(),
+        'veiculos': veiculos?.map((v) => v.toJson()).toList(),
+        'crimeTransitoCondicoes': crimeTransitoCondicoes?.toJson(),
+        'envolvidosTransito':
+            envolvidosTransito?.map((e) => e.toJson()).toList(),
+        'crimeTransitoNatureza': crimeTransitoNatureza?.toJson(),
+        'dataCriacao': dataCriacao.toIso8601String(),
+        'dataUltimaAtualizacao': dataUltimaAtualizacao?.toIso8601String(),
+      };
 
   factory FichaCompletaModel.fromJson(Map<String, dynamic> json) {
     return FichaCompletaModel(
@@ -135,20 +147,20 @@ class FichaCompletaModel {
           : null,
       equipesPoliciais: json['equipesPoliciais'] != null
           ? (json['equipesPoliciais'] as List<dynamic>)
-                .map(
-                  (e) => EquipePolicialFichaModel.fromJson(
-                    e as Map<String, dynamic>,
-                  ),
-                )
-                .toList()
+              .map(
+                (e) => EquipePolicialFichaModel.fromJson(
+                  e as Map<String, dynamic>,
+                ),
+              )
+              .toList()
           : null,
       naoHaviaEquipesPoliciais: json['naoHaviaEquipesPoliciais'] as bool?,
       equipesResgate: json['equipesResgate'] != null
           ? (json['equipesResgate'] as List<dynamic>)
-                .map(
-                  (e) => EquipeResgateModel.fromJson(e as Map<String, dynamic>),
-                )
-                .toList()
+              .map(
+                (e) => EquipeResgateModel.fromJson(e as Map<String, dynamic>),
+              )
+              .toList()
           : null,
       local: json['local'] != null
           ? LocalFichaModel.fromJson(json['local'] as Map<String, dynamic>)
@@ -168,8 +180,7 @@ class FichaCompletaModel {
           : null,
       modusOperandi: json['modusOperandi'] as String?,
       conclusaoPositiva: json['conclusaoPositiva'] as bool?,
-      fotosLevantamento:
-          (json['fotosLevantamento'] as List<dynamic>?)
+      fotosLevantamento: (json['fotosLevantamento'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -178,13 +189,32 @@ class FichaCompletaModel {
           : null,
       cadaveres: json['cadaveres'] != null
           ? (json['cadaveres'] as List<dynamic>)
-                .map((c) => CadaverModel.fromJson(c as Map<String, dynamic>))
-                .toList()
+              .map((c) => CadaverModel.fromJson(c as Map<String, dynamic>))
+              .toList()
           : null,
       veiculos: json['veiculos'] != null
           ? (json['veiculos'] as List<dynamic>)
-                .map((v) => VeiculoModel.fromJson(v as Map<String, dynamic>))
-                .toList()
+              .map((v) => VeiculoModel.fromJson(v as Map<String, dynamic>))
+              .toList()
+          : null,
+      crimeTransitoCondicoes: json['crimeTransitoCondicoes'] != null
+          ? CrimeTransitoCondicoesViaModel.fromJson(
+              json['crimeTransitoCondicoes'] as Map<String, dynamic>,
+            )
+          : null,
+      envolvidosTransito: json['envolvidosTransito'] != null
+          ? (json['envolvidosTransito'] as List<dynamic>)
+              .map(
+                (e) => CrimeTransitoEnvolvidoModel.fromJson(
+                  e as Map<String, dynamic>,
+                ),
+              )
+              .toList()
+          : null,
+      crimeTransitoNatureza: json['crimeTransitoNatureza'] != null
+          ? CrimeTransitoNaturezaModel.fromJson(
+              json['crimeTransitoNatureza'] as Map<String, dynamic>,
+            )
           : null,
       dataCriacao: DateTime.parse(json['dataCriacao'] as String),
       dataUltimaAtualizacao: json['dataUltimaAtualizacao'] != null
@@ -215,6 +245,9 @@ class FichaCompletaModel {
     DanoModel? dano,
     List<CadaverModel>? cadaveres,
     List<VeiculoModel>? veiculos,
+    CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes,
+    List<CrimeTransitoEnvolvidoModel>? envolvidosTransito,
+    CrimeTransitoNaturezaModel? crimeTransitoNatureza,
     DateTime? dataCriacao,
     DateTime? dataUltimaAtualizacao,
   }) {
@@ -246,6 +279,11 @@ class FichaCompletaModel {
       dano: dano ?? this.dano,
       cadaveres: cadaveres ?? this.cadaveres,
       veiculos: veiculos ?? this.veiculos,
+      crimeTransitoCondicoes:
+          crimeTransitoCondicoes ?? this.crimeTransitoCondicoes,
+      envolvidosTransito: envolvidosTransito ?? this.envolvidosTransito,
+      crimeTransitoNatureza:
+          crimeTransitoNatureza ?? this.crimeTransitoNatureza,
       dataCriacao: dataCriacao ?? this.dataCriacao,
       dataUltimaAtualizacao:
           dataUltimaAtualizacao ?? this.dataUltimaAtualizacao,

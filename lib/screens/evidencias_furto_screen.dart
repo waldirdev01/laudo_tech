@@ -585,8 +585,12 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Coordenada X',
                           border: OutlineInputBorder(),
+                          hintText: 'Ex: -23,5',
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: true,
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -596,8 +600,12 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Coordenada Y',
                           border: OutlineInputBorder(),
+                          hintText: 'Ex: -46,6',
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: true,
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -739,8 +747,12 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                       labelText: 'Coord. 1',
                       border: OutlineInputBorder(),
                       isDense: true,
+                      hintText: 'Ex: -23,5',
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: true,
+                      decimal: true,
+                    ),
                     onChanged: (value) {
                       final updated = evidencia.copyWith(
                         coordenada1: value.isEmpty ? null : value,
@@ -759,8 +771,12 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                       labelText: 'Coord. 2',
                       border: OutlineInputBorder(),
                       isDense: true,
+                      hintText: 'Ex: -46,6',
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: true,
+                      decimal: true,
+                    ),
                     onChanged: (value) {
                       final updated = evidencia.copyWith(
                         coordenada2: value.isEmpty ? null : value,

@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/cadaver_model.dart';
+import '../models/crime_transito_model.dart';
 import '../models/evidencia_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/marco_zero_local_model.dart';
@@ -33,6 +34,12 @@ class WordGeneratorService {
   static const String _fontSize = '24'; // 12pt em half-points
   static const String _fontSizeTitulo = '28'; // 14pt
 
+  // Imagens do corpo na ficha (CVLI) — rIds usados em document.xml.rels
+  static const String _rIdCorpoMasculino = 'rIdCorpoM';
+  static const String _rIdCorpoFeminino = 'rIdCorpoF';
+  static const String _assetCorpoMasculino = 'assets/images/corpo_homem.png';
+  static const String _assetCorpoFeminino = 'assets/images/corpo_mulher.png';
+
   /// Gera um documento Word preenchendo o template com os dados da ficha
   Future<File> gerarDocumentoWord(FichaCompletaModel ficha) async {
     // Obter o perito e o caminho do template
@@ -53,6 +60,25 @@ class WordGeneratorService {
     // Ler o template
     final templateBytes = await templateFile.readAsBytes();
     final archive = ZipDecoder().decodeBytes(templateBytes);
+
+    // Carregar imagens do corpo para CVLI (cadaveres)
+    final temCadaveres = ficha.tipoOcorrencia == TipoOcorrencia.cvli &&
+        ficha.cadaveres != null &&
+        ficha.cadaveres!.isNotEmpty;
+    Uint8List? bytesCorpoMasculino;
+    Uint8List? bytesCorpoFeminino;
+    if (temCadaveres) {
+      try {
+        bytesCorpoMasculino = (await rootBundle.load(_assetCorpoMasculino))
+            .buffer
+            .asUint8List();
+      } catch (_) {}
+      try {
+        bytesCorpoFeminino = (await rootBundle.load(_assetCorpoFeminino))
+            .buffer
+            .asUint8List();
+      } catch (_) {}
+    }
 
     // Gerar o conteúdo do documento
     final conteudoXml = await _gerarConteudoDocumento(ficha, perito);
@@ -84,6 +110,54 @@ class WordGeneratorService {
         conteudo = Uint8List.fromList(utf8.encode(novoXml));
       }
 
+      // Incluir relações das imagens do corpo (CVLI) em document.xml.rels
+      if (temCadaveres &&
+          arquivo.name == 'word/_rels/document.xml.rels' &&
+          (bytesCorpoMasculino != null || bytesCorpoFeminino != null)) {
+        String relsXml;
+        if (conteudo is List<int>) {
+          relsXml = utf8.decode(conteudo);
+        } else {
+          relsXml = conteudo.toString();
+        }
+        final sb = StringBuffer();
+        if (bytesCorpoMasculino != null) {
+          sb.writeln(
+            '<Relationship Id="$_rIdCorpoMasculino" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/corpo_homem.png"/>',
+          );
+        }
+        if (bytesCorpoFeminino != null) {
+          sb.writeln(
+            '<Relationship Id="$_rIdCorpoFeminino" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/corpo_mulher.png"/>',
+          );
+        }
+        relsXml = relsXml.replaceFirst('</Relationships>', '$sb</Relationships>');
+        conteudo = Uint8List.fromList(utf8.encode(relsXml));
+      }
+
+      // Registrar imagens do corpo em [Content_Types].xml
+      if (temCadaveres && arquivo.name == '[Content_Types].xml') {
+        String ctXml;
+        if (conteudo is List<int>) {
+          ctXml = utf8.decode(conteudo);
+        } else {
+          ctXml = conteudo.toString();
+        }
+        final sb = StringBuffer();
+        if (bytesCorpoMasculino != null) {
+          sb.writeln(
+            '<Override PartName="/word/media/corpo_homem.png" ContentType="image/png"/>',
+          );
+        }
+        if (bytesCorpoFeminino != null) {
+          sb.writeln(
+            '<Override PartName="/word/media/corpo_mulher.png" ContentType="image/png"/>',
+          );
+        }
+        ctXml = ctXml.replaceFirst('</Types>', '$sb</Types>');
+        conteudo = Uint8List.fromList(utf8.encode(ctXml));
+      }
+
       // Adicionar ao novo arquivo
       final tamanho = conteudo is List<int>
           ? conteudo.length
@@ -92,14 +166,30 @@ class WordGeneratorService {
       novoArchive.addFile(ArchiveFile(arquivo.name, tamanho, conteudo));
     }
 
+    // Incluir os arquivos de imagem do corpo no pacote Word (CVLI)
+    if (temCadaveres && bytesCorpoMasculino != null) {
+      novoArchive.addFile(ArchiveFile(
+        'word/media/corpo_homem.png',
+        bytesCorpoMasculino.length,
+        bytesCorpoMasculino,
+      ));
+    }
+    if (temCadaveres && bytesCorpoFeminino != null) {
+      novoArchive.addFile(ArchiveFile(
+        'word/media/corpo_mulher.png',
+        bytesCorpoFeminino.length,
+        bytesCorpoFeminino,
+      ));
+    }
+
     // Criar o novo arquivo Word
     final encoder = ZipEncoder();
     final novoBytes = encoder.encode(novoArchive);
 
     // Salvar em um local temporário
     final diretorio = await getApplicationDocumentsDirectory();
-    final raiNumeroSaneado = (ficha.dadosSolicitacao.raiNumero ?? ficha.id)
-        .replaceAll('/', '-');
+    final raiNumeroSaneado =
+        (ficha.dadosSolicitacao.raiNumero ?? ficha.id).replaceAll('/', '-');
     final nomeArquivo =
         'Ficha_${raiNumeroSaneado}_${DateTime.now().millisecondsSinceEpoch}.docx';
     final arquivoFinal = File('${diretorio.path}/$nomeArquivo');
@@ -211,12 +301,22 @@ $conteudo
       buffer.writeln(_gerarParagrafoVazio());
     }
 
+    if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito &&
+        ficha.crimeTransitoCondicoes != null) {
+      final tabelaCondicoes = _gerarTabelaCondicoesCrimeTransito(ficha);
+      if (tabelaCondicoes.isNotEmpty) {
+        buffer.writeln(tabelaCondicoes);
+        buffer.writeln(_gerarParagrafoVazio());
+      }
+    }
+
     // TABELA 10: VEÍCULOS (apenas para CVLI)
-    if (ficha.tipoOcorrencia == TipoOcorrencia.cvli &&
-        ficha.veiculos != null &&
-        ficha.veiculos!.isNotEmpty) {
-      buffer.writeln(await _gerarTabelaVeiculos(ficha));
-      buffer.writeln(_gerarParagrafoVazio());
+    if (ficha.veiculos != null && ficha.veiculos!.isNotEmpty) {
+      final tipo = ficha.tipoOcorrencia;
+      if (tipo == TipoOcorrencia.cvli || tipo == TipoOcorrencia.crimeTransito) {
+        buffer.writeln(await _gerarTabelaVeiculos(ficha));
+        buffer.writeln(_gerarParagrafoVazio());
+      }
     }
 
     // TABELA 11: CADÁVERES (apenas para CVLI)
@@ -225,6 +325,22 @@ $conteudo
         ficha.cadaveres!.isNotEmpty) {
       buffer.writeln(await _gerarTabelaCadaveres(ficha));
       buffer.writeln(_gerarParagrafoVazio());
+    }
+
+    if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito &&
+        ficha.envolvidosTransito != null &&
+        ficha.envolvidosTransito!.isNotEmpty) {
+      buffer.writeln(_gerarTabelaEnvolvidosCrimeTransito(ficha));
+      buffer.writeln(_gerarParagrafoVazio());
+    }
+
+    if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito &&
+        ficha.crimeTransitoNatureza != null) {
+      final tabelaNatureza = _gerarTabelaNaturezaCrimeTransito(ficha);
+      if (tabelaNatureza.isNotEmpty) {
+        buffer.writeln(tabelaNatureza);
+        buffer.writeln(_gerarParagrafoVazio());
+      }
     }
 
     // TABELA 12: EXAMES COMPLEMENTARES (vestígios coletados)
@@ -336,6 +452,45 @@ $conteudo
     </w:p>''';
   }
 
+  /// Gera um parágrafo com imagem inline (figura do corpo) para a ficha Word.
+  /// [rId] deve ser o Id do relacionamento em document.xml.rels (ex.: rIdCorpoM, rIdCorpoF).
+  String _gerarParagrafoImagemCorpo(String rId) {
+    // Tamanho em EMUs (1 polegada ≈ 914400): ~2" x 2,5" para a figura
+    const cx = 1828800;
+    const cy = 2286000;
+    return '''    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r>
+        <w:drawing>
+          <wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0">
+            <wp:extent cx="$cx" cy="$cy"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="1" name="Figura corpo"/>
+            <wp:cNvGraphicFramePr/>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="Corpo"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="$rId" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm><a:off x="0" y="0"/><a:ext cx="$cx" cy="$cy"/></a:xfrm>
+                    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>''';
+  }
+
   // ============ GERADORES DE TABELAS ============
 
   Future<String> _gerarTabelaSolicitacao(FichaCompletaModel ficha) async {
@@ -424,15 +579,16 @@ $conteudo
       if (ficha.equipesPoliciais != null &&
           ficha.equipesPoliciais!.isNotEmpty) {
         for (final equipe in ficha.equipesPoliciais!) {
-          final tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
-          final membrosTexto = equipe.membros
-              .map((m) {
-                final posto = m.postoGraduacao != null
-                    ? ' (${m.postoGraduacao})'
-                    : '';
-                return '${m.nome}$posto - ${m.matricula}';
-              })
-              .join('\n');
+          String tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
+          if (equipe.viaturaNumero != null &&
+              equipe.viaturaNumero!.trim().isNotEmpty) {
+            tipoNome += ' - Viatura n. ${equipe.viaturaNumero}';
+          }
+          final membrosTexto = equipe.membros.map((m) {
+            final posto =
+                m.postoGraduacao != null ? ' (${m.postoGraduacao})' : '';
+            return '${m.nome}$posto - ${m.matricula}';
+          }).join('\n');
 
           linhas.add([tipoNome, membrosTexto]);
         }
@@ -444,22 +600,20 @@ $conteudo
           final tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
 
           // Formatar membros com cargo, nome, CRM e matrícula
-          final membrosTexto = equipe.membros
-              .map((m) {
-                final partes = <String>[];
-                if (m.cargo != null && m.cargo!.isNotEmpty) {
-                  partes.add(m.cargo!);
-                }
-                partes.add(m.nome);
-                if (m.crm != null && m.crm!.isNotEmpty) {
-                  partes.add('CRM ${m.crm}');
-                }
-                if (m.matricula != null && m.matricula!.isNotEmpty) {
-                  partes.add('Mat. ${m.matricula}');
-                }
-                return partes.join(' - ');
-              })
-              .join('\n');
+          final membrosTexto = equipe.membros.map((m) {
+            final partes = <String>[];
+            if (m.cargo != null && m.cargo!.isNotEmpty) {
+              partes.add(m.cargo!);
+            }
+            partes.add(m.nome);
+            if (m.crm != null && m.crm!.isNotEmpty) {
+              partes.add('CRM ${m.crm}');
+            }
+            if (m.matricula != null && m.matricula!.isNotEmpty) {
+              partes.add('Mat. ${m.matricula}');
+            }
+            return partes.join(' - ');
+          }).join('\n');
 
           // Adicionar informação sobre "não estava no local"
           String observacao = '';
@@ -969,9 +1123,8 @@ $conteudo
         _adicionarCelulaTabela(buffer, vestigio.coordenadaY ?? '');
 
         // Recolhido (Sim/Não)
-        final recolhido = vestigio.tipoAcao == TipoAcaoVestigio.coletado
-            ? 'Sim'
-            : 'Não';
+        final recolhido =
+            vestigio.tipoAcao == TipoAcaoVestigio.coletado ? 'Sim' : 'Não';
         _adicionarCelulaTabela(buffer, recolhido);
 
         buffer.writeln('      </w:tr>');
@@ -1013,9 +1166,270 @@ $conteudo
     buffer.writeln('        </w:tc>');
   }
 
+  String _formatarListaTexto<T>(
+    Iterable<T>? valores,
+    String Function(T) label,
+  ) {
+    if (valores == null || valores.isEmpty) return '';
+    return valores.map(label).join(', ');
+  }
+
+  String _labelCondicaoSolo(CondicaoSoloLocal valor) => switch (valor) {
+        CondicaoSoloLocal.seco => 'Seco',
+        CondicaoSoloLocal.umido => 'Úmido',
+        CondicaoSoloLocal.molhado => 'Molhado',
+      };
+
+  String _labelIluminacao(IluminacaoLocal valor) => switch (valor) {
+        IluminacaoLocal.artificial => 'Artificial',
+        IluminacaoLocal.naturalDia => 'Natural (Dia)',
+        IluminacaoLocal.ausente => 'Ausente (Noturno)',
+      };
+
+  String _labelTracado(TracadoPista valor) => switch (valor) {
+        TracadoPista.curvaEsquerda => 'Curva à esquerda',
+        TracadoPista.curvaDireita => 'Curva à direita',
+        TracadoPista.reto => 'Reto',
+        TracadoPista.raioAmplo => 'Raio amplo',
+        TracadoPista.raioPequeno => 'Raio pequeno',
+        TracadoPista.cruzamento => 'Cruzamento',
+      };
+
+  String _labelTipoPista(TipoPistaRodovia valor) =>
+      valor == TipoPistaRodovia.simples ? 'Simples' : 'Dupla';
+  String _labelSentido(SentidoPista valor) =>
+      valor == SentidoPista.unico ? 'Único' : 'Duplo';
+
+  String _labelPerfil(PerfilPista valor) => switch (valor) {
+        PerfilPista.plano => 'Plano',
+        PerfilPista.suave => 'Suave',
+        PerfilPista.declive => 'Declive',
+        PerfilPista.moderado => 'Moderado',
+        PerfilPista.aclive => 'Aclive',
+        PerfilPista.acentuado => 'Acentuado',
+      };
+
+  String _labelCondicaoVia(CondicaoViaOpcao valor) => switch (valor) {
+        CondicaoViaOpcao.seca => 'Seca',
+        CondicaoViaOpcao.molhada => 'Molhada',
+        CondicaoViaOpcao.semDefeito => 'Sem defeito',
+        CondicaoViaOpcao.emObras => 'Em obras',
+        CondicaoViaOpcao.cascalho => 'Cascalho',
+        CondicaoViaOpcao.terra => 'Terra',
+        CondicaoViaOpcao.asfaltoRugoso => 'Asfalto rugoso',
+        CondicaoViaOpcao.buracos => 'Buracos',
+        CondicaoViaOpcao.ondulacoes => 'Ondulações',
+        CondicaoViaOpcao.contaminantes => 'Com contaminantes',
+        CondicaoViaOpcao.asfaltoLiso => 'Asfalto liso',
+        CondicaoViaOpcao.outro => 'Outro',
+      };
+
+  String _labelRegime(RegimeTrafego? valor) => switch (valor) {
+        RegimeTrafego.intenso => 'Intenso',
+        RegimeTrafego.moderado => 'Moderado',
+        RegimeTrafego.leve => 'Leve',
+        RegimeTrafego.outro => 'Outro',
+        null => '',
+      };
+
+  String _labelVisibilidade(VisibilidadeTipo? valor) => switch (valor) {
+        VisibilidadeTipo.boa => 'Boa',
+        VisibilidadeTipo.reduzida => 'Reduzida',
+        null => '',
+      };
+
+  String _labelSeparacaoFaixa(SeparacaoFaixasOpcao valor) => switch (valor) {
+        SeparacaoFaixasOpcao.simplesContinua => 'Simples contínua',
+        SeparacaoFaixasOpcao.duplaContinua => 'Dupla contínua',
+        SeparacaoFaixasOpcao.simplesSeccionada => 'Simples seccionada',
+        SeparacaoFaixasOpcao.duplaContinuaSeccionada =>
+          'Dupla contínua/seccionada',
+      };
+
+  String _labelCorFaixa(CorFaixa valor) =>
+      valor == CorFaixa.amarela ? 'Amarela' : 'Branca';
+
+  String _labelSeparacaoPista(SeparacaoPistasOpcao valor) => switch (valor) {
+        SeparacaoPistasOpcao.canteiro => 'Canteiro',
+        SeparacaoPistasOpcao.muretaConcreto => 'Mureta de concreto',
+        SeparacaoPistasOpcao.tachoes => 'Tachões',
+        SeparacaoPistasOpcao.defensa => 'Defensa / Guard rail',
+        SeparacaoPistasOpcao.nenhum => 'Nenhum',
+        SeparacaoPistasOpcao.outro => 'Outro',
+      };
+
+  String _labelElementoLateral(ElementoLateral valor) => switch (valor) {
+        ElementoLateral.meioFio => 'Meio-fio',
+        ElementoLateral.faixaPintada => 'Faixa pintada',
+        ElementoLateral.acostamento => 'Acostamento',
+        ElementoLateral.muretaConcreto => 'Mureta de concreto',
+        ElementoLateral.outro => 'Outro',
+      };
+
+  String _labelConservacao(ConservacaoEstado? valor) => switch (valor) {
+        ConservacaoEstado.boa => 'Boa',
+        ConservacaoEstado.ruim => 'Ruim',
+        null => '',
+      };
+
+  String _labelIntensidadeDano(IntensidadeDano? valor) => switch (valor) {
+        IntensidadeDano.leve => 'Leve',
+        IntensidadeDano.media => 'Média',
+        IntensidadeDano.grave => 'Grave',
+        IntensidadeDano.gravissima => 'Gravíssima',
+        null => '',
+      };
+
+  String _labelSetorImpacto(SetorImpacto valor) => switch (valor) {
+        SetorImpacto.anterior => 'Anterior',
+        SetorImpacto.posterior => 'Posterior',
+        SetorImpacto.lateralEsquerdo => 'Lateral esquerdo',
+        SetorImpacto.lateralDireito => 'Lateral direito',
+        SetorImpacto.angularAnteriorEsquerdo => 'Angular anterior esquerdo',
+        SetorImpacto.angularAnteriorDireito => 'Angular anterior direito',
+        SetorImpacto.angularPosteriorEsquerdo => 'Angular posterior esquerdo',
+        SetorImpacto.angularPosteriorDireito => 'Angular posterior direito',
+      };
+
+  String _labelTipificacao(TipificacaoDeformacao valor) => switch (valor) {
+        TipificacaoDeformacao.amassamento => 'Amassamento',
+        TipificacaoDeformacao.cisalhamento => 'Cisalhamento',
+        TipificacaoDeformacao.arrastamento => 'Arrastamento',
+        TipificacaoDeformacao.empenamento => 'Empenamento',
+        TipificacaoDeformacao.arrancamento => 'Arrancamento',
+        TipificacaoDeformacao.estampamento => 'Estampamento',
+        TipificacaoDeformacao.quebramento => 'Quebramento',
+        TipificacaoDeformacao.esmagamento => 'Esmagamento',
+        TipificacaoDeformacao.sanfonamento => 'Sanfonamento',
+        TipificacaoDeformacao.mossa => 'Mossa',
+        TipificacaoDeformacao.atritamento => 'Atritamento',
+        TipificacaoDeformacao.afundamento => 'Afundamento',
+      };
+
+  String _labelOrientacao(OrientacaoDeformacao valor) => switch (valor) {
+        OrientacaoDeformacao.direitaParaEsquerda => 'Direita → Esquerda',
+        OrientacaoDeformacao.esquerdaParaDireita => 'Esquerda → Direita',
+        OrientacaoDeformacao.dianteiraParaTraseira => 'Dianteira → Traseira',
+        OrientacaoDeformacao.traseiraParaDianteira => 'Traseira → Dianteira',
+      };
+
+  String _labelStatusComponente(StatusComponenteVeiculo? status) =>
+      switch (status) {
+        StatusComponenteVeiculo.funcionando => 'Funcionando',
+        StatusComponenteVeiculo.naoFuncionando => 'Não funcionando',
+        StatusComponenteVeiculo.prejudicado => 'Prejudicado',
+        null => '',
+      };
+
+  String _labelEstadoPneu(EstadoPneumaticos? estado) => switch (estado) {
+        EstadoPneumaticos.novos => 'Novos',
+        EstadoPneumaticos.meiaVida => 'Meia vida',
+        EstadoPneumaticos.desgastados => 'Desgastados',
+        null => '',
+      };
+
+  String _labelAirbag(AirbagStatus? status) => switch (status) {
+        AirbagStatus.acionado => 'Acionado',
+        AirbagStatus.naoAcionado => 'Não acionado',
+        AirbagStatus.ausente => 'Ausente',
+        null => '',
+      };
+
+  String _labelRetrovisor(RetrovisorStatus? status) => switch (status) {
+        RetrovisorStatus.presente => 'Presente',
+        RetrovisorStatus.ausente => 'Ausente',
+        null => '',
+      };
+
+  String _labelTacografo(TacografoStatus? status) => switch (status) {
+        TacografoStatus.ausente => 'Ausente',
+        TacografoStatus.recolhido => 'Recolhido',
+        null => '',
+      };
+
+  String _labelClassificacaoEnvolvido(
+    CrimeTransitoClassificacaoEnvolvido? valor,
+  ) =>
+      switch (valor) {
+        CrimeTransitoClassificacaoEnvolvido.condutor => 'Condutor',
+        CrimeTransitoClassificacaoEnvolvido.passageiro => 'Passageiro',
+        CrimeTransitoClassificacaoEnvolvido.pedestre => 'Pedestre',
+        null => '',
+      };
+
+  String _labelEquipamento(CrimeTransitoEquipamentoSeguranca valor) =>
+      switch (valor) {
+        CrimeTransitoEquipamentoSeguranca.cinto => 'Cinto',
+        CrimeTransitoEquipamentoSeguranca.capacete => 'Capacete',
+        CrimeTransitoEquipamentoSeguranca.nenhum => 'Nenhum',
+        CrimeTransitoEquipamentoSeguranca.naoSeAplica => 'Não se aplica',
+      };
+
+  String _labelSituacaoEnvolvido(CrimeTransitoSituacaoEnvolvido? valor) =>
+      switch (valor) {
+        CrimeTransitoSituacaoEnvolvido.semFerimentos => 'Sem ferimentos',
+        CrimeTransitoSituacaoEnvolvido.feridoGrave => 'Ferido grave (hospital)',
+        CrimeTransitoSituacaoEnvolvido.obito => 'Óbito',
+        null => '',
+      };
+
+  String _labelPosicaoEnvolvido(CrimeTransitoPosicaoEnvolvido? valor) =>
+      switch (valor) {
+        CrimeTransitoPosicaoEnvolvido.interiorVeiculo => 'Interior do veículo',
+        CrimeTransitoPosicaoEnvolvido.leitoVia => 'Leito da via',
+        CrimeTransitoPosicaoEnvolvido.exteriorPista => 'Exterior à pista',
+        null => '',
+      };
+
+  String _labelNaturezaTipo(CrimeTransitoNaturezaTipo? tipo) => switch (tipo) {
+        CrimeTransitoNaturezaTipo.simples => 'Simples (1 unidade)',
+        CrimeTransitoNaturezaTipo.composta => 'Composta (2 ou mais unidades)',
+        null => '',
+      };
+
+  String _labelFormaInteracao(CrimeTransitoFormaInteracao valor) =>
+      switch (valor) {
+        CrimeTransitoFormaInteracao.saidaPista => 'Saída de pista',
+        CrimeTransitoFormaInteracao.colisao => 'Colisão',
+        CrimeTransitoFormaInteracao.colisaoFrontal => 'Colisão frontal',
+        CrimeTransitoFormaInteracao.colisaoOposta => 'Colisão oposta',
+        CrimeTransitoFormaInteracao.objetoFixo => 'Objeto fixo',
+        CrimeTransitoFormaInteracao.capotamento => 'Capotamento',
+        CrimeTransitoFormaInteracao.abalroamento => 'Abalroamento',
+        CrimeTransitoFormaInteracao.colisaoTraseira => 'Colisão traseira',
+        CrimeTransitoFormaInteracao.colisaoTransversal => 'Colisão transversal',
+        CrimeTransitoFormaInteracao.veiculoEstacionado => 'Veículo estacionado',
+        CrimeTransitoFormaInteracao.tombamento => 'Tombamento',
+        CrimeTransitoFormaInteracao.choque => 'Choque',
+        CrimeTransitoFormaInteracao.colisaoLateral => 'Colisão lateral',
+        CrimeTransitoFormaInteracao.colisaoObliqua => 'Colisão oblíqua',
+        CrimeTransitoFormaInteracao.veiculoParado => 'Veículo parado',
+        CrimeTransitoFormaInteracao.colisaoLongitudinal =>
+          'Colisão longitudinal',
+        CrimeTransitoFormaInteracao.colisaoOrtogonal => 'Colisão ortogonal',
+        CrimeTransitoFormaInteracao.pedestre => 'Pedestre',
+        CrimeTransitoFormaInteracao.queda => 'Queda',
+        CrimeTransitoFormaInteracao.atropelamento => 'Atropelamento',
+        CrimeTransitoFormaInteracao.animal => 'Animal',
+        CrimeTransitoFormaInteracao.outro => 'Outro',
+      };
+
+  String _textoIntegridade(String titulo, IntegridadeItemModel? item) {
+    if (item == null) return '';
+    final status = item.integro == null
+        ? 'Não informado'
+        : (item.integro! ? 'Íntegros' : 'Não íntegros');
+    final obs = item.observacoes?.trim().isNotEmpty == true
+        ? ' (${item.observacoes})'
+        : '';
+    return '$titulo: $status$obs';
+  }
+
   Future<String> _gerarTabelaVeiculos(FichaCompletaModel ficha) async {
     final buffer = StringBuffer();
     final veiculos = ficha.veiculos!;
+    final isCrimeTransito =
+        ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito;
 
     for (var i = 0; i < veiculos.length; i++) {
       final veiculo = veiculos[i];
@@ -1057,6 +1471,11 @@ $conteudo
 
       if (veiculo.placa != null && veiculo.placa!.isNotEmpty) {
         linhas.add(['Placa', veiculo.placa!]);
+      }
+      if (isCrimeTransito &&
+          veiculo.chassiAparente != null &&
+          veiculo.chassiAparente!.isNotEmpty) {
+        linhas.add(['Chassi Aparente', veiculo.chassiAparente!]);
       }
 
       // Localização no ambiente
@@ -1125,6 +1544,96 @@ $conteudo
         linhas.add(['Relação com o Caso', veiculo.relacao!.label]);
       }
 
+      if (isCrimeTransito) {
+        final intensidade = _labelIntensidadeDano(veiculo.intensidadeDano);
+        if (intensidade.isNotEmpty) {
+          linhas.add(['Intensidade dos Danos', intensidade]);
+        }
+        final setores =
+            _formatarListaTexto(veiculo.setoresImpacto, _labelSetorImpacto);
+        if (setores.isNotEmpty) {
+          linhas.add(['Setor de Impacto', setores]);
+        }
+        final tipificacoes = _formatarListaTexto(
+          veiculo.tipificacoesDeformacoes,
+          _labelTipificacao,
+        );
+        if (tipificacoes.isNotEmpty) {
+          linhas.add(['Tipificação das Deformações', tipificacoes]);
+        }
+        final orientacoes = _formatarListaTexto(
+          veiculo.orientacoesDeformacoes,
+          _labelOrientacao,
+        );
+        if (orientacoes.isNotEmpty) {
+          linhas.add(['Orientação das Deformações', orientacoes]);
+        }
+        if (veiculo.danosObservacoes != null &&
+            veiculo.danosObservacoes!.isNotEmpty) {
+          linhas.add(['Observações sobre os danos', veiculo.danosObservacoes!]);
+        }
+        final farois = _labelStatusComponente(veiculo.faroisLanternas);
+        if (farois.isNotEmpty) {
+          linhas.add(['Faróis/Lanternas', farois]);
+        }
+        final cintos = _labelStatusComponente(veiculo.cintosSeguranca);
+        if (cintos.isNotEmpty) {
+          linhas.add(['Cintos de Segurança', cintos]);
+        }
+        final pneus = _labelEstadoPneu(veiculo.estadoPneumaticos);
+        if (pneus.isNotEmpty) {
+          linhas.add(['Pneumáticos', pneus]);
+        }
+        final freios = _labelStatusComponente(veiculo.freios);
+        if (freios.isNotEmpty) {
+          linhas.add(['Freios', freios]);
+        }
+        final direcao = _labelStatusComponente(veiculo.direcao);
+        if (direcao.isNotEmpty) {
+          linhas.add(['Direção', direcao]);
+        }
+        final airbag = _labelAirbag(veiculo.airbag);
+        if (airbag.isNotEmpty) {
+          linhas.add(['Airbag', airbag]);
+        }
+        final retrovisor = _labelRetrovisor(veiculo.retrovisor);
+        if (retrovisor.isNotEmpty) {
+          linhas.add(['Retrovisor', retrovisor]);
+        }
+        final tacografo = _labelTacografo(veiculo.tacografoStatus);
+        if (tacografo.isNotEmpty) {
+          linhas.add(['Disco de Tacógrafo', tacografo]);
+        }
+        if (veiculo.frenagemMetros != null &&
+            veiculo.frenagemMetros!.isNotEmpty) {
+          linhas.add(['Frenagem (m)', veiculo.frenagemMetros!]);
+        }
+
+        final detalhesBicicleta = <String>[];
+        if (veiculo.bicicletaCor != null && veiculo.bicicletaCor!.isNotEmpty) {
+          detalhesBicicleta.add('Cor: ${veiculo.bicicletaCor}');
+        }
+        if (veiculo.bicicletaMarcaModelo != null &&
+            veiculo.bicicletaMarcaModelo!.isNotEmpty) {
+          detalhesBicicleta
+              .add('Marca/Modelo: ${veiculo.bicicletaMarcaModelo}');
+        }
+        if (veiculo.bicicletaElementosSinalizacao != null &&
+            veiculo.bicicletaElementosSinalizacao!.isNotEmpty) {
+          detalhesBicicleta.add(
+            'Elementos de sinalização: ${veiculo.bicicletaElementosSinalizacao}',
+          );
+        }
+        if (veiculo.bicicletaPossuiCampainha != null) {
+          detalhesBicicleta.add(
+            'Campainha: ${veiculo.bicicletaPossuiCampainha! ? 'Sim' : 'Não'}',
+          );
+        }
+        if (detalhesBicicleta.isNotEmpty) {
+          linhas.add(['Bicicleta', detalhesBicicleta.join('\\n')]);
+        }
+      }
+
       // Observações
       if (veiculo.observacoes != null && veiculo.observacoes!.isNotEmpty) {
         linhas.add(['Observações', veiculo.observacoes!]);
@@ -1153,6 +1662,310 @@ $conteudo
     }
 
     return buffer.toString();
+  }
+
+  String _gerarTabelaCondicoesCrimeTransito(FichaCompletaModel ficha) {
+    final cond = ficha.crimeTransitoCondicoes;
+    if (cond == null) return '';
+    final linhas = <List<String>>[];
+
+    final solo = _formatarListaTexto(cond.condicoesSolo, _labelCondicaoSolo);
+    if (solo.isNotEmpty) linhas.add(['Condições do Solo', solo]);
+
+    final iluminacao = _formatarListaTexto(cond.iluminacao, _labelIluminacao);
+    if (iluminacao.isNotEmpty) {
+      linhas.add(['Iluminação', iluminacao]);
+    }
+
+    final tracado = _formatarListaTexto(cond.tracados, _labelTracado);
+    if (tracado.isNotEmpty) {
+      linhas.add(['Traçado da Pista', tracado]);
+    }
+
+    final tiposPista = _formatarListaTexto(cond.tiposPista, _labelTipoPista);
+    if (tiposPista.isNotEmpty) {
+      linhas.add(['Tipo de Pista', tiposPista]);
+    }
+
+    final sentidos = _formatarListaTexto(cond.sentidos, _labelSentido);
+    if (sentidos.isNotEmpty) linhas.add(['Sentido da Via', sentidos]);
+
+    final perfis = _formatarListaTexto(cond.perfis, _labelPerfil);
+    if (perfis.isNotEmpty) linhas.add(['Perfil da Via', perfis]);
+
+    if (cond.larguraPista != null && cond.larguraPista!.isNotEmpty) {
+      linhas.add(['Largura da Pista', '${cond.larguraPista} m']);
+    }
+
+    if (cond.intensidadePerfil != null && cond.intensidadePerfil!.isNotEmpty) {
+      linhas.add(['Intensidade (Aclive/Declive)', cond.intensidadePerfil!]);
+    }
+
+    final condicoesVia =
+        _formatarListaTexto(cond.condicoesVia, _labelCondicaoVia);
+    if (condicoesVia.isNotEmpty) {
+      linhas.add(['Condições da Via', condicoesVia]);
+    }
+
+    if (cond.condicaoViaOutroDescricao != null &&
+        cond.condicaoViaOutroDescricao!.isNotEmpty) {
+      linhas.add(['Observações da Via', cond.condicaoViaOutroDescricao!]);
+    }
+
+    if (cond.sinalizacao != null) {
+      final partes = <String>[];
+      final tipos = _formatarListaTexto(
+        cond.sinalizacao!.tipos,
+        (t) => switch (t) {
+          SinalizacaoTipo.vertical => 'Vertical',
+          SinalizacaoTipo.horizontal => 'Horizontal',
+          SinalizacaoTipo.semaforica => 'Semafórica',
+        },
+      );
+      if (tipos.isNotEmpty) partes.add('Tipos: $tipos');
+      final situacoes = _formatarListaTexto(
+        cond.sinalizacao!.situacoes,
+        (s) => switch (s) {
+          SinalizacaoSituacao.normal => 'Normal',
+          SinalizacaoSituacao.desligado => 'Desligado',
+          SinalizacaoSituacao.defeituoso => 'Defeituoso',
+        },
+      );
+      if (situacoes.isNotEmpty) partes.add('Situação: $situacoes');
+      if (cond.sinalizacao!.observacoes != null &&
+          cond.sinalizacao!.observacoes!.isNotEmpty) {
+        partes.add('Obs.: ${cond.sinalizacao!.observacoes}');
+      }
+      if (partes.isNotEmpty) {
+        linhas.add(['Sinalização', partes.join('\\n')]);
+      }
+    }
+
+    final regime = _labelRegime(cond.regimeTrafego);
+    if (regime.isNotEmpty) {
+      linhas.add(['Regime de Tráfego', regime]);
+    }
+
+    if (cond.regimeTrafegoOutro != null &&
+        cond.regimeTrafegoOutro!.isNotEmpty) {
+      linhas.add(['Descrição do Tráfego', cond.regimeTrafegoOutro!]);
+    }
+
+    final velocidades = <String>[];
+    if (cond.velocidadePorSinalizacao == true) {
+      velocidades.add('Por sinalização expressa');
+    }
+    if (cond.velocidadePorCTB == true) {
+      velocidades.add('Conforme CTB/1997');
+    }
+    if (cond.velocidadeMaxima != null && cond.velocidadeMaxima!.isNotEmpty) {
+      velocidades.add('Velocidade máxima: ${cond.velocidadeMaxima}');
+    }
+    if (velocidades.isNotEmpty) {
+      linhas.add(['Velocidade', velocidades.join('\\n')]);
+    }
+
+    if (cond.numeroFaixas != null) {
+      linhas.add(['Número de Faixas', cond.numeroFaixas.toString()]);
+    }
+
+    if (cond.largurasFaixas != null && cond.largurasFaixas!.isNotEmpty) {
+      linhas.add([
+        'Largura das Faixas',
+        cond.largurasFaixas!.map((e) => '$e m').join(', '),
+      ]);
+    }
+
+    final visibilidade = _labelVisibilidade(cond.visibilidade);
+    if (visibilidade.isNotEmpty) {
+      String texto = visibilidade;
+      if (cond.visibilidadeReducaoDescricao != null &&
+          cond.visibilidadeReducaoDescricao!.isNotEmpty) {
+        texto += ' (${cond.visibilidadeReducaoDescricao})';
+      }
+      linhas.add(['Visibilidade', texto]);
+    }
+
+    final separacaoFaixas =
+        _formatarListaTexto(cond.separacoesFaixas, _labelSeparacaoFaixa);
+    if (separacaoFaixas.isNotEmpty) {
+      linhas.add(['Separação das Faixas', separacaoFaixas]);
+    }
+
+    final corFaixas = _formatarListaTexto(cond.corFaixas, _labelCorFaixa);
+    if (corFaixas.isNotEmpty) linhas.add(['Cor das Faixas', corFaixas]);
+
+    final separacaoPistas = _formatarListaTexto(
+      cond.separacoesPistas,
+      _labelSeparacaoPista,
+    );
+    if (separacaoPistas.isNotEmpty) {
+      linhas.add(['Separação das Pistas', separacaoPistas]);
+    }
+
+    void adicionarLateral(String titulo, CrimeTransitoLateralInfo? lateral) {
+      if (lateral == null) return;
+      final partes = <String>[];
+      final elementos =
+          _formatarListaTexto(lateral.elementos, _labelElementoLateral);
+      if (elementos.isNotEmpty) partes.add('Elementos: $elementos');
+      if (lateral.largura != null && lateral.largura!.isNotEmpty) {
+        partes.add('Largura: ${lateral.largura} m');
+      }
+      final conservacao = _labelConservacao(lateral.conservacao);
+      if (conservacao.isNotEmpty) partes.add('Conservação: $conservacao');
+      if (lateral.observacoes != null && lateral.observacoes!.isNotEmpty) {
+        partes.add('Obs.: ${lateral.observacoes}');
+      }
+      if (partes.isNotEmpty) {
+        linhas.add([titulo, partes.join('\\n')]);
+      }
+    }
+
+    adicionarLateral('Lateral Direita', cond.lateralDireita);
+    adicionarLateral('Lateral Esquerda', cond.lateralEsquerda);
+
+    if (cond.observacoes != null && cond.observacoes!.isNotEmpty) {
+      linhas.add(['Observações', cond.observacoes!]);
+    }
+
+    if (linhas.isEmpty) return '';
+    return _gerarTabela(
+      cabecalho: 'CONDIÇÕES DA VIA - CRIME DE TRÂNSITO',
+      linhas: linhas,
+    );
+  }
+
+  String _gerarTabelaEnvolvidosCrimeTransito(FichaCompletaModel ficha) {
+    final envolvidos = ficha.envolvidosTransito;
+    if (envolvidos == null || envolvidos.isEmpty) return '';
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < envolvidos.length; i++) {
+      final envolvido = envolvidos[i];
+      final linhas = <List<String>>[];
+
+      if (envolvido.nome != null && envolvido.nome!.isNotEmpty) {
+        linhas.add(['Nome', envolvido.nome!]);
+      }
+      if (envolvido.cnh != null && envolvido.cnh!.isNotEmpty) {
+        linhas.add(['CNH', envolvido.cnh!]);
+      }
+      if (envolvido.cnhValidade != null && envolvido.cnhValidade!.isNotEmpty) {
+        linhas.add(['Validade CNH', envolvido.cnhValidade!]);
+      }
+      if (envolvido.cnhCategoria != null &&
+          envolvido.cnhCategoria!.isNotEmpty) {
+        linhas.add(['Categoria CNH', envolvido.cnhCategoria!]);
+      }
+      if (envolvido.rg != null && envolvido.rg!.isNotEmpty) {
+        linhas.add(['RG', envolvido.rg!]);
+      }
+      if (envolvido.dataNascimento != null &&
+          envolvido.dataNascimento!.isNotEmpty) {
+        linhas.add(['Data de Nascimento', envolvido.dataNascimento!]);
+      }
+      final classificacao =
+          _labelClassificacaoEnvolvido(envolvido.classificacao);
+      if (classificacao.isNotEmpty) {
+        linhas.add(['Classificação', classificacao]);
+      }
+      final equipamentos = _formatarListaTexto(
+          envolvido.equipamentosSeguranca, _labelEquipamento);
+      if (equipamentos.isNotEmpty) {
+        linhas.add(['Equipamentos de Segurança', equipamentos]);
+      }
+      final situacao = _labelSituacaoEnvolvido(envolvido.situacao);
+      if (situacao.isNotEmpty) linhas.add(['Situação', situacao]);
+      final posicao = _labelPosicaoEnvolvido(envolvido.posicao);
+      if (posicao.isNotEmpty) {
+        String texto = posicao;
+        if (envolvido.posicaoDetalhe != null &&
+            envolvido.posicaoDetalhe!.isNotEmpty) {
+          texto += ' (${envolvido.posicaoDetalhe})';
+        }
+        linhas.add(['Posição', texto]);
+      }
+
+      final vestes = _textoIntegridade('Vestes', envolvido.vestes);
+      if (vestes.isNotEmpty) linhas.add(['Vestes', vestes]);
+      final calcados = _textoIntegridade('Calçados', envolvido.calcados);
+      if (calcados.isNotEmpty) linhas.add(['Calçados', calcados]);
+      final pertences = _textoIntegridade('Pertences', envolvido.pertences);
+      if (pertences.isNotEmpty) linhas.add(['Pertences', pertences]);
+
+      if (envolvido.observacoes != null && envolvido.observacoes!.isNotEmpty) {
+        linhas.add(['Observações', envolvido.observacoes!]);
+      }
+
+      buffer.writeln(
+        _gerarTabela(
+          cabecalho: 'ENVOLVIDO ${i + 1}',
+          linhas: linhas,
+        ),
+      );
+      if (i < envolvidos.length - 1) {
+        buffer.writeln(_gerarParagrafoVazio());
+      }
+    }
+
+    return buffer.toString();
+  }
+
+  String _gerarTabelaNaturezaCrimeTransito(FichaCompletaModel ficha) {
+    final natureza = ficha.crimeTransitoNatureza;
+    if (natureza == null) return '';
+    final linhas = <List<String>>[];
+
+    final tipo = _labelNaturezaTipo(natureza.tipo);
+    if (tipo.isNotEmpty) linhas.add(['Tipo', tipo]);
+    if (natureza.quantidadeUnidades != null) {
+      linhas.add([
+        'Quantidade de unidades',
+        natureza.quantidadeUnidades.toString(),
+      ]);
+    }
+    final formas = _formatarListaTexto(
+      natureza.formasInteracao,
+      _labelFormaInteracao,
+    );
+    if (formas.isNotEmpty) {
+      linhas.add(['Formas de interação', formas]);
+    }
+    if (natureza.materialRecolhido != null) {
+      linhas.add([
+        'Material recolhido',
+        natureza.materialRecolhido! ? 'Sim' : 'Não',
+      ]);
+    }
+    if (natureza.materialDescricao != null &&
+        natureza.materialDescricao!.isNotEmpty) {
+      linhas.add(['Material (descrição)', natureza.materialDescricao!]);
+    }
+    if (natureza.solicitacaoExamesComplementares != null) {
+      linhas.add([
+        'Exames complementares',
+        natureza.solicitacaoExamesComplementares! ? 'Sim' : 'Não',
+      ]);
+    }
+    if (natureza.laboratorioDestino != null &&
+        natureza.laboratorioDestino!.isNotEmpty) {
+      linhas.add(['Laboratório/Seção', natureza.laboratorioDestino!]);
+    }
+    if (natureza.examesDinamica != null &&
+        natureza.examesDinamica!.isNotEmpty) {
+      linhas.add(['Exames / Dinâmica', natureza.examesDinamica!]);
+    }
+    if (natureza.croquiObservacoes != null &&
+        natureza.croquiObservacoes!.isNotEmpty) {
+      linhas.add(['Croqui', natureza.croquiObservacoes!]);
+    }
+
+    if (linhas.isEmpty) return '';
+    return _gerarTabela(
+      cabecalho: 'NATUREZA DA OCORRÊNCIA - CRIME DE TRÂNSITO',
+      linhas: linhas,
+    );
   }
 
   String _gerarTabelaVestigiosVeiculo({
@@ -1257,9 +2070,8 @@ $conteudo
       _adicionarCelulaTabelaVestigioVeiculo(buffer, vestigio.localizacao ?? '');
 
       // Recolhido (Sim/Não)
-      final recolhido = vestigio.tipoAcao == TipoAcaoVestigioVeiculo.coletado
-          ? 'Sim'
-          : 'Não';
+      final recolhido =
+          vestigio.tipoAcao == TipoAcaoVestigioVeiculo.coletado ? 'Sim' : 'Não';
       _adicionarCelulaTabelaVestigioVeiculo(buffer, recolhido);
 
       buffer.writeln('      </w:tr>');
@@ -1980,6 +2792,14 @@ $conteudo
         );
       }
 
+      // Figura do corpo (masculino/feminino) conforme sexo do cadáver — após tabela de lesões
+      buffer.writeln(_gerarParagrafoVazio());
+      final rIdCorpo = cadaver.sexo == SexoCadaver.feminino
+          ? _rIdCorpoFeminino
+          : _rIdCorpoMasculino;
+      buffer.writeln(_gerarParagrafoImagemCorpo(rIdCorpo));
+      buffer.writeln(_gerarParagrafoVazio());
+
       // Gerar tabela de vestes se houver
       if (cadaver.vestes != null && cadaver.vestes!.isNotEmpty) {
         buffer.writeln(_gerarParagrafoVazio());
@@ -2087,8 +2907,27 @@ $conteudo
       // Região
       _adicionarCelulaTabelaLesao(buffer, lesao.regiao);
 
-      // Descrição (já vem formatada da função gerarDescricaoPAF quando é PAF)
-      _adicionarCelulaTabelaLesao(buffer, lesao.descricao ?? '');
+      // Descrição: mesma lógica do laudo (PAF gerada, senão descricao ou fallback)
+      String descricaoCelula;
+      if (lesao.descricao != null && lesao.descricao!.trim().isNotEmpty) {
+        descricaoCelula = lesao.descricao!;
+        if (lesao.tipo != null && lesao.tipo!.trim().isNotEmpty && !lesao.isPaf) {
+          descricaoCelula = '${lesao.tipo}: $descricaoCelula';
+        }
+      } else if (lesao.isPaf && lesao.paf != null) {
+        descricaoCelula = gerarDescricaoPAF(
+          regiao: lesao.regiao,
+          tipo: lesao.paf!.tipo,
+          distancia: lesao.paf!.distancia,
+          diametro: lesao.paf!.diametro,
+          sinais: lesao.paf!.sinais,
+        );
+      } else {
+        descricaoCelula = lesao.tipo != null && lesao.tipo!.trim().isNotEmpty
+            ? '${lesao.tipo}: Lesão em ${lesao.regiao}'
+            : 'Lesão em ${lesao.regiao}';
+      }
+      _adicionarCelulaTabelaLesao(buffer, descricaoCelula);
 
       buffer.writeln('      </w:tr>');
     }
@@ -2380,14 +3219,12 @@ $conteudo
       // Vestígio de local
       if (info.tipoDestino != null) {
         if (info.tipoDestino == TipoDestinoVestigio.unidade) {
-          final unidade = unidades
-              .where((u) => u.id == info.destinoId)
-              .firstOrNull;
+          final unidade =
+              unidades.where((u) => u.id == info.destinoId).firstOrNull;
           return unidade?.nome ?? '';
         } else if (info.tipoDestino == TipoDestinoVestigio.laboratorio) {
-          final lab = laboratorios
-              .where((l) => l.id == info.destinoId)
-              .firstOrNull;
+          final lab =
+              laboratorios.where((l) => l.id == info.destinoId).firstOrNull;
           return lab?.nome ?? '';
         }
       }
@@ -2395,15 +3232,13 @@ $conteudo
       // Vestígio de veículo
       if (info.tipoDestinoVeiculo != null) {
         if (info.tipoDestinoVeiculo == TipoDestinoVestigioVeiculo.unidade) {
-          final unidade = unidades
-              .where((u) => u.id == info.destinoId)
-              .firstOrNull;
+          final unidade =
+              unidades.where((u) => u.id == info.destinoId).firstOrNull;
           return unidade?.nome ?? '';
         } else if (info.tipoDestinoVeiculo ==
             TipoDestinoVestigioVeiculo.laboratorio) {
-          final lab = laboratorios
-              .where((l) => l.id == info.destinoId)
-              .firstOrNull;
+          final lab =
+              laboratorios.where((l) => l.id == info.destinoId).firstOrNull;
           return lab?.nome ?? '';
         }
       }

@@ -1,5 +1,10 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/detatlhes_local.dart';
 import '../models/ficha_completa_model.dart';
@@ -29,6 +34,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   final _peritoService = PeritoService();
   final _unidadeService = UnidadeService();
   final _laboratorioService = LaboratorioService();
+  final _imagePicker = ImagePicker();
   final _viasAcessoController = TextEditingController();
   final _sinaisArrombamentoController = TextEditingController();
   final _descricaoLocalController = TextEditingController();
@@ -82,6 +88,118 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   bool? _sinaisArrombamentoNao;
   bool? _sinaisArrombamentoNaoSeAplica;
 
+  // Descrição assistida – Mediato
+  String? _tipoRegiaoMediato;
+  String? _tipoImovelMediato;
+  int? _qtdPavimentosMediato;
+  final Set<String> _infraestruturaMediato = {};
+  final Set<String> _delimitacaoMediato = {};
+  final Set<String> _acessosMediato = {};
+
+  // Descrição assistida – Imediato
+  String? _abrangenciaImediato;
+  final Set<String> _ambientesImediato = {};
+  final Set<String> _estruturasImediato = {};
+  final Set<String> _acessosImediato = {};
+  String? _estadoConservacaoImediato;
+
+  static const _opcoesAbrangenciaImediato = [
+    'único ambiente',
+    'múltiplos ambientes',
+  ];
+  static const _opcoesAmbiente = [
+    'sala',
+    'quarto',
+    'cozinha',
+    'banheiro',
+    'garagem',
+    'quintal',
+    'varanda',
+    'corredor',
+    'escritório',
+    'depósito',
+    'área de serviço',
+    'loja (interior)',
+    'recepção',
+    'estacionamento',
+    'área comum',
+    'outro',
+  ];
+  static const _opcoesEstruturas = [
+    'fechadura',
+    'cadeado',
+    'tranca',
+    'janela de vidro',
+    'janela basculante',
+    'grade na janela',
+    'porta de madeira',
+    'porta de vidro',
+    'porta metálica',
+    'câmera de segurança',
+    'alarme',
+  ];
+  static const _opcoesEstadoConservacao = [
+    'bom estado de conservação',
+    'estado regular de conservação',
+    'mau estado de conservação',
+    'em reforma',
+    'abandonado',
+  ];
+
+  static const _opcoesRegiao = [
+    'comercial',
+    'residencial',
+    'mista (residencial e comercial)',
+    'industrial',
+    'rural',
+  ];
+  static const _opcoesInfraestrutura = [
+    'asfalto',
+    'calçadas',
+    'iluminação pública',
+    'rede de esgoto',
+    'transporte público',
+  ];
+  static const _opcoesTipoImovel = [
+    'casa',
+    'apartamento',
+    'kitnet',
+    'loja',
+    'galpão',
+    'prédio comercial',
+    'prédio residencial',
+    'terreno baldio',
+    'igreja',
+    'escola',
+    'outro',
+  ];
+  static const _opcoesDelimitacao = [
+    'muro de alvenaria',
+    'grade metálica',
+    'cerca de arame',
+    'cerca viva',
+    'sem delimitação',
+  ];
+  static const _opcoesAcessos = [
+    'portão metálico',
+    'porta de madeira',
+    'porta de vidro',
+    'porta metálica de enrolar',
+    'porta de alumínio',
+    'janela',
+    'garagem',
+  ];
+  static const _opcoesAcessosInternos = [
+    'porta interna de madeira',
+    'porta interna de vidro',
+    'porta metálica',
+    'janela',
+    'corredor interno',
+    'escada interna',
+    'varanda',
+    'área de serviço',
+  ];
+
   // Vestígios por local
   List<VestigioLocalModel> _vestigiosMediato = [];
   List<VestigioLocalModel> _vestigiosImediato = [];
@@ -89,6 +207,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   bool _semVestigiosMediato = false;
   bool _semVestigiosImediato = false;
   bool _semVestigiosRelacionado = false;
+  List<String> _fotosVistaAmplaPaths = [];
 
   @override
   void initState() {
@@ -162,6 +281,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _semVestigiosImediato = dados.semVestigiosImediato ?? false;
       _semVestigiosRelacionado = dados.semVestigiosRelacionado ?? false;
       _demaisObservacoesController.text = dados.demaisObservacoes ?? '';
+      _fotosVistaAmplaPaths = List<String>.from(dados.fotosVistaAmplaPaths ?? []);
     }
   }
 
@@ -396,6 +516,35 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
 
   String _gerarIdVestigio() => DateTime.now().microsecondsSinceEpoch.toString();
 
+  String _nomeArquivo(String path) {
+    final idx = path.lastIndexOf(Platform.pathSeparator);
+    return idx >= 0 ? path.substring(idx + 1) : path;
+  }
+
+  Future<String?> _persistirFotoVestigio(XFile arquivo) async {
+    try {
+      final origem = File(arquivo.path);
+      if (!await origem.exists()) return null;
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_fotografico/${widget.ficha.id}',
+      );
+      if (!await pasta.exists()) {
+        await pasta.create(recursive: true);
+      }
+      final ext = arquivo.path.contains('.')
+          ? arquivo.path.split('.').last.toLowerCase()
+          : 'jpg';
+      final destino = File(
+        '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
+      );
+      await origem.copy(destino.path);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _adicionarOuEditarVestigio(
     String secao, {
     VestigioLocalModel? existente,
@@ -411,6 +560,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     );
     final alturaCtrl = TextEditingController(
       text: existente?.alturaRelacaoPiso ?? '',
+    );
+    final fotosVinculadas = List<String>.from(
+      existente?.fotosVinculadasPaths ?? const <String>[],
     );
 
     TipoAcaoVestigio? tipoAcaoSelecionado = existente?.tipoAcao;
@@ -483,6 +635,79 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                       textInputAction: TextInputAction.newline,
                     ),
                     const SizedBox(height: 12),
+                    const Text(
+                      'Fotografias do vestígio *',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final foto = await _imagePicker.pickImage(
+                              source: ImageSource.camera,
+                              imageQuality: 90,
+                            );
+                            if (foto == null) return;
+                            final path = await _persistirFotoVestigio(foto);
+                            if (path == null) return;
+                            setDialogState(() {
+                              fotosVinculadas.add(path);
+                            });
+                          },
+                          icon: const Icon(Icons.photo_camera),
+                          label: const Text('Fotografar'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final fotos = await _imagePicker.pickMultiImage(
+                              imageQuality: 90,
+                            );
+                            if (fotos.isEmpty) return;
+                            for (final foto in fotos) {
+                              final path = await _persistirFotoVestigio(foto);
+                              if (path != null) {
+                                setDialogState(() {
+                                  fotosVinculadas.add(path);
+                                });
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.photo_library),
+                          label: const Text('Galeria'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (fotosVinculadas.isEmpty)
+                      Text(
+                        'Nenhuma foto vinculada.',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      )
+                    else
+                      ...fotosVinculadas.asMap().entries.map(
+                        (entry) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.image_outlined, size: 18),
+                          title: Text(
+                            _nomeArquivo(entry.value),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            tooltip: 'Remover foto',
+                            onPressed: () {
+                              setDialogState(() {
+                                fotosVinculadas.removeAt(entry.key);
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -491,8 +716,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Coordenada X *',
                               border: OutlineInputBorder(),
+                              hintText: 'Ex: -23,5 ou -23.5',
                             ),
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -502,8 +731,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Coordenada Y *',
                               border: OutlineInputBorder(),
+                              hintText: 'Ex: -46,6 ou -46.6',
                             ),
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
+                            ),
                           ),
                         ),
                       ],
@@ -739,6 +972,14 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                       return;
                     }
 
+                    if (fotosVinculadas.isEmpty) {
+                      setDialogState(() {
+                        erroMensagem =
+                            'Informe ao menos uma fotografia relacionada ao vestígio.';
+                      });
+                      return;
+                    }
+
                     if (tipoAcaoSelecionado == TipoAcaoVestigio.coletado) {
                       if (tipoDestinoSelecionado == null) {
                         setDialogState(() {
@@ -807,6 +1048,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           ? null
                           : numeroLacreCtrl.text.trim(),
                       isSangueHumano: isSangueHumano,
+                      fotosVinculadasPaths: fotosVinculadas,
                     );
 
                     setState(() {
@@ -985,6 +1227,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         sinaisArrombamentoSim: _sinaisArrombamentoSim,
         sinaisArrombamentoNao: _sinaisArrombamentoNao,
         sinaisArrombamentoNaoSeAplica: _sinaisArrombamentoNaoSeAplica,
+        fotosVistaAmplaPaths: _fotosVistaAmplaPaths.isEmpty ? null : _fotosVistaAmplaPaths,
       );
 
       // Preservar todos os dados existentes
@@ -1127,6 +1370,373 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     );
   }
 
+  String _gerarTextoDescricaoMediato() {
+    final partes = <String>[];
+
+    if (_tipoImovelMediato != null) {
+      String frase = 'Tratava-se de $_tipoImovelMediato';
+      if (_qtdPavimentosMediato != null && _qtdPavimentosMediato! > 0) {
+        final n = _qtdPavimentosMediato.toString().padLeft(2, '0');
+        frase += ' de $n pavimento${_qtdPavimentosMediato == 1 ? '' : 's'}';
+      }
+      frase += '.';
+      partes.add(frase);
+    }
+
+    if (_tipoRegiaoMediato != null) {
+      String frase =
+          'O imóvel estava situado em região predominantemente $_tipoRegiaoMediato';
+      if (_infraestruturaMediato.isNotEmpty) {
+        frase += ', provida de ${_listarItens(_infraestruturaMediato.toList())}';
+      }
+      frase += '.';
+      partes.add(frase);
+    }
+
+    if (_delimitacaoMediato.isNotEmpty) {
+      if (_delimitacaoMediato.contains('sem delimitação')) {
+        partes.add(
+          'Não existia muro ou qualquer outro tipo de cerca delimitando o terreno.',
+        );
+      } else {
+        partes.add(
+          'O terreno era delimitado por ${_listarItens(_delimitacaoMediato.toList())}.',
+        );
+      }
+    }
+
+    if (_acessosMediato.isNotEmpty) {
+      partes.add(
+        'O acesso se dava por ${_listarItens(_acessosMediato.toList())}.',
+      );
+    }
+
+    return partes.join(' ');
+  }
+
+  String _gerarTextoDescricaoImediato() {
+    final partes = <String>[];
+
+    if (_ambientesImediato.isNotEmpty) {
+      final ambientes = _listarItens(_ambientesImediato.toList());
+      final plural = _ambientesImediato.length > 1;
+      String frase = plural
+          ? 'O local imediato abrangeu múltiplos ambientes no interior do imóvel, compreendendo $ambientes'
+          : 'O local imediato correspondeu ao ambiente: $ambientes';
+      if (_estadoConservacaoImediato != null) {
+        frase += ', em $_estadoConservacaoImediato';
+      }
+      frase += '.';
+      partes.add(frase);
+    }
+
+    if (_estruturasImediato.isNotEmpty) {
+      partes.add(
+        'O ambiente possuía ${_listarItens(_estruturasImediato.toList())}.',
+      );
+    }
+
+    if (_acessosImediato.isNotEmpty) {
+      partes.add(
+        'O acesso ao(s) ambiente(s) imediato(s) se dava por ${_listarItens(_acessosImediato.toList())}.',
+      );
+    }
+
+    return partes.join(' ');
+  }
+
+  String _listarItens(List<String> itens) {
+    if (itens.isEmpty) return '';
+    if (itens.length == 1) return itens.first;
+    final ultimos = itens.sublist(0, itens.length - 1).join(', ');
+    return '$ultimos e ${itens.last}';
+  }
+
+  void _atualizarTextoMediato() {
+    final texto = _gerarTextoDescricaoMediato();
+    if (texto.isNotEmpty) {
+      _descricaoMediatoController.text = texto;
+    }
+  }
+
+  void _atualizarTextoImediato() {
+    final texto = _gerarTextoDescricaoImediato();
+    if (texto.isNotEmpty) {
+      _descricaoImediatoController.text = texto;
+    }
+  }
+
+  Widget _buildDescricaoAssistidaMediato() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Assistente de descrição',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Selecione as opções para gerar o texto automaticamente.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _tipoRegiaoMediato,
+          decoration: const InputDecoration(
+            labelText: 'Tipo de região',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _opcoesRegiao
+              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .toList(),
+          onChanged: (v) => setState(() {
+            _tipoRegiaoMediato = v;
+            _atualizarTextoMediato();
+          }),
+        ),
+        const SizedBox(height: 12),
+        const Text('Infraestrutura da região'),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 0,
+          children: _opcoesInfraestrutura
+              .map(
+                (op) => FilterChip(
+                  label: Text(_capitalize(op)),
+                  selected: _infraestruturaMediato.contains(op),
+                  onSelected: (_) => setState(() {
+                    _infraestruturaMediato.contains(op)
+                        ? _infraestruturaMediato.remove(op)
+                        : _infraestruturaMediato.add(op);
+                    _atualizarTextoMediato();
+                  }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _tipoImovelMediato,
+          decoration: const InputDecoration(
+            labelText: 'Tipo de imóvel',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _opcoesTipoImovel
+              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .toList(),
+          onChanged: (v) => setState(() {
+            _tipoImovelMediato = v;
+            _atualizarTextoMediato();
+          }),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          isExpanded: true,
+          initialValue: _qtdPavimentosMediato,
+          decoration: const InputDecoration(
+            labelText: 'Nº de pavimentos',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: List.generate(10, (i) => i + 1)
+              .map((n) => DropdownMenuItem(
+                    value: n,
+                    child: Text(n.toString().padLeft(2, '0')),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() {
+            _qtdPavimentosMediato = v;
+            _atualizarTextoMediato();
+          }),
+        ),
+        const SizedBox(height: 12),
+        const Text('Delimitação'),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 0,
+          children: _opcoesDelimitacao
+              .map(
+                (op) => FilterChip(
+                  label: Text(_capitalize(op)),
+                  selected: _delimitacaoMediato.contains(op),
+                  onSelected: (_) => setState(() {
+                    _delimitacaoMediato.contains(op)
+                        ? _delimitacaoMediato.remove(op)
+                        : _delimitacaoMediato.add(op);
+                    _atualizarTextoMediato();
+                  }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 12),
+        const Text('Acessos'),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 0,
+          children: _opcoesAcessos
+              .map(
+                (op) => FilterChip(
+                  label: Text(_capitalize(op)),
+                  selected: _acessosMediato.contains(op),
+                  onSelected: (_) => setState(() {
+                    _acessosMediato.contains(op)
+                        ? _acessosMediato.remove(op)
+                        : _acessosMediato.add(op);
+                    _atualizarTextoMediato();
+                  }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildDescricaoAssistidaImediato() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Assistente de descrição',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Descreva o(s) ambiente(s) onde ocorreu o fato.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _abrangenciaImediato,
+          decoration: const InputDecoration(
+            labelText: 'Abrangência do local imediato',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _opcoesAbrangenciaImediato
+              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .toList(),
+          onChanged: (v) => setState(() {
+            _abrangenciaImediato = v;
+            if (v == 'único ambiente' && _ambientesImediato.length > 1) {
+              final primeiro = _ambientesImediato.first;
+              _ambientesImediato
+                ..clear()
+                ..add(primeiro);
+            }
+            _atualizarTextoImediato();
+          }),
+        ),
+        const SizedBox(height: 12),
+        const Text('Ambiente(s) do fato'),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 0,
+          children: _opcoesAmbiente
+              .map(
+                (op) => FilterChip(
+                  label: Text(_capitalize(op)),
+                  selected: _ambientesImediato.contains(op),
+                  onSelected: (_) => setState(() {
+                    _ambientesImediato.contains(op)
+                        ? _ambientesImediato.remove(op)
+                        : _ambientesImediato.add(op);
+                    if (_abrangenciaImediato == 'único ambiente' &&
+                        _ambientesImediato.length > 1) {
+                      _ambientesImediato
+                        ..clear()
+                        ..add(op);
+                    }
+                    _atualizarTextoImediato();
+                  }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _estadoConservacaoImediato,
+          decoration: const InputDecoration(
+            labelText: 'Estado de conservação',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: _opcoesEstadoConservacao
+              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .toList(),
+          onChanged: (v) => setState(() {
+            _estadoConservacaoImediato = v;
+            _atualizarTextoImediato();
+          }),
+        ),
+        const SizedBox(height: 12),
+        const Text('Estruturas pertinentes ao exame'),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 0,
+          children: _opcoesEstruturas
+              .map(
+                (op) => FilterChip(
+                  label: Text(_capitalize(op)),
+                  selected: _estruturasImediato.contains(op),
+                  onSelected: (_) => setState(() {
+                    _estruturasImediato.contains(op)
+                        ? _estruturasImediato.remove(op)
+                        : _estruturasImediato.add(op);
+                    _atualizarTextoImediato();
+                  }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 12),
+        const Text('Acessos internos ao(s) ambiente(s)'),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 0,
+          children: _opcoesAcessosInternos
+              .map(
+                (op) => FilterChip(
+                  label: Text(_capitalize(op)),
+                  selected: _acessosImediato.contains(op),
+                  onSelected: (_) => setState(() {
+                    _acessosImediato.contains(op)
+                        ? _acessosImediato.remove(op)
+                        : _acessosImediato.add(op);
+                    _atualizarTextoImediato();
+                  }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  String _capitalize(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1);
+  }
+
   Widget _buildSecaoLocalDetalhado({
     required String titulo,
     required String local,
@@ -1180,7 +1790,16 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (local == 'mediato') _buildDescricaoAssistidaMediato(),
+                if (local == 'imediato') _buildDescricaoAssistidaImediato(),
                 const Text('Descrição (do geral para o particular)'),
+                const SizedBox(height: 4),
+                Text(
+                  local == 'mediato' || local == 'imediato'
+                      ? 'Texto gerado automaticamente. Edite à vontade.'
+                      : 'Descreva o local...',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: descricaoController,
@@ -1190,7 +1809,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     isDense: true,
                   ),
                   maxLines: null,
-                  minLines: 5,
+                  minLines: 4,
                   textInputAction: TextInputAction.newline,
                 ),
                 const SizedBox(height: 16),
@@ -1222,8 +1841,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           labelText: 'Coordenada X',
                           border: OutlineInputBorder(),
                           isDense: true,
+                          hintText: 'Ex: -23,5',
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: true,
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1234,8 +1857,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           labelText: 'Coordenada Y',
                           border: OutlineInputBorder(),
                           isDense: true,
+                          hintText: 'Ex: -46,6',
                         ),
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: true,
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -1408,6 +2035,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   'Altura em relação ao piso: ${v.alturaRelacaoPiso}',
+                                ),
+                              ),
+                            if (v.fotosVinculadasPaths.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Fotografias vinculadas: ${v.fotosVinculadasPaths.length}',
                                 ),
                               ),
                             if (v.tipoAcao != null)
@@ -1584,6 +2218,113 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                   fontSize: 16,
                 ),
                 textAlign: TextAlign.center,
+              ),
+            ),
+            // Foto(s) vista ampla do local
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Foto(s) vista ampla do local',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ex.: fachada ou porção anterior do imóvel (será a Fotografia 01 no laudo).',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final foto = await _imagePicker.pickImage(
+                            source: ImageSource.camera,
+                            imageQuality: 90,
+                          );
+                          if (foto != null && mounted) {
+                            final path = await _persistirFotoVestigio(foto);
+                            if (path != null) {
+                              setState(() => _fotosVistaAmplaPaths.add(path));
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.photo_camera),
+                        label: const Text('Câmera'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final result = await FilePicker.platform.pickFiles(
+                            type: FileType.image,
+                            allowMultiple: true,
+                          );
+                          if (result != null && result.files.isNotEmpty && mounted) {
+                            for (final f in result.files) {
+                              if (f.path == null) continue;
+                              final path = await _persistirFotoVestigio(XFile(f.path!));
+                              if (path != null) {
+                                setState(() => _fotosVistaAmplaPaths.add(path));
+                              }
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.photo_library),
+                        label: const Text('Galeria'),
+                      ),
+                    ],
+                  ),
+                  if (_fotosVistaAmplaPaths.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _fotosVistaAmplaPaths.asMap().entries.map((e) {
+                        return Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(e.value),
+                                width: 72,
+                                height: 72,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: IconButton(
+                                icon: const Icon(Icons.close, size: 20),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black54,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.all(4),
+                                ),
+                                onPressed: () {
+                                  setState(() => _fotosVistaAmplaPaths.removeAt(e.key));
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
               ),
             ),
             // Tabela de dados

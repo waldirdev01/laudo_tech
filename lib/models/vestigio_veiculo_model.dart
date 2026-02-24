@@ -41,6 +41,12 @@ class VestigioVeiculoModel {
   // Flag para identificar sangue humano (para textos específicos no laudo)
   final bool isSangueHumano;
 
+  /// Fotos vinculadas a este vestígio (paths locais).
+  final List<String> fotosPaths;
+
+  /// Números das fotografias no anexo do laudo (preenchido na geração do laudo).
+  final List<int>? numerosFotografias;
+
   VestigioVeiculoModel({
     required this.id,
     this.descricao,
@@ -52,6 +58,8 @@ class VestigioVeiculoModel {
     this.dataHoraColeta,
     this.numeroLacre,
     this.isSangueHumano = false,
+    this.fotosPaths = const [],
+    this.numerosFotografias,
   });
 
   Map<String, dynamic> toJson() => {
@@ -65,6 +73,7 @@ class VestigioVeiculoModel {
         'dataHoraColeta': dataHoraColeta,
         'numeroLacre': numeroLacre,
         'isSangueHumano': isSangueHumano,
+        'fotosPaths': fotosPaths,
       };
 
   factory VestigioVeiculoModel.fromJson(Map<String, dynamic> json) {
@@ -95,6 +104,10 @@ class VestigioVeiculoModel {
       dataHoraColeta: json['dataHoraColeta'] as String?,
       numeroLacre: json['numeroLacre'] as String?,
       isSangueHumano: json['isSangueHumano'] as bool? ?? false,
+      fotosPaths: (json['fotosPaths'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -109,6 +122,8 @@ class VestigioVeiculoModel {
     String? dataHoraColeta,
     String? numeroLacre,
     bool? isSangueHumano,
+    List<String>? fotosPaths,
+    List<int>? numerosFotografias,
   }) {
     return VestigioVeiculoModel(
       id: id ?? this.id,
@@ -121,6 +136,8 @@ class VestigioVeiculoModel {
       dataHoraColeta: dataHoraColeta ?? this.dataHoraColeta,
       numeroLacre: numeroLacre ?? this.numeroLacre,
       isSangueHumano: isSangueHumano ?? this.isSangueHumano,
+      fotosPaths: fotosPaths ?? this.fotosPaths,
+      numerosFotografias: numerosFotografias ?? this.numerosFotografias,
     );
   }
 

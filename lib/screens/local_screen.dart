@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/ficha_completa_model.dart';
 import '../models/local_ficha_model.dart';
@@ -25,6 +29,9 @@ class _LocalScreenState extends State<LocalScreen> {
   bool _obtendoCoordenadas = false;
   bool _salvando = false;
 
+  /// Caminho da imagem de captura de tela do mapa (copiada para o app).
+  String? _capturaTelaLocalPath;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +51,7 @@ class _LocalScreenState extends State<LocalScreen> {
           widget.ficha.local!.municipio ?? _municipioController.text;
       _latitude = widget.ficha.local!.latitude;
       _longitude = widget.ficha.local!.longitude;
+      _capturaTelaLocalPath = widget.ficha.local!.capturaTelaLocalPath;
     }
   }
 
@@ -211,6 +219,7 @@ class _LocalScreenState extends State<LocalScreen> {
             : _municipioController.text.trim(),
         latitude: _latitude,
         longitude: _longitude,
+        capturaTelaLocalPath: _capturaTelaLocalPath,
       );
 
       // Preservar todos os dados existentes
@@ -264,6 +273,72 @@ class _LocalScreenState extends State<LocalScreen> {
     }
   }
 
+  Future<void> _adicionarCapturaTela() async {
+    final escolheu = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Captura de tela do local'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Abra o Google Maps no seu celular, busque o endereço ou localize '
+            'o ponto no mapa e tire um print da tela.\n\n'
+            'Em seguida, toque em "Selecionar da galeria" para escolher a imagem '
+            'do print e inseri-la no laudo, abaixo do endereço.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Selecionar da galeria'),
+          ),
+        ],
+      ),
+    );
+    if (escolheu != true || !mounted) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+    final path = result.files.single.path;
+    if (path == null || path.isEmpty) return;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final capturaDir = Directory('${dir.path}/laudo_tech/captura_local');
+      if (!await capturaDir.exists()) await capturaDir.create(recursive: true);
+      final ext = path.split('.').last;
+      final destPath =
+          '${capturaDir.path}/local_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      await File(path).copy(destPath);
+      if (mounted) {
+        setState(() => _capturaTelaLocalPath = destPath);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Imagem adicionada. Salve o local para confirmar.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao salvar imagem: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removerCapturaTela() {
+    setState(() => _capturaTelaLocalPath = null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final localModel = LocalFichaModel(
@@ -272,7 +347,10 @@ class _LocalScreenState extends State<LocalScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Local - Coordenadas GPS'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Local - Coordenadas GPS'),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -439,6 +517,60 @@ class _LocalScreenState extends State<LocalScreen> {
                 ],
               ),
             ),
+            if (_latitude != null && _longitude != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Captura de tela do local',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Abra o Google Maps no celular, tire um print do local e adicione abaixo.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_capturaTelaLocalPath != null) ...[
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(_capturaTelaLocalPath!),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: Icon(Icons.broken_image),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: const Text(
+                        'Imagem será incluída no laudo abaixo do endereço.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _removerCapturaTela,
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: 'Remover imagem',
+                    ),
+                  ],
+                ),
+              ] else
+                OutlinedButton.icon(
+                  onPressed: _adicionarCapturaTela,
+                  icon: const Icon(Icons.add_photo_alternate, size: 20),
+                  label: const Text('Adicionar captura de tela do mapa'),
+                ),
+            ],
             const SizedBox(height: 32),
             FilledButton(
               onPressed: _salvando ? null : _salvarLocal,
@@ -454,7 +586,9 @@ class _LocalScreenState extends State<LocalScreen> {
                     )
                   : const Text('Salvar e Continuar'),
             ),
-            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+            const SizedBox(
+              height: 80,
+            ), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),

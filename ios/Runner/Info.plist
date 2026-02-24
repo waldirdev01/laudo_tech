@@ -53,5 +53,7 @@
 	<string>Este aplicativo precisa acessar suas fotos para incluir imagens no levantamento fotográfico do laudo pericial.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Este aplicativo pode precisar salvar fotos relacionadas aos laudos periciais.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Este aplicativo precisa acessar a câmera para fotografar vestígios e o local durante o registro pericial.</string>
 </dict>
 </plist>

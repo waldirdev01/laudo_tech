@@ -4,12 +4,15 @@ class LocalFichaModel {
   final String? municipio;
   final double? latitude; // Coordenada S (Sul) em formato decimal
   final double? longitude; // Coordenada W (Oeste) em formato decimal
+  /// Caminho local da imagem de captura de tela do mapa (para incluir no laudo).
+  final String? capturaTelaLocalPath;
 
   LocalFichaModel({
     this.endereco,
     this.municipio,
     this.latitude,
     this.longitude,
+    this.capturaTelaLocalPath,
   });
 
   /// Converte coordenadas decimais para formato DMS (Graus, Minutos, Segundos)
@@ -37,6 +40,7 @@ class LocalFichaModel {
         'municipio': municipio,
         'latitude': latitude,
         'longitude': longitude,
+        'capturaTelaLocalPath': capturaTelaLocalPath,
       };
 
   factory LocalFichaModel.fromJson(Map<String, dynamic> json) =>
@@ -45,6 +49,7 @@ class LocalFichaModel {
         municipio: json['municipio'] as String?,
         latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
         longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+        capturaTelaLocalPath: json['capturaTelaLocalPath'] as String?,
       );
 
   LocalFichaModel copyWith({
@@ -52,12 +57,14 @@ class LocalFichaModel {
     String? municipio,
     double? latitude,
     double? longitude,
+    String? capturaTelaLocalPath,
   }) {
     return LocalFichaModel(
       endereco: endereco ?? this.endereco,
       municipio: municipio ?? this.municipio,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      capturaTelaLocalPath: capturaTelaLocalPath ?? this.capturaTelaLocalPath,
     );
   }
 }

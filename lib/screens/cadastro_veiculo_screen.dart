@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/ficha_completa_model.dart';
 import '../models/laboratorio_model.dart';
@@ -9,6 +13,7 @@ import '../models/vestigio_veiculo_model.dart';
 import '../services/laboratorio_service.dart';
 import '../services/perito_service.dart';
 import '../services/unidade_service.dart';
+import '../models/tipo_ocorrencia.dart';
 
 class CadastroVeiculoScreen extends StatefulWidget {
   final VeiculoModel veiculo;
@@ -36,6 +41,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   final _anoModeloCtrl = TextEditingController();
   final _corCtrl = TextEditingController();
   final _placaCtrl = TextEditingController();
+  final _chassiCtrl = TextEditingController();
 
   // Controllers - Localização
   final _localizacaoAmbienteCtrl = TextEditingController();
@@ -52,6 +58,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   // Controllers - Estado e Posição
   final _posicaoLivreCtrl = TextEditingController();
   final _condicaoGeralCtrl = TextEditingController();
+  final _danosObservacoesCtrl = TextEditingController();
+  final _frenagemCtrl = TextEditingController();
+  final _bicicletaCorCtrl = TextEditingController();
+  final _bicicletaModeloCtrl = TextEditingController();
+  final _bicicletaSinalizacaoCtrl = TextEditingController();
 
   // Controllers - Vestígios (legados, mantidos para compatibilidade)
   final _localizacaoSangueCtrl = TextEditingController();
@@ -64,8 +75,27 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   TipoVeiculo? _tipoVeiculo;
   PosicaoVeiculo? _posicao;
   RelacaoVeiculo? _relacao;
+  IntensidadeDano? _intensidadeDano;
+  final Set<SetorImpacto> _setoresImpacto = {};
+  final Set<TipificacaoDeformacao> _tipificacoes = {};
+  final Set<OrientacaoDeformacao> _orientacoes = {};
+  StatusComponenteVeiculo? _faroisStatus;
+  StatusComponenteVeiculo? _cintosStatus;
+  EstadoPneumaticos? _estadoPneus;
+  StatusComponenteVeiculo? _freiosStatus;
+  StatusComponenteVeiculo? _direcaoStatus;
+  AirbagStatus? _airbagStatus;
+  RetrovisorStatus? _retrovisorStatus;
+  TacografoStatus? _tacografoStatus;
+  bool _bicicletaPossuiCampainha = false;
   // Flags legados (enquanto migramos para lista de vestígios)
   List<VestigioVeiculoModel> _vestigios = [];
+
+  List<String> _fotosVistaVeiculoAmbiente = [];
+  final _imagePicker = ImagePicker();
+
+  bool get _isCrimeTransito =>
+      widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito;
 
   @override
   void initState() {
@@ -82,6 +112,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _anoModeloCtrl.text = v.anoModelo ?? '';
     _corCtrl.text = v.cor ?? '';
     _placaCtrl.text = v.placa ?? '';
+    _chassiCtrl.text = v.chassiAparente ?? '';
 
     _localizacaoAmbienteCtrl.text = v.localizacaoAmbiente ?? '';
     _coordenadaFrenteXCtrl.text = v.coordenadaFrenteX ?? '';
@@ -97,8 +128,35 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _posicao = v.posicao;
     _posicaoLivreCtrl.text = v.posicaoLivre ?? '';
     _condicaoGeralCtrl.text = v.condicaoGeral ?? '';
+    _intensidadeDano = v.intensidadeDano;
+    _setoresImpacto
+      ..clear()
+      ..addAll(v.setoresImpacto ?? const []);
+    _tipificacoes
+      ..clear()
+      ..addAll(v.tipificacoesDeformacoes ?? const []);
+    _orientacoes
+      ..clear()
+      ..addAll(v.orientacoesDeformacoes ?? const []);
+    _danosObservacoesCtrl.text = v.danosObservacoes ?? '';
+    _faroisStatus = v.faroisLanternas;
+    _cintosStatus = v.cintosSeguranca;
+    _estadoPneus = v.estadoPneumaticos;
+    _freiosStatus = v.freios;
+    _direcaoStatus = v.direcao;
+    _airbagStatus = v.airbag;
+    _retrovisorStatus = v.retrovisor;
+    _tacografoStatus = v.tacografoStatus;
+    _frenagemCtrl.text = v.frenagemMetros ?? '';
+    _bicicletaCorCtrl.text = v.bicicletaCor ?? '';
+    _bicicletaModeloCtrl.text = v.bicicletaMarcaModelo ?? '';
+    _bicicletaSinalizacaoCtrl.text = v.bicicletaElementosSinalizacao ?? '';
+    _bicicletaPossuiCampainha = v.bicicletaPossuiCampainha ?? false;
 
     _vestigios = List<VestigioVeiculoModel>.from(v.vestigios ?? []);
+
+    _fotosVistaVeiculoAmbiente =
+        List<String>.from(v.fotosVistaVeiculoAmbiente);
 
     _relacao = v.relacao;
     _observacoesCtrl.text = v.observacoes ?? '';
@@ -112,6 +170,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _anoModeloCtrl.dispose();
     _corCtrl.dispose();
     _placaCtrl.dispose();
+    _chassiCtrl.dispose();
     _localizacaoAmbienteCtrl.dispose();
     _coordenadaFrenteXCtrl.dispose();
     _coordenadaFrenteYCtrl.dispose();
@@ -124,6 +183,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _alturaCentroCtrl.dispose();
     _posicaoLivreCtrl.dispose();
     _condicaoGeralCtrl.dispose();
+    _danosObservacoesCtrl.dispose();
+    _frenagemCtrl.dispose();
+    _bicicletaCorCtrl.dispose();
+    _bicicletaModeloCtrl.dispose();
+    _bicicletaSinalizacaoCtrl.dispose();
     _localizacaoSangueCtrl.dispose();
     _localizacaoProjeteisImpactosCtrl.dispose();
     _observacoesCtrl.dispose();
@@ -147,6 +211,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           : _anoModeloCtrl.text.trim(),
       cor: _corCtrl.text.trim().isEmpty ? null : _corCtrl.text.trim(),
       placa: _placaCtrl.text.trim().isEmpty ? null : _placaCtrl.text.trim(),
+      chassiAparente:
+          _chassiCtrl.text.trim().isEmpty ? null : _chassiCtrl.text.trim(),
       localizacaoAmbiente: _localizacaoAmbienteCtrl.text.trim().isEmpty
           ? null
           : _localizacaoAmbienteCtrl.text.trim(),
@@ -184,6 +250,37 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       condicaoGeral: _condicaoGeralCtrl.text.trim().isEmpty
           ? null
           : _condicaoGeralCtrl.text.trim(),
+      intensidadeDano: _intensidadeDano,
+      setoresImpacto: _setoresImpacto.isEmpty ? null : _setoresImpacto.toList(),
+      tipificacoesDeformacoes:
+          _tipificacoes.isEmpty ? null : _tipificacoes.toList(),
+      orientacoesDeformacoes:
+          _orientacoes.isEmpty ? null : _orientacoes.toList(),
+      danosObservacoes: _danosObservacoesCtrl.text.trim().isEmpty
+          ? null
+          : _danosObservacoesCtrl.text.trim(),
+      faroisLanternas: _faroisStatus,
+      cintosSeguranca: _cintosStatus,
+      estadoPneumaticos: _estadoPneus,
+      freios: _freiosStatus,
+      direcao: _direcaoStatus,
+      airbag: _airbagStatus,
+      retrovisor: _retrovisorStatus,
+      tacografoStatus: _tacografoStatus,
+      frenagemMetros:
+          _frenagemCtrl.text.trim().isEmpty ? null : _frenagemCtrl.text.trim(),
+      bicicletaCor: _bicicletaCorCtrl.text.trim().isEmpty
+          ? null
+          : _bicicletaCorCtrl.text.trim(),
+      bicicletaMarcaModelo: _bicicletaModeloCtrl.text.trim().isEmpty
+          ? null
+          : _bicicletaModeloCtrl.text.trim(),
+      bicicletaElementosSinalizacao:
+          _bicicletaSinalizacaoCtrl.text.trim().isEmpty
+              ? null
+              : _bicicletaSinalizacaoCtrl.text.trim(),
+      bicicletaPossuiCampainha: _bicicletaPossuiCampainha,
+      fotosVistaVeiculoAmbiente: _fotosVistaVeiculoAmbiente,
       vestigios: _vestigios,
       relacao: _relacao,
       observacoes: _observacoesCtrl.text.trim().isEmpty
@@ -193,6 +290,305 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   }
 
   String _gerarIdVestigio() => DateTime.now().microsecondsSinceEpoch.toString();
+
+  void _alternarEnum<T>(Set<T> conjunto, T valor) {
+    setState(() {
+      if (conjunto.contains(valor)) {
+        conjunto.remove(valor);
+      } else {
+        conjunto.add(valor);
+      }
+    });
+  }
+
+  String _descricaoStatusComponente(StatusComponenteVeiculo valor) {
+    switch (valor) {
+      case StatusComponenteVeiculo.funcionando:
+        return 'Funcionando';
+      case StatusComponenteVeiculo.naoFuncionando:
+        return 'Não funcionando';
+      case StatusComponenteVeiculo.prejudicado:
+        return 'Prejudicado';
+    }
+  }
+
+  Widget _buildStatusDropdown({
+    required String label,
+    required StatusComponenteVeiculo? valor,
+    required ValueChanged<StatusComponenteVeiculo?> onChanged,
+  }) {
+    return DropdownButtonFormField<StatusComponenteVeiculo>(
+      initialValue: valor,
+      decoration: InputDecoration(labelText: label),
+      items: StatusComponenteVeiculo.values
+          .map(
+            (status) => DropdownMenuItem(
+              value: status,
+              child: Text(_descricaoStatusComponente(status)),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildChipGroup<T>({
+    required Iterable<T> valores,
+    required Set<T> selecionados,
+    required String titulo,
+    required String Function(T valor) label,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        Text(
+          titulo,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: valores
+              .map(
+                (valor) => FilterChip(
+                  label: Text(label(valor)),
+                  selected: selecionados.contains(valor),
+                  onSelected: (_) => _alternarEnum(selecionados, valor),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCrimeTransitoSection() {
+    if (!_isCrimeTransito) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 32),
+        Text(
+          'Informações específicas - Crime de Trânsito',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _chassiCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Chassi aparente',
+          ),
+        ),
+        DropdownButtonFormField<IntensidadeDano>(
+          initialValue: _intensidadeDano,
+          decoration: const InputDecoration(
+            labelText: 'Intensidade dos danos',
+          ),
+          items: IntensidadeDano.values
+              .map(
+                (dano) => DropdownMenuItem(
+                  value: dano,
+                  child: Text(
+                    switch (dano) {
+                      IntensidadeDano.leve => 'Leve',
+                      IntensidadeDano.media => 'Média',
+                      IntensidadeDano.grave => 'Grave',
+                      IntensidadeDano.gravissima => 'Gravíssima',
+                    },
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (valor) => setState(() => _intensidadeDano = valor),
+        ),
+        _buildChipGroup<SetorImpacto>(
+          valores: SetorImpacto.values,
+          selecionados: _setoresImpacto,
+          titulo: 'Setor atingido pelo impacto',
+          label: (v) => switch (v) {
+            SetorImpacto.anterior => 'Anterior',
+            SetorImpacto.posterior => 'Posterior',
+            SetorImpacto.lateralEsquerdo => 'Lateral esquerdo',
+            SetorImpacto.lateralDireito => 'Lateral direito',
+            SetorImpacto.angularAnteriorEsquerdo => 'Angular anterior esquerdo',
+            SetorImpacto.angularAnteriorDireito => 'Angular anterior direito',
+            SetorImpacto.angularPosteriorEsquerdo =>
+              'Angular posterior esquerdo',
+            SetorImpacto.angularPosteriorDireito => 'Angular posterior direito',
+          },
+        ),
+        _buildChipGroup<TipificacaoDeformacao>(
+          valores: TipificacaoDeformacao.values,
+          selecionados: _tipificacoes,
+          titulo: 'Tipificação das deformações',
+          label: (v) => switch (v) {
+            TipificacaoDeformacao.amassamento => 'Amassamento',
+            TipificacaoDeformacao.cisalhamento => 'Cisalhamento',
+            TipificacaoDeformacao.arrastamento => 'Arrastamento',
+            TipificacaoDeformacao.empenamento => 'Empenamento',
+            TipificacaoDeformacao.arrancamento => 'Arrancamento',
+            TipificacaoDeformacao.estampamento => 'Estampamento',
+            TipificacaoDeformacao.quebramento => 'Quebramento',
+            TipificacaoDeformacao.esmagamento => 'Esmagamento',
+            TipificacaoDeformacao.sanfonamento => 'Sanfonamento',
+            TipificacaoDeformacao.mossa => 'Mossa',
+            TipificacaoDeformacao.atritamento => 'Atritamento',
+            TipificacaoDeformacao.afundamento => 'Afundamento',
+          },
+        ),
+        _buildChipGroup<OrientacaoDeformacao>(
+          valores: OrientacaoDeformacao.values,
+          selecionados: _orientacoes,
+          titulo: 'Orientação das deformações',
+          label: (v) => switch (v) {
+            OrientacaoDeformacao.direitaParaEsquerda => 'Direita → Esquerda',
+            OrientacaoDeformacao.esquerdaParaDireita => 'Esquerda → Direita',
+            OrientacaoDeformacao.dianteiraParaTraseira =>
+              'Dianteira → Traseira',
+            OrientacaoDeformacao.traseiraParaDianteira =>
+              'Traseira → Dianteira',
+          },
+        ),
+        TextField(
+          controller: _danosObservacoesCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Observações complementares',
+          ),
+          maxLines: 2,
+        ),
+        _buildStatusDropdown(
+          label: 'Faróis/Lanternas',
+          valor: _faroisStatus,
+          onChanged: (valor) => setState(() => _faroisStatus = valor),
+        ),
+        _buildStatusDropdown(
+          label: 'Cintos de segurança',
+          valor: _cintosStatus,
+          onChanged: (valor) => setState(() => _cintosStatus = valor),
+        ),
+        DropdownButtonFormField<EstadoPneumaticos>(
+          initialValue: _estadoPneus,
+          decoration: const InputDecoration(labelText: 'Pneumáticos'),
+          items: EstadoPneumaticos.values
+              .map(
+                (estado) => DropdownMenuItem(
+                  value: estado,
+                  child: Text(
+                    switch (estado) {
+                      EstadoPneumaticos.novos => 'Novos',
+                      EstadoPneumaticos.meiaVida => 'Meia vida',
+                      EstadoPneumaticos.desgastados => 'Desgastados',
+                    },
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (valor) => setState(() => _estadoPneus = valor),
+        ),
+        _buildStatusDropdown(
+          label: 'Freios',
+          valor: _freiosStatus,
+          onChanged: (valor) => setState(() => _freiosStatus = valor),
+        ),
+        _buildStatusDropdown(
+          label: 'Direção',
+          valor: _direcaoStatus,
+          onChanged: (valor) => setState(() => _direcaoStatus = valor),
+        ),
+        DropdownButtonFormField<AirbagStatus>(
+          initialValue: _airbagStatus,
+          decoration: const InputDecoration(labelText: 'Airbag'),
+          items: AirbagStatus.values
+              .map(
+                (status) => DropdownMenuItem(
+                  value: status,
+                  child: Text(
+                    switch (status) {
+                      AirbagStatus.acionado => 'Acionado',
+                      AirbagStatus.naoAcionado => 'Não acionado',
+                      AirbagStatus.ausente => 'Ausente',
+                    },
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (valor) => setState(() => _airbagStatus = valor),
+        ),
+        DropdownButtonFormField<RetrovisorStatus>(
+          initialValue: _retrovisorStatus,
+          decoration: const InputDecoration(labelText: 'Retrovisor'),
+          items: RetrovisorStatus.values
+              .map(
+                (status) => DropdownMenuItem(
+                  value: status,
+                  child: Text(
+                    status == RetrovisorStatus.presente
+                        ? 'Presente'
+                        : 'Ausente',
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (valor) => setState(() => _retrovisorStatus = valor),
+        ),
+        DropdownButtonFormField<TacografoStatus>(
+          initialValue: _tacografoStatus,
+          decoration: const InputDecoration(labelText: 'Disco de tacógrafo'),
+          items: TacografoStatus.values
+              .map(
+                (status) => DropdownMenuItem(
+                  value: status,
+                  child: Text(
+                    status == TacografoStatus.ausente ? 'Ausente' : 'Recolhido',
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (valor) => setState(() => _tacografoStatus = valor),
+        ),
+        TextField(
+          controller: _frenagemCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Frenagem (m)',
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Bicicleta (preencher se aplicável)',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        TextField(
+          controller: _bicicletaCorCtrl,
+          decoration: const InputDecoration(labelText: 'Cor'),
+        ),
+        TextField(
+          controller: _bicicletaModeloCtrl,
+          decoration: const InputDecoration(labelText: 'Marca/Modelo'),
+        ),
+        TextField(
+          controller: _bicicletaSinalizacaoCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Elementos de sinalização',
+            helperText: 'Ex.: dianteira, lateral, pedais, traseira',
+          ),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Possui campainha?'),
+          value: _bicicletaPossuiCampainha,
+          onChanged: (valor) => setState(() {
+            _bicicletaPossuiCampainha = valor;
+          }),
+        ),
+      ],
+    );
+  }
 
   Future<void> _adicionarOuEditarVestigio({
     VestigioVeiculoModel? existente,
@@ -211,6 +607,9 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       text: existente?.numeroLacre ?? '',
     );
     bool isSangueHumano = existente?.isSangueHumano ?? false;
+    final fotosVestigio = List<String>.from(existente?.fotosPaths ?? []);
+    final subpastaVestigio =
+        existente != null ? 'vestigio_${existente.id}' : 'vestigio_novo_${DateTime.now().microsecondsSinceEpoch}';
 
     if (!mounted) return;
 
@@ -283,6 +682,82 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                       ),
                       maxLines: 2,
                     ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const Text(
+                      'Fotos do vestígio',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final foto = await _imagePicker.pickImage(
+                              source: ImageSource.camera,
+                              imageQuality: 90,
+                            );
+                            if (foto == null || !mounted) return;
+                            final path = await _persistirFotoVeiculo(
+                              foto,
+                              subpastaVestigio,
+                            );
+                            if (path != null) {
+                              fotosVestigio.add(path);
+                              setDialogState(() {});
+                            }
+                          },
+                          icon: const Icon(Icons.photo_camera, size: 18),
+                          label: const Text('Câmera'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final fotos = await _imagePicker.pickMultiImage(
+                              imageQuality: 90,
+                            );
+                            if (fotos.isEmpty || !mounted) return;
+                            for (final foto in fotos) {
+                              final path = await _persistirFotoVeiculo(
+                                foto,
+                                subpastaVestigio,
+                              );
+                              if (path != null) {
+                                fotosVestigio.add(path);
+                                setDialogState(() {});
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.photo_library, size: 18),
+                          label: const Text('Galeria'),
+                        ),
+                      ],
+                    ),
+                    if (fotosVestigio.isNotEmpty)
+                      ...fotosVestigio.asMap().entries.map(
+                            (e) => ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.image_outlined, size: 18),
+                              title: Text(
+                                _nomeArquivoFoto(e.value),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                tooltip: 'Remover foto',
+                                onPressed: () {
+                                  fotosVestigio.removeAt(e.key);
+                                  setDialogState(() {});
+                                },
+                              ),
+                            ),
+                          ),
                     const SizedBox(height: 16),
                     CheckboxListTile(
                       title: const Text('Sangue humano'),
@@ -400,8 +875,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                       if (tipoDestinoSelecionado != null) ...[
                         const SizedBox(height: 16),
                         FutureBuilder<List<dynamic>>(
-                          future:
-                              tipoDestinoSelecionado ==
+                          future: tipoDestinoSelecionado ==
                                   TipoDestinoVestigioVeiculo.unidade
                               ? _unidadeService.listarUnidades()
                               : _laboratorioService.listarLaboratorios(),
@@ -432,13 +906,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                 border: OutlineInputBorder(),
                               ),
                               items: opcoes.map((opcao) {
-                                final id =
-                                    tipoDestinoSelecionado ==
+                                final id = tipoDestinoSelecionado ==
                                         TipoDestinoVestigioVeiculo.unidade
                                     ? (opcao as UnidadeModel).id
                                     : (opcao as LaboratorioModel).id;
-                                final nome =
-                                    tipoDestinoSelecionado ==
+                                final nome = tipoDestinoSelecionado ==
                                         TipoDestinoVestigioVeiculo.unidade
                                     ? (opcao as UnidadeModel).nome
                                     : (opcao as LaboratorioModel).nome;
@@ -547,6 +1019,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                           ? null
                           : numeroLacreCtrl.text.trim(),
                       isSangueHumano: isSangueHumano,
+                      fotosPaths: List<String>.from(fotosVestigio),
                     );
 
                     setState(() {
@@ -578,7 +1051,45 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     });
   }
 
+  Future<String?> _persistirFotoVeiculo(XFile arquivo, String subpasta) async {
+    try {
+      final origem = File(arquivo.path);
+      if (!await origem.exists()) return null;
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_fotografico/${widget.ficha.id}/veiculo_${widget.veiculo.numero}/$subpasta',
+      );
+      if (!await pasta.exists()) await pasta.create(recursive: true);
+      final ext = arquivo.path.contains('.')
+          ? arquivo.path.split('.').last.toLowerCase()
+          : 'jpg';
+      final destino = File(
+        '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
+      );
+      await origem.copy(destino.path);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _nomeArquivoFoto(String path) {
+    final idx = path.lastIndexOf(Platform.pathSeparator);
+    return idx >= 0 ? path.substring(idx + 1) : path;
+  }
+
   void _salvar() {
+    if (_fotosVistaVeiculoAmbiente.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Adicione ao menos uma foto: Vista do veículo no ambiente.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     if (_localizacaoAmbienteCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -633,6 +1144,118 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Fotos da cena (veículo no ambiente)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'FOTOS DA CENA',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Vista do veículo no ambiente *',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final foto = await _imagePicker.pickImage(
+                              source: ImageSource.camera,
+                              imageQuality: 90,
+                            );
+                            if (foto == null || !mounted) return;
+                            final path = await _persistirFotoVeiculo(
+                              foto,
+                              'vista_ambiente',
+                            );
+                            if (path != null) {
+                              setState(() =>
+                                  _fotosVistaVeiculoAmbiente =
+                                      [..._fotosVistaVeiculoAmbiente, path]);
+                            }
+                          },
+                          icon: const Icon(Icons.photo_camera, size: 18),
+                          label: const Text('Câmera'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final fotos = await _imagePicker.pickMultiImage(
+                              imageQuality: 90,
+                            );
+                            if (fotos.isEmpty || !mounted) return;
+                            final novas = <String>[];
+                            for (final foto in fotos) {
+                              final path = await _persistirFotoVeiculo(
+                                foto,
+                                'vista_ambiente',
+                              );
+                              if (path != null) novas.add(path);
+                            }
+                            if (novas.isNotEmpty) {
+                              setState(() =>
+                                  _fotosVistaVeiculoAmbiente =
+                                      [..._fotosVistaVeiculoAmbiente, ...novas]);
+                            }
+                          },
+                          icon: const Icon(Icons.photo_library, size: 18),
+                          label: const Text('Galeria'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (_fotosVistaVeiculoAmbiente.isEmpty)
+                      Text(
+                        'Nenhuma foto. Adicione ao menos uma.',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      )
+                    else
+                      ..._fotosVistaVeiculoAmbiente.asMap().entries.map(
+                            (e) => ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.image_outlined, size: 18),
+                              title: Text(
+                                _nomeArquivoFoto(e.value),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                tooltip: 'Remover foto',
+                                onPressed: () {
+                                  setState(() {
+                                    _fotosVistaVeiculoAmbiente =
+                                        List<String>.from(
+                                            _fotosVistaVeiculoAmbiente)
+                                          ..removeAt(e.key);
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             // Identificação Básica
             Card(
               child: Padding(
@@ -796,6 +1419,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               labelText: 'X',
                               border: OutlineInputBorder(),
                               isDense: true,
+                              hintText: 'Ex: -23,5',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
                             ),
                           ),
                         ),
@@ -807,6 +1435,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               labelText: 'Y',
                               border: OutlineInputBorder(),
                               isDense: true,
+                              hintText: 'Ex: -46,6',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
                             ),
                           ),
                         ),
@@ -843,6 +1476,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               labelText: 'X',
                               border: OutlineInputBorder(),
                               isDense: true,
+                              hintText: 'Ex: -23,5',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
                             ),
                           ),
                         ),
@@ -854,6 +1492,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               labelText: 'Y',
                               border: OutlineInputBorder(),
                               isDense: true,
+                              hintText: 'Ex: -46,6',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
                             ),
                           ),
                         ),
@@ -890,6 +1533,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               labelText: 'X',
                               border: OutlineInputBorder(),
                               isDense: true,
+                              hintText: 'Ex: -23,5',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
                             ),
                           ),
                         ),
@@ -901,6 +1549,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               labelText: 'Y',
                               border: OutlineInputBorder(),
                               isDense: true,
+                              hintText: 'Ex: -46,6',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
                             ),
                           ),
                         ),
@@ -992,11 +1645,13 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'VESTÍGIOS/EVIDÊNCIAS',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
+                        Expanded(
+                          child: Text(
+                            'VESTÍGIOS/EVIDÊNCIAS',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
                         ),
                         IconButton(
@@ -1067,6 +1722,14 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                if (vestigio.fotosPaths.isNotEmpty)
+                                  Text(
+                                    '${vestigio.fotosPaths.length} foto(s)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
                                 if (vestigio.localizacao != null)
                                   Text('Local: ${vestigio.localizacao}'),
                                 if (vestigio.tipoAcao != null)
@@ -1080,12 +1743,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                 if (vestigio.tipoDestino != null &&
                                     vestigio.destinoId != null)
                                   FutureBuilder<dynamic>(
-                                    future:
-                                        vestigio.tipoDestino ==
+                                    future: vestigio.tipoDestino ==
                                             TipoDestinoVestigioVeiculo.unidade
                                         ? _unidadeService.listarUnidades()
                                         : _laboratorioService
-                                              .listarLaboratorios(),
+                                            .listarLaboratorios(),
                                     builder: (context, snapshot) {
                                       if (snapshot.hasData) {
                                         final lista = snapshot.data as List;
@@ -1095,8 +1757,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                         );
                                         if (items.isNotEmpty) {
                                           final item = items.first;
-                                          final nome =
-                                              vestigio.tipoDestino ==
+                                          final nome = vestigio.tipoDestino ==
                                                   TipoDestinoVestigioVeiculo
                                                       .unidade
                                               ? (item as UnidadeModel).nome
@@ -1140,6 +1801,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
             ),
 
             const SizedBox(height: 16),
+
+            _buildCrimeTransitoSection(),
 
             // Relacionamento com o caso
             Card(

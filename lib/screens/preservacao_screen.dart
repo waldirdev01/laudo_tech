@@ -14,6 +14,11 @@ class PreservacaoScreen extends StatefulWidget {
 }
 
 class _PreservacaoScreenState extends State<PreservacaoScreen> {
+  static const String _defaultPessoasAcessaram =
+      'Não foi possível identificar, com segurança, pessoas que tenham adentrado o local antes da chegada da perícia.';
+  static const String _defaultAlteracoesObservadas =
+      'Não foram observadas alterações relevantes no local no momento do exame, ressalvadas as intervenções necessárias ao socorro e à segurança.';
+
   final _fichaService = FichaService();
   final _pessoasAcessaramController = TextEditingController();
   final _alteracoesDetectadasController = TextEditingController();
@@ -40,8 +45,15 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
       _preservacaoInidoneo = dados.preservacaoInidoneo;
       _preservacaoParcialmenteIdoneo = dados.preservacaoParcialmenteIdoneo;
       _preservacaoCuriososNoPerimetro = dados.preservacaoCuriososNoPerimetro ?? false;
-      _pessoasAcessaramController.text = dados.preservacaoPessoasAcessaram ?? '';
-      _alteracoesDetectadasController.text = dados.preservacaoAlteracoesDetectadas ?? '';
+      final pessoasSalvas = dados.preservacaoPessoasAcessaram?.trim();
+      _pessoasAcessaramController.text =
+          (pessoasSalvas == null || pessoasSalvas.isEmpty) ? _defaultPessoasAcessaram : pessoasSalvas;
+      final alteracoesSalvas = dados.preservacaoAlteracoesDetectadas?.trim();
+      _alteracoesDetectadasController.text =
+          (alteracoesSalvas == null || alteracoesSalvas.isEmpty) ? _defaultAlteracoesObservadas : alteracoesSalvas;
+    } else {
+      _pessoasAcessaramController.text = _defaultPessoasAcessaram;
+      _alteracoesDetectadasController.text = _defaultAlteracoesObservadas;
     }
   }
 

@@ -69,6 +69,9 @@ class LocalFurtoModel {
   final bool? sinaisArrombamentoNao;
   final bool? sinaisArrombamentoNaoSeAplica;
 
+  // Foto(s) vista ampla do local (ex.: fachada) – primeira(s) do levantamento (Fotografia 01)
+  final List<String>? fotosVistaAmplaPaths;
+
   LocalFurtoModel({
     this.classificacaoMediato,
     this.classificacaoImediato,
@@ -110,6 +113,7 @@ class LocalFurtoModel {
     this.sinaisArrombamentoSim,
     this.sinaisArrombamentoNao,
     this.sinaisArrombamentoNaoSeAplica,
+    this.fotosVistaAmplaPaths,
   });
 
   Map<String, dynamic> toJson() => {
@@ -153,6 +157,7 @@ class LocalFurtoModel {
         'sinaisArrombamentoSim': sinaisArrombamentoSim,
         'sinaisArrombamentoNao': sinaisArrombamentoNao,
         'sinaisArrombamentoNaoSeAplica': sinaisArrombamentoNaoSeAplica,
+        'fotosVistaAmplaPaths': fotosVistaAmplaPaths,
       };
 
   factory LocalFurtoModel.fromJson(Map<String, dynamic> json) =>
@@ -209,6 +214,9 @@ class LocalFurtoModel {
         sinaisArrombamentoSim: json['sinaisArrombamentoSim'] as bool?,
         sinaisArrombamentoNao: json['sinaisArrombamentoNao'] as bool?,
         sinaisArrombamentoNaoSeAplica: json['sinaisArrombamentoNaoSeAplica'] as bool?,
+        fotosVistaAmplaPaths: (json['fotosVistaAmplaPaths'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
       );
 
   LocalFurtoModel copyWith({
@@ -252,6 +260,7 @@ class LocalFurtoModel {
     bool? sinaisArrombamentoSim,
     bool? sinaisArrombamentoNao,
     bool? sinaisArrombamentoNaoSeAplica,
+    List<String>? fotosVistaAmplaPaths,
   }) {
     return LocalFurtoModel(
       classificacaoMediato: classificacaoMediato ?? this.classificacaoMediato,
@@ -294,6 +303,7 @@ class LocalFurtoModel {
       sinaisArrombamentoSim: sinaisArrombamentoSim ?? this.sinaisArrombamentoSim,
       sinaisArrombamentoNao: sinaisArrombamentoNao ?? this.sinaisArrombamentoNao,
       sinaisArrombamentoNaoSeAplica: sinaisArrombamentoNaoSeAplica ?? this.sinaisArrombamentoNaoSeAplica,
+      fotosVistaAmplaPaths: fotosVistaAmplaPaths ?? this.fotosVistaAmplaPaths,
     );
   }
 }

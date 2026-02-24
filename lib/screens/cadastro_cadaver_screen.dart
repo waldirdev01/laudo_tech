@@ -1,5 +1,11 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../constants/evidencias_cadaver_regioes.dart';
+import '../constants/tipos_barba_referencia.dart';
 import '../models/cadaver_model.dart';
 import '../models/ficha_completa_model.dart';
 
@@ -88,10 +94,18 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   List<LesaoCadaverModel> _lesoes = [];
   List<VesteCadaverModel> _vestes = [];
 
+  // Fotos dos exames (paths locais)
+  List<String> _fotosVistaCadaversAmbiente = [];
+  List<String> _fotosPosicaoEncontrada = [];
+  List<String> _fotosHipostaseSecrecoes = [];
+  List<String> _fotosTatuagens = [];
+
+  final _imagePicker = ImagePicker();
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _carregarDados();
   }
 
@@ -152,6 +166,12 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
 
     _lesoes = List<LesaoCadaverModel>.from(c.lesoes ?? []);
     _vestes = List<VesteCadaverModel>.from(c.vestes ?? []);
+
+    _fotosVistaCadaversAmbiente =
+        List<String>.from(c.fotosVistaCadaversAmbiente);
+    _fotosPosicaoEncontrada = List<String>.from(c.fotosPosicaoEncontrada);
+    _fotosHipostaseSecrecoes = List<String>.from(c.fotosHipostaseSecrecoes);
+    _fotosTatuagens = List<String>.from(c.fotosTatuagens);
   }
 
   @override
@@ -299,6 +319,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
           : _outrasObservacoesCtrl.text.trim(),
       lesoes: _lesoes,
       vestes: _vestes,
+      fotosVistaCadaversAmbiente: _fotosVistaCadaversAmbiente,
+      fotosPosicaoEncontrada: _fotosPosicaoEncontrada,
+      fotosHipostaseSecrecoes: _fotosHipostaseSecrecoes,
+      fotosTatuagens: _fotosTatuagens,
       tatuagensMarcas: _tatuagensMarcasCtrl.text.trim().isEmpty
           ? null
           : _tatuagensMarcasCtrl.text.trim(),
@@ -308,7 +332,53 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     );
   }
 
+  Future<String?> _persistirFotoCadaver(XFile arquivo, String subpasta) async {
+    try {
+      final origem = File(arquivo.path);
+      if (!await origem.exists()) return null;
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_fotografico/${widget.ficha.id}/cadaver_${widget.cadaver.numero}/$subpasta',
+      );
+      if (!await pasta.exists()) await pasta.create(recursive: true);
+      final ext = arquivo.path.contains('.')
+          ? arquivo.path.split('.').last.toLowerCase()
+          : 'jpg';
+      final destino = File(
+        '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
+      );
+      await origem.copy(destino.path);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _salvar() {
+    if (_fotosVistaCadaversAmbiente.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Adicione ao menos uma foto: Vista do cadáver no ambiente.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      _tabController.animateTo(0);
+      return;
+    }
+    if (_fotosPosicaoEncontrada.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Adicione ao menos uma foto: Cadáver na posição em que foi encontrado.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      _tabController.animateTo(0);
+      return;
+    }
     final cadaver = _construirCadaver();
     Navigator.of(context).pop(cadaver);
   }
@@ -322,9 +392,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'Descrição', icon: Icon(Icons.person)),
-            Tab(text: 'Exames', icon: Icon(Icons.medical_services)),
+            Tab(text: 'Cena', icon: Icon(Icons.photo_camera)),
             Tab(text: 'Vestes', icon: Icon(Icons.checkroom)),
+            Tab(text: 'Exames', icon: Icon(Icons.medical_services)),
+            Tab(text: 'Descrição', icon: Icon(Icons.person)),
           ],
         ),
         actions: [
@@ -337,7 +408,12 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [_buildDescricaoTab(), _buildExamesTab(), _buildVestesTab()],
+        children: [
+          _buildCenaTab(),
+          _buildVestesTab(),
+          _buildExamesTab(),
+          _buildDescricaoTab(),
+        ],
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -352,12 +428,21 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     );
   }
 
+  /// Aba 4: Descrição — identificação e características físicas.
   Widget _buildDescricaoTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            'Identificação e características físicas do cadáver.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
           // Identificação
           Card(
             child: Padding(
@@ -538,30 +623,39 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   if (_sexo != SexoCadaver.feminino) ...[
                     const SizedBox(height: 12),
                     const Divider(),
-                    const Text(
-                      'Barba',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    Row(
+                      children: [
+                        const Text(
+                          'Barba',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _mostrarSelecaoBarbaReferencia(context),
+                            icon: const Icon(Icons.image_outlined, size: 18),
+                            label: const Text('Selecionar da referência'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
-
-                    // Tipo da Barba
-                    _buildDropdown<TipoBarba>(
-                      label: 'Tipo',
-                      value: _tipoBarba,
-                      items: TipoBarba.values,
-                      onChanged: (v) => setState(() => _tipoBarba = v),
+                    // Tipo selecionado (apenas pela referência)
+                    Text(
+                      _textoTipoBarbaSelecionado(),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
-                    if (_tipoBarba == TipoBarba.outro) ...[
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _tipoBarbaOutroCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Especifique o tipo',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                    ],
+                    const SizedBox(height: 12),
 
                     if (_tipoBarba != null &&
                         _tipoBarba != TipoBarba.naoSeAplica) ...[
@@ -617,12 +711,177 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     );
   }
 
-  Widget _buildExamesTab() {
+  String _nomeArquivoFoto(String path) {
+    final idx = path.lastIndexOf(Platform.pathSeparator);
+    return idx >= 0 ? path.substring(idx + 1) : path;
+  }
+
+  Widget _buildSecaoFotos({
+    required String titulo,
+    required List<String> paths,
+    required ValueChanged<List<String>> onChanged,
+    bool obrigatorio = false,
+    String? hint,
+    String? subpasta,
+  }) {
+    final pasta = subpasta ??
+        titulo.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                titulo,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            if (obrigatorio) ...[
+              const SizedBox(width: 4),
+              Text(
+                '*',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (hint != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            hint,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                final foto = await _imagePicker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 90,
+                );
+                if (foto == null || !mounted) return;
+                final path = await _persistirFotoCadaver(foto, pasta);
+                if (path != null) onChanged([...paths, path]);
+              },
+              icon: const Icon(Icons.photo_camera, size: 18),
+              label: const Text('Câmera'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final fotos = await _imagePicker.pickMultiImage(
+                  imageQuality: 90,
+                );
+                if (fotos.isEmpty || !mounted) return;
+                final novas = <String>[];
+                for (final foto in fotos) {
+                  final path = await _persistirFotoCadaver(foto, pasta);
+                  if (path != null) novas.add(path);
+                }
+                if (novas.isNotEmpty) onChanged([...paths, ...novas]);
+              },
+              icon: const Icon(Icons.photo_library, size: 18),
+              label: const Text('Galeria'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (paths.isEmpty)
+          Text(
+            obrigatorio ? 'Nenhuma foto. Adicione ao menos uma.' : 'Nenhuma foto.',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          )
+        else
+          ...paths.asMap().entries.map(
+                (e) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.image_outlined, size: 18),
+                  title: Text(
+                    _nomeArquivoFoto(e.value),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Remover foto',
+                    onPressed: () {
+                      final nova = List<String>.from(paths)..removeAt(e.key);
+                      onChanged(nova);
+                    },
+                  ),
+                ),
+              ),
+      ],
+    );
+  }
+
+  /// Aba 1: Cena — ambiente e posição em que o cadáver foi encontrado (sequência da perícia).
+  Widget _buildCenaTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            'Registre o ambiente e a posição em que o cadáver foi encontrado.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Fotos obrigatórias
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'FOTOS DA CENA',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  _buildSecaoFotos(
+                    titulo: 'Vista do cadáver no ambiente',
+                    paths: _fotosVistaCadaversAmbiente,
+                    onChanged: (v) =>
+                        setState(() => _fotosVistaCadaversAmbiente = v),
+                    obrigatorio: true,
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSecaoFotos(
+                    titulo:
+                        'Cadáver na posição em que foi encontrado pela equipe pericial',
+                    paths: _fotosPosicaoEncontrada,
+                    onChanged: (v) =>
+                        setState(() => _fotosPosicaoEncontrada = v),
+                    obrigatorio: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           // Posição do Corpo
           Card(
             child: Padding(
@@ -646,7 +905,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         _posicaoCorpoPreset = selectedValue;
                         if (selectedValue == 'outra') {
                           _posicaoCorpoLivreCtrl.clear();
-                          // Focar automaticamente no campo quando "Outra" é selecionado
                           Future.delayed(const Duration(milliseconds: 100), () {
                             _posicaoCorpoLivreFocusNode.requestFocus();
                           });
@@ -714,9 +972,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
           // Localização no ambiente
           Card(
             child: Padding(
@@ -748,7 +1004,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
-                  // Coordenadas da Cabeça
                   Text(
                     'Cabeça',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
@@ -792,7 +1047,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Coordenadas dos Pés
                   Text(
                     'Pés',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
@@ -836,7 +1090,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Coordenadas do Centro do Tronco
                   Text(
                     'Centro do Tronco',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
@@ -883,7 +1136,26 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
               ),
             ),
           ),
+          const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
 
+  /// Aba 3: Exames no corpo (após retirada das vestes): rigidez, hipóstase, secreções, tatuagens, lesões.
+  Widget _buildExamesTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Exames no corpo (rigidez, hipóstase, secreções, tatuagens e lesões).',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Rigidez
@@ -1024,6 +1296,16 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     },
                     _secrecaoPenianaVaginalTipoCtrl,
                   ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  _buildSecaoFotos(
+                    titulo: 'Fotos (manchas de hipóstase e secreções)',
+                    paths: _fotosHipostaseSecrecoes,
+                    onChanged: (v) =>
+                        setState(() => _fotosHipostaseSecrecoes = v),
+                    obrigatorio: false,
+                  ),
                 ],
               ),
             ),
@@ -1054,6 +1336,17 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 5,
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  _buildSecaoFotos(
+                    titulo: 'Fotos (tatuagens e marcas corporais)',
+                    paths: _fotosTatuagens,
+                    onChanged: (v) => setState(() => _fotosTatuagens = v),
+                    obrigatorio: false,
+                    hint:
+                        'Sugestão: uma foto de vista ampla (posição no corpo) e uma em detalhe.',
                   ),
                 ],
               ),
@@ -1129,17 +1422,42 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       final lesao = _lesoes[index];
                       return ListTile(
                         title: Text(lesao.regiao),
-                        subtitle: lesao.descricao != null
-                            ? Text(lesao.descricao!)
-                            : null,
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            setState(() {
-                              _lesoes.removeAt(index);
-                            });
-                          },
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _descricaoLesaoParaExibicao(lesao),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (lesao.fotosPaths.isNotEmpty)
+                              Text(
+                                '${lesao.fotosPaths.length} foto(s)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                          ],
                         ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _editarLesao(index),
+                              tooltip: 'Editar',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () {
+                                setState(() => _lesoes.removeAt(index));
+                              },
+                              tooltip: 'Excluir',
+                            ),
+                          ],
+                        ),
+                        onTap: () => _editarLesao(index),
                       );
                     }),
                 ],
@@ -1152,12 +1470,21 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     );
   }
 
+  /// Aba 2: Vestes — exame das roupas antes da retirada.
   Widget _buildVestesTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            'Examine e registre as vestes antes da retirada (fotos opcionais por peça).',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
           // Lista de Vestes
           Card(
             child: Padding(
@@ -1202,6 +1529,16 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (veste.cor != null) Text('Cor: ${veste.cor}'),
+                              if (veste.fotosPaths.isNotEmpty)
+                                Text(
+                                  '${veste.fotosPaths.length} foto(s)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                  ),
+                                ),
                               Wrap(
                                 spacing: 4,
                                 runSpacing: 4,
@@ -1344,17 +1681,377 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     );
   }
 
+  /// Retorna o texto da descrição da lesão para exibir na lista (tela e ficha).
+  /// Usa descrição salva, ou gera no caso PAF, ou fallback região/tipo.
+  String _descricaoLesaoParaExibicao(LesaoCadaverModel lesao) {
+    if (lesao.descricao != null && lesao.descricao!.trim().isNotEmpty) {
+      return lesao.descricao!;
+    }
+    if (lesao.isPaf && lesao.paf != null) {
+      return gerarDescricaoPAF(
+        regiao: lesao.regiao,
+        tipo: lesao.paf!.tipo,
+        distancia: lesao.paf!.distancia,
+        diametro: lesao.paf!.diametro,
+        sinais: lesao.paf!.sinais,
+      );
+    }
+    if (lesao.tipo != null && lesao.tipo!.trim().isNotEmpty) {
+      return '${lesao.tipo}: Lesão em ${lesao.regiao}';
+    }
+    return 'Lesão em ${lesao.regiao}';
+  }
+
+  static const String _assetCorpoMasculino = 'assets/images/corpo_homem.png';
+  static const String _assetCorpoFeminino = 'assets/images/corpo_mulher.png';
+  static const String _assetBarba = 'assets/images/barba.png';
+
+  /// Abre bottom sheet com a numeração das regiões da ficha EVIDÊNCIAS NO CADÁVER (CVLI).
+  /// Ao tocar em uma região, preenche o [regiaoCtrl] e fecha o sheet.
+  void _mostrarNumeracaoCorpoCvli(
+    BuildContext dialogContext,
+    TextEditingController regiaoCtrl,
+  ) {
+    showModalBottomSheet(
+      context: dialogContext,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'EVIDÊNCIAS NO CADÁVER — Numeração',
+                          style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _mostrarFiguraCorpo(sheetContext, _assetCorpoMasculino, 'Corpo masculino'),
+                          icon: const Icon(Icons.image_outlined, size: 20),
+                          label: const Text('Masculino'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _mostrarFiguraCorpo(sheetContext, _assetCorpoFeminino, 'Corpo feminino'),
+                          icon: const Icon(Icons.image_outlined, size: 20),
+                          label: const Text('Feminino'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.only(bottom: 24),
+                    children: [
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Toque em uma região para preencher o campo.',
+                          style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Vista anterior (frente)',
+                          style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(sheetContext).colorScheme.primary,
+                              ),
+                        ),
+                      ),
+                      ...EvidenciasCadaverRegioes.vistaAnterior.map((r) {
+                        final texto = EvidenciasCadaverRegioes.textoRegiao(
+                          r.numero,
+                          r.nome,
+                          anterior: true,
+                        );
+                        return ListTile(
+                          title: Text('${r.numero} - ${r.nome}'),
+                          dense: true,
+                          onTap: () {
+                            regiaoCtrl.text = texto;
+                            Navigator.pop(sheetContext);
+                          },
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Vista posterior (costas)',
+                          style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(sheetContext).colorScheme.primary,
+                              ),
+                        ),
+                      ),
+                      ...EvidenciasCadaverRegioes.vistaPosterior.map((r) {
+                        final texto = EvidenciasCadaverRegioes.textoRegiao(
+                          r.numero,
+                          r.nome,
+                          anterior: false,
+                        );
+                        return ListTile(
+                          title: Text('${r.numero} - ${r.nome}'),
+                          dense: true,
+                          onTap: () {
+                            regiaoCtrl.text = texto;
+                            Navigator.pop(sheetContext);
+                          },
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _textoTipoBarbaSelecionado() {
+    if (_tipoBarba == null) return 'Tipo: Nenhum selecionado';
+    switch (_tipoBarba!) {
+      case TipoBarba.cavanhaque:
+        return 'Tipo: Cavanhaque';
+      case TipoBarba.bigode:
+        return 'Tipo: Bigode';
+      case TipoBarba.naoSeAplica:
+        return 'Tipo: Rosto limpo (não se aplica)';
+      case TipoBarba.outro:
+        final outro = _tipoBarbaOutroCtrl.text.trim();
+        return outro.isEmpty ? 'Tipo: Nenhum selecionado' : 'Tipo: $outro';
+    }
+  }
+
+  /// Abre bottom sheet com a imagem de referência da barba e lista numerada;
+  /// ao tocar em um item, preenche o tipo de barba e fecha.
+  void _mostrarSelecaoBarbaReferencia(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Tipos de barba (referência)',
+                          style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: InteractiveViewer(
+                      minScale: 0.5,
+                      maxScale: 4.0,
+                      child: Image.asset(
+                        _assetBarba,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, e, s) => const Center(
+                          child: Text('Imagem não encontrada.'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Use o gesto de pinça para zoom. Toque no tipo desejado abaixo para preencher.',
+                    style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.only(bottom: 24),
+                    itemCount: TiposBarbaReferencia.tipos.length,
+                    itemBuilder: (_, i) {
+                      final item = TiposBarbaReferencia.tipos[i];
+                      return ListTile(
+                        title: Text('${item.numero} - ${item.nome}'),
+                        dense: true,
+                        onTap: () {
+                          TipoBarba? tipo;
+                          if (item.nome == 'Cavanhaque') {
+                            tipo = TipoBarba.cavanhaque;
+                          } else if (item.nome == 'Rosto Limpo') {
+                            tipo = TipoBarba.naoSeAplica;
+                          } else {
+                            tipo = TipoBarba.outro;
+                            _tipoBarbaOutroCtrl.text = item.nome;
+                          }
+                          setState(() => _tipoBarba = tipo);
+                          Navigator.pop(sheetContext);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Exibe a figura do corpo (masculino/feminino) em um diálogo para consulta.
+  void _mostrarFiguraCorpo(BuildContext context, String assetPath, String titulo) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        titulo,
+                        style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Image.asset(
+                      assetPath,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Imagem não encontrada.',
+                          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(ctx).colorScheme.error,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _adicionarLesao() {
-    final regiaoCtrl = TextEditingController();
-    final descricaoCtrl = TextEditingController();
-    final tipoCtrl = TextEditingController();
-    final diametroCtrl = TextEditingController();
+    _mostrarDialogoLesao(null);
+  }
+
+  void _editarLesao(int index) {
+    _mostrarDialogoLesao(index);
+  }
+
+  void _mostrarDialogoLesao(int? index) {
+    final lesaoExistente = index != null ? _lesoes[index] : null;
+    final regiaoCtrl = TextEditingController(
+      text: lesaoExistente?.regiao ?? '',
+    );
+    final descricaoCtrl = TextEditingController(
+      text: lesaoExistente?.descricao ?? '',
+    );
+    final tipoCtrl = TextEditingController(
+      text: lesaoExistente?.tipo ?? '',
+    );
+    final diametroCtrl = TextEditingController(
+      text: lesaoExistente?.paf?.diametro?.toString() ?? '',
+    );
 
     // Estados para PAF
-    bool isPaf = false;
-    TipoLesaoPaf tipoLesaoPaf = TipoLesaoPaf.entrada;
-    DistanciaTiro? distanciaTiro;
-    Set<String> sinaisSelecionados = {};
+    bool isPaf = lesaoExistente?.isPaf ?? false;
+    TipoLesaoPaf tipoLesaoPaf = lesaoExistente?.paf?.tipo ?? TipoLesaoPaf.entrada;
+    DistanciaTiro? distanciaTiro = lesaoExistente?.paf?.distancia;
+    Set<String> sinaisSelecionados =
+        Set<String>.from(lesaoExistente?.paf?.sinais ?? []);
+
+    final fotosLesao = List<String>.from(lesaoExistente?.fotosPaths ?? []);
+    final subpasta = lesaoExistente != null
+        ? 'lesao_${lesaoExistente.id}'
+        : 'lesao_novo_${DateTime.now().microsecondsSinceEpoch}';
 
     void atualizarPresets(StateSetter setDialogState) {
       final novosSinais = aplicarPresetPAF(tipoLesaoPaf, distanciaTiro);
@@ -1383,7 +2080,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Nova Lesão'),
+            title: Text(index == null ? 'Nova Lesão' : 'Editar Lesão'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1395,10 +2092,18 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     decoration: const InputDecoration(
                       labelText: 'Região *',
                       border: OutlineInputBorder(),
-                      hintText: 'Ex: Torácica anterior esquerda',
+                      hintText: 'Ex: Anterior 12 - Epigástricas ou texto livre',
                     ),
                     onChanged: (_) =>
                         atualizarDescricaoAutomatica(setDialogState),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    onPressed: () {
+                      _mostrarNumeracaoCorpoCvli(dialogContext, regiaoCtrl);
+                    },
+                    icon: const Icon(Icons.help_outline, size: 20),
+                    label: const Text('Consultar numeração do corpo (figura CVLI)'),
                   ),
                   const SizedBox(height: 12),
 
@@ -1570,6 +2275,21 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
 
                   const SizedBox(height: 12),
 
+                  // Fotos da lesão
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  _buildSecaoFotos(
+                    titulo: 'Fotos da lesão',
+                    paths: fotosLesao,
+                    onChanged: (v) {
+                      fotosLesao.clear();
+                      fotosLesao.addAll(v);
+                      setDialogState(() {});
+                    },
+                    subpasta: subpasta,
+                  ),
+                  const SizedBox(height: 12),
+
                   // Campo Descrição
                   TextField(
                     controller: descricaoCtrl,
@@ -1614,27 +2334,33 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     );
                   }
 
+                  final novaLesao = LesaoCadaverModel(
+                    id: lesaoExistente?.id ??
+                        DateTime.now().microsecondsSinceEpoch.toString(),
+                    regiao: regiaoCtrl.text.trim(),
+                    tipo: isPaf
+                        ? 'PAF'
+                        : (tipoCtrl.text.trim().isEmpty
+                              ? null
+                              : tipoCtrl.text.trim()),
+                    descricao: descricaoCtrl.text.trim().isEmpty
+                        ? null
+                        : descricaoCtrl.text.trim(),
+                    isPaf: isPaf,
+                    paf: pafData,
+                    fotosPaths: List<String>.from(fotosLesao),
+                  );
+
                   setState(() {
-                    _lesoes.add(
-                      LesaoCadaverModel(
-                        id: DateTime.now().microsecondsSinceEpoch.toString(),
-                        regiao: regiaoCtrl.text.trim(),
-                        tipo: isPaf
-                            ? 'PAF'
-                            : (tipoCtrl.text.trim().isEmpty
-                                  ? null
-                                  : tipoCtrl.text.trim()),
-                        descricao: descricaoCtrl.text.trim().isEmpty
-                            ? null
-                            : descricaoCtrl.text.trim(),
-                        isPaf: isPaf,
-                        paf: pafData,
-                      ),
-                    );
+                    if (index != null) {
+                      _lesoes[index] = novaLesao;
+                    } else {
+                      _lesoes.add(novaLesao);
+                    }
                   });
                   Navigator.pop(dialogContext);
                 },
-                child: const Text('Adicionar'),
+                child: Text(index == null ? 'Adicionar' : 'Salvar'),
               ),
             ],
           );
@@ -1669,6 +2395,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     bool? sangue = vesteExistente?.sangue;
     bool? bolsos = vesteExistente?.bolsos;
     bool? bolsosVazios = vesteExistente?.bolsosVazios;
+    final fotosVeste = List<String>.from(vesteExistente?.fotosPaths ?? []);
 
     showDialog(
       context: context,
@@ -1701,19 +2428,27 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                 Row(
                   children: [
                     const Text('Sujidades:'),
-                    const Spacer(),
-                    ChoiceChip(
-                      label: const Text('Sim'),
-                      selected: sujidades == true,
-                      onSelected: (v) =>
-                          setDialogState(() => sujidades = v ? true : null),
-                    ),
                     const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Não'),
-                      selected: sujidades == false,
-                      onSelected: (v) =>
-                          setDialogState(() => sujidades = v ? false : null),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Sim'),
+                            selected: sujidades == true,
+                            onSelected: (v) =>
+                                setDialogState(() => sujidades = v ? true : null),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Não'),
+                            selected: sujidades == false,
+                            onSelected: (v) =>
+                                setDialogState(() => sujidades = v ? false : null),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1721,19 +2456,27 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                 Row(
                   children: [
                     const Text('Sangue:'),
-                    const Spacer(),
-                    ChoiceChip(
-                      label: const Text('Sim'),
-                      selected: sangue == true,
-                      onSelected: (v) =>
-                          setDialogState(() => sangue = v ? true : null),
-                    ),
                     const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Não'),
-                      selected: sangue == false,
-                      onSelected: (v) =>
-                          setDialogState(() => sangue = v ? false : null),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Sim'),
+                            selected: sangue == true,
+                            onSelected: (v) =>
+                                setDialogState(() => sangue = v ? true : null),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Não'),
+                            selected: sangue == false,
+                            onSelected: (v) =>
+                                setDialogState(() => sangue = v ? false : null),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1741,19 +2484,27 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                 Row(
                   children: [
                     const Text('Bolsos:'),
-                    const Spacer(),
-                    ChoiceChip(
-                      label: const Text('Sim'),
-                      selected: bolsos == true,
-                      onSelected: (v) =>
-                          setDialogState(() => bolsos = v ? true : null),
-                    ),
                     const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Não'),
-                      selected: bolsos == false,
-                      onSelected: (v) =>
-                          setDialogState(() => bolsos = v ? false : null),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Sim'),
+                            selected: bolsos == true,
+                            onSelected: (v) =>
+                                setDialogState(() => bolsos = v ? true : null),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Não'),
+                            selected: bolsos == false,
+                            onSelected: (v) =>
+                                setDialogState(() => bolsos = v ? false : null),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1762,20 +2513,28 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   Row(
                     children: [
                       const Text('Vazios:'),
-                      const Spacer(),
-                      ChoiceChip(
-                        label: const Text('Sim'),
-                        selected: bolsosVazios == true,
-                        onSelected: (v) => setDialogState(
-                          () => bolsosVazios = v ? true : null,
-                        ),
-                      ),
                       const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Não'),
-                        selected: bolsosVazios == false,
-                        onSelected: (v) => setDialogState(
-                          () => bolsosVazios = v ? false : null,
+                      Expanded(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          alignment: WrapAlignment.end,
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Sim'),
+                              selected: bolsosVazios == true,
+                              onSelected: (v) => setDialogState(
+                                () => bolsosVazios = v ? true : null,
+                              ),
+                            ),
+                            ChoiceChip(
+                              label: const Text('Não'),
+                              selected: bolsosVazios == false,
+                              onSelected: (v) => setDialogState(
+                                () => bolsosVazios = v ? false : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -1789,6 +2548,19 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                _buildSecaoFotos(
+                  titulo: 'Fotos da veste',
+                  paths: fotosVeste,
+                  onChanged: (v) {
+                    fotosVeste.clear();
+                    fotosVeste.addAll(v);
+                    setDialogState(() {});
+                  },
+                  subpasta: 'veste_$proximoNumero',
                 ),
               ],
             ),
@@ -1816,6 +2588,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   notas: notasCtrl.text.trim().isEmpty
                       ? null
                       : notasCtrl.text.trim(),
+                  fotosPaths: List<String>.from(fotosVeste),
                 );
 
                 setState(() {

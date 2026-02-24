@@ -2,8 +2,7 @@
 enum TipoOcorrencia {
   furtoDanoExameLocal('FURTO / DANO / EXAME DE LOCAL'),
   cvli('CVLI - CRIMES VIOLENTOS LETAIS INTENCIONAIS'),
-  // Outros tipos serão adicionados depois
-  // crimeTransito('CRIME DE TRÂNSITO'),
+  crimeTransito('CRIME DE TRÂNSITO'),
   // vistoriaVeiculo('VISTORIA EM VEÍCULO'),
   ;
 
@@ -13,7 +12,6 @@ enum TipoOcorrencia {
   static List<TipoOcorrencia> get tiposDisponiveis => [
         furtoDanoExameLocal,
         cvli,
-        // Adicionar outros conforme implementamos
+        crimeTransito,
       ];
 }
-

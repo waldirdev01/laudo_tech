@@ -129,6 +129,7 @@ class VesteCadaverModel {
   final bool? bolsos;
   final bool? bolsosVazios;
   final String? notas;
+  final List<String> fotosPaths;
 
   VesteCadaverModel({
     this.id,
@@ -140,6 +141,7 @@ class VesteCadaverModel {
     this.bolsos,
     this.bolsosVazios,
     this.notas,
+    this.fotosPaths = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -152,6 +154,7 @@ class VesteCadaverModel {
     'bolsos': bolsos,
     'bolsosVazios': bolsosVazios,
     'notas': notas,
+    'fotosPaths': fotosPaths,
   };
 
   factory VesteCadaverModel.fromJson(Map<String, dynamic> json) =>
@@ -165,6 +168,10 @@ class VesteCadaverModel {
         bolsos: json['bolsos'] as bool?,
         bolsosVazios: json['bolsosVazios'] as bool?,
         notas: json['notas'] as String?,
+        fotosPaths: (json['fotosPaths'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
       );
 
   VesteCadaverModel copyWith({
@@ -177,6 +184,7 @@ class VesteCadaverModel {
     bool? bolsos,
     bool? bolsosVazios,
     String? notas,
+    List<String>? fotosPaths,
   }) {
     return VesteCadaverModel(
       id: id ?? this.id,
@@ -188,6 +196,7 @@ class VesteCadaverModel {
       bolsos: bolsos ?? this.bolsos,
       bolsosVazios: bolsosVazios ?? this.bolsosVazios,
       notas: notas ?? this.notas,
+      fotosPaths: fotosPaths ?? this.fotosPaths,
     );
   }
 }
@@ -448,6 +457,10 @@ class LesaoCadaverModel {
   final String? tipo; // PAF, PAB, contusão, etc.
   final bool isPaf;
   final PafData? paf;
+  /// Fotos vinculadas a esta lesão (paths locais).
+  final List<String> fotosPaths;
+  /// Números das fotografias no anexo do laudo (preenchido na geração do laudo).
+  final List<int>? numerosFotografias;
 
   LesaoCadaverModel({
     this.id,
@@ -456,6 +469,8 @@ class LesaoCadaverModel {
     this.tipo,
     this.isPaf = false,
     this.paf,
+    this.fotosPaths = const [],
+    this.numerosFotografias,
   });
 
   Map<String, dynamic> toJson() => {
@@ -465,6 +480,7 @@ class LesaoCadaverModel {
     'tipo': tipo,
     'isPaf': isPaf,
     'paf': paf?.toJson(),
+    'fotosPaths': fotosPaths,
   };
 
   factory LesaoCadaverModel.fromJson(Map<String, dynamic> json) =>
@@ -477,6 +493,10 @@ class LesaoCadaverModel {
         paf: json['paf'] != null
             ? PafData.fromJson(json['paf'] as Map<String, dynamic>)
             : null,
+        fotosPaths: (json['fotosPaths'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
       );
 
   LesaoCadaverModel copyWith({
@@ -486,6 +506,8 @@ class LesaoCadaverModel {
     String? tipo,
     bool? isPaf,
     PafData? paf,
+    List<String>? fotosPaths,
+    List<int>? numerosFotografias,
   }) {
     return LesaoCadaverModel(
       id: id ?? this.id,
@@ -494,6 +516,8 @@ class LesaoCadaverModel {
       tipo: tipo ?? this.tipo,
       isPaf: isPaf ?? this.isPaf,
       paf: paf ?? this.paf,
+      fotosPaths: fotosPaths ?? this.fotosPaths,
+      numerosFotografias: numerosFotografias ?? this.numerosFotografias,
     );
   }
 }
@@ -573,6 +597,12 @@ class CadaverModel {
   // Outras observações
   final String? outrasObservacoes;
 
+  // Fotos dos exames (paths locais)
+  final List<String> fotosVistaCadaversAmbiente; // obrigatório: vista do cadáver no ambiente
+  final List<String> fotosPosicaoEncontrada; // obrigatório: posição em que foi encontrado
+  final List<String> fotosHipostaseSecrecoes; // opcional
+  final List<String> fotosTatuagens; // opcional (tatuagens e marcas corporais)
+
   // Lesões/Evidências no cadáver
   final List<LesaoCadaverModel>? lesoes;
 
@@ -635,6 +665,10 @@ class CadaverModel {
     this.secrecaoPenianaVaginal,
     this.secrecaoPenianaVaginalTipo,
     this.outrasObservacoes,
+    this.fotosVistaCadaversAmbiente = const [],
+    this.fotosPosicaoEncontrada = const [],
+    this.fotosHipostaseSecrecoes = const [],
+    this.fotosTatuagens = const [],
     this.lesoes,
     this.vestes,
     this.tatuagensMarcas,
@@ -691,6 +725,10 @@ class CadaverModel {
     'secrecaoPenianaVaginal': secrecaoPenianaVaginal,
     'secrecaoPenianaVaginalTipo': secrecaoPenianaVaginalTipo,
     'outrasObservacoes': outrasObservacoes,
+    'fotosVistaCadaversAmbiente': fotosVistaCadaversAmbiente,
+    'fotosPosicaoEncontrada': fotosPosicaoEncontrada,
+    'fotosHipostaseSecrecoes': fotosHipostaseSecrecoes,
+    'fotosTatuagens': fotosTatuagens,
     'lesoes': lesoes?.map((l) => l.toJson()).toList(),
     'vestes': vestes?.map((v) => v.toJson()).toList(),
     'tatuagensMarcas': tatuagensMarcas,
@@ -813,6 +851,26 @@ class CadaverModel {
       secrecaoPenianaVaginal: json['secrecaoPenianaVaginal'] as bool?,
       secrecaoPenianaVaginalTipo: json['secrecaoPenianaVaginalTipo'] as String?,
       outrasObservacoes: json['outrasObservacoes'] as String?,
+      fotosVistaCadaversAmbiente:
+          (json['fotosVistaCadaversAmbiente'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      fotosPosicaoEncontrada:
+          (json['fotosPosicaoEncontrada'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      fotosHipostaseSecrecoes:
+          (json['fotosHipostaseSecrecoes'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      fotosTatuagens:
+          ((json['fotosTatuagens'] ?? json['fotosTatuagensLesoes']) as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
       lesoes: (json['lesoes'] as List<dynamic>?)
           ?.map((l) => LesaoCadaverModel.fromJson(l as Map<String, dynamic>))
           .toList(),
@@ -874,6 +932,10 @@ class CadaverModel {
     bool? secrecaoPenianaVaginal,
     String? secrecaoPenianaVaginalTipo,
     String? outrasObservacoes,
+    List<String>? fotosVistaCadaversAmbiente,
+    List<String>? fotosPosicaoEncontrada,
+    List<String>? fotosHipostaseSecrecoes,
+    List<String>? fotosTatuagens,
     List<LesaoCadaverModel>? lesoes,
     List<VesteCadaverModel>? vestes,
     String? tatuagensMarcas,
@@ -935,6 +997,13 @@ class CadaverModel {
       secrecaoPenianaVaginalTipo:
           secrecaoPenianaVaginalTipo ?? this.secrecaoPenianaVaginalTipo,
       outrasObservacoes: outrasObservacoes ?? this.outrasObservacoes,
+      fotosVistaCadaversAmbiente:
+          fotosVistaCadaversAmbiente ?? this.fotosVistaCadaversAmbiente,
+      fotosPosicaoEncontrada:
+          fotosPosicaoEncontrada ?? this.fotosPosicaoEncontrada,
+      fotosHipostaseSecrecoes:
+          fotosHipostaseSecrecoes ?? this.fotosHipostaseSecrecoes,
+      fotosTatuagens: fotosTatuagens ?? this.fotosTatuagens,
       lesoes: lesoes ?? this.lesoes,
       vestes: vestes ?? this.vestes,
       tatuagensMarcas: tatuagensMarcas ?? this.tatuagensMarcas,

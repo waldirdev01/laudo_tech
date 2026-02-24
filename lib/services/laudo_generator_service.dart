@@ -3,9 +3,12 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/cadaver_model.dart';
+import '../models/crime_transito_model.dart';
+import '../models/detatlhes_local.dart';
 import '../models/equipe_policial_ficha_model.dart';
 import '../models/equipe_resgate_model.dart';
 import '../models/evidencia_model.dart';
@@ -36,11 +39,13 @@ class LaudoGeneratorService {
   static const String _fontSizeNormal = '24'; // 12pt = 24 half-points
 
   /// Gera o documento Word do laudo
+  /// [legendasFotos] opcional: descrição de cada foto na mesma ordem de [fotos] (ex.: "Vista ampla do local", "Vestígio: ...").
   Future<File> gerarLaudo({
     required FichaCompletaModel ficha,
     required PeritoModel perito,
     required String templatePath,
     List<File>? fotos,
+    List<String>? legendasFotos,
   }) async {
     // Ler o template
     final templateFile = File(templatePath);
@@ -68,15 +73,32 @@ class LaudoGeneratorService {
       documentContent = String.fromCharCodes(conteudoOriginal);
     }
 
-    // Processar relationships se houver fotos e preparar nomes únicos (evita sobrescrever imagens do template)
+    // Imagem do mapa (captura de tela do local), se houver
+    File? imagemMapaLocal;
+    final capturaPath = ficha.local?.capturaTelaLocalPath;
+    if (capturaPath != null && capturaPath.isNotEmpty) {
+      final f = File(capturaPath);
+      if (await f.exists()) imagemMapaLocal = f;
+    }
+
+    // Processar relationships: imagem do mapa (rId maxId+1) + fotos do anexo (maxId+2, ...)
     String? relationshipsXml;
     int maxId = 0;
     List<String> nomesFotosDocx = const [];
-    if (fotos != null && fotos.isNotEmpty) {
-      final result = await _processarRelationships(archive, fotos);
+    int? mapaRId;
+    String? mapaFileName;
+    final hasFotos = fotos != null && fotos.isNotEmpty;
+    if (imagemMapaLocal != null || hasFotos) {
+      final result = await _processarRelationships(
+        archive,
+        fotos ?? [],
+        imagemMapaLocal: imagemMapaLocal,
+      );
       relationshipsXml = result['xml'] as String;
       maxId = result['maxId'] as int;
       nomesFotosDocx = (result['fileNames'] as List<dynamic>).cast<String>();
+      mapaRId = result['mapaRId'] as int?;
+      mapaFileName = result['mapaFileName'] as String?;
     }
 
     // Gerar novo conteúdo do documento
@@ -85,12 +107,21 @@ class LaudoGeneratorService {
       perito,
       documentContent,
       fotos: fotos,
+      legendasFotos: legendasFotos,
       maxId: maxId,
+      mapaRId: mapaRId,
     );
+
+    // Nota de rodapé real (Feca Cult) quando há material sangue humano
+    final materiaisApreendidos =
+        ficha.evidenciasFurto?.materiaisApreendidos ?? [];
+    final materialSangue = materiaisApreendidos
+        .where((m) => m.descricao == 'Sangue humano')
+        .firstOrNull;
+    final precisaFootnotes = materialSangue != null;
 
     // Criar novo arquivo com o conteúdo atualizado
     final novoArchive = Archive();
-    // (contador não necessário aqui; mantemos por clareza apenas se precisarmos de logs)
 
     for (final file in archive.files) {
       if (file.name == 'word/document.xml') {
@@ -98,26 +129,54 @@ class LaudoGeneratorService {
         novoArchive.addFile(
           ArchiveFile(file.name, novoDocBytes.length, novoDocBytes),
         );
-      } else if (file.name == 'word/_rels/document.xml.rels' &&
-          relationshipsXml != null) {
-        // Atualizar relationships com as novas imagens
-        final relsBytes = Uint8List.fromList(utf8.encode(relationshipsXml));
+      } else if (file.name == 'word/_rels/document.xml.rels') {
+        String relsContent =
+            relationshipsXml ?? utf8.decode((file.content as List<int>));
+        if (precisaFootnotes) {
+          final nextRId = _proximoRIdEmRels(relsContent);
+          relsContent = relsContent.replaceFirst(
+            '</Relationships>',
+            '  <Relationship Id="rId$nextRId" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>\n</Relationships>',
+          );
+        }
+        final relsBytes = Uint8List.fromList(utf8.encode(relsContent));
         novoArchive.addFile(
           ArchiveFile(file.name, relsBytes.length, relsBytes),
         );
+      } else if (file.name == 'word/footnotes.xml' && precisaFootnotes) {
+        // Substituiremos por nosso footnotes.xml abaixo; não copiar o do template
       } else {
         novoArchive.addFile(file);
       }
     }
 
-    // Adicionar imagens ao archive com nomes únicos (não colide com imagens do template)
+    if (precisaFootnotes) {
+      final footnotesXml = _gerarFootnotesXml();
+      novoArchive.addFile(
+        ArchiveFile(
+          'word/footnotes.xml',
+          footnotesXml.length,
+          Uint8List.fromList(utf8.encode(footnotesXml)),
+        ),
+      );
+    }
+
+    // Adicionar imagens ao archive: primeiro a do mapa (se houver), depois as fotos do anexo
+    if (imagemMapaLocal != null && mapaFileName != null) {
+      final imageBytes = await imagemMapaLocal.readAsBytes();
+      novoArchive.addFile(
+        ArchiveFile('word/media/$mapaFileName', imageBytes.length, imageBytes),
+      );
+    }
     if (fotos != null && fotos.isNotEmpty) {
+      final offset = mapaFileName != null ? 1 : 0;
       for (int i = 0; i < fotos.length; i++) {
+        final idx = i + offset;
+        if (idx >= nomesFotosDocx.length) continue;
         final foto = fotos[i];
         if (!await foto.exists()) continue;
-        if (i >= nomesFotosDocx.length) continue;
         final imageBytes = await foto.readAsBytes();
-        final imageName = 'word/media/${nomesFotosDocx[i]}';
+        final imageName = 'word/media/${nomesFotosDocx[idx]}';
         novoArchive.addFile(
           ArchiveFile(imageName, imageBytes.length, imageBytes),
         );
@@ -144,7 +203,9 @@ class LaudoGeneratorService {
     PeritoModel perito,
     String documentContent, {
     List<File>? fotos,
+    List<String>? legendasFotos,
     int maxId = 0,
+    int? mapaRId,
   }) async {
     // Extrair sectPr do documento original (contém referências a header/footer)
     final sectPr = _extrairSectPr(documentContent);
@@ -152,66 +213,70 @@ class LaudoGeneratorService {
     // Gerar o conteúdo interno do body
     final buffer = StringBuffer();
 
+    // Três linhas em branco antes do título (altura 22pt cada)
+    buffer.writeln(_gerarLinhaEmBrancoTamanho22());
+    buffer.writeln(_gerarLinhaEmBrancoTamanho22());
+    buffer.writeln(_gerarLinhaEmBrancoTamanho22());
+
     // TÍTULO PRINCIPAL: "LAUDO DE PERÍCIA CRIMINAL"
     buffer.writeln(_gerarTituloPrincipal('LAUDO DE PERÍCIA CRIMINAL'));
+    buffer.writeln(_gerarLinhaEmBranco());
 
     // SUBTÍTULO: Natureza do exame
     final subtitulo = _getSubtituloParaTipo(ficha.tipoOcorrencia);
     buffer.writeln(_gerarSubtitulo(subtitulo));
-    buffer.writeln(_gerarParagrafoVazio());
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(_gerarLinhaEmBranco());
 
-    // TABELA DE IDENTIFICAÇÃO DO LAUDO
+    // TABELA DE IDENTIFICAÇÃO DO LAUDO (preâmbulo)
     buffer.writeln(_gerarTabelaIdentificacao(ficha, perito));
-    buffer.writeln(_gerarParagrafoVazio());
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(_gerarLinhaEmBranco());
 
     // SEÇÃO 1. HISTÓRICO
     buffer.writeln(await _gerarSecaoHistorico(ficha, perito));
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(_gerarLinhaEmBranco());
 
-    // SEÇÃO 2. OBJETIVOS
+    // SEÇÃO 2. OBJETIVOS (uma linha em branco antes de cada item principal)
     buffer.writeln(_gerarSecaoObjetivos());
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(_gerarLinhaEmBranco());
 
     // SEÇÃO 3. ISOLAMENTO DO LOCAL E PRESERVAÇÃO DOS VESTÍGIOS
     buffer.writeln(_gerarSecaoIsolamentoPreservacao(ficha));
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(_gerarLinhaEmBranco());
 
     // SEÇÃO 4. DESCRIÇÃO DO LOCAL
-    buffer.writeln(_gerarSecaoDescricaoLocal(ficha));
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(_gerarSecaoDescricaoLocal(ficha, mapaRId: mapaRId));
+    buffer.writeln(_gerarLinhaEmBranco());
 
     // SEÇÃO 5. EXAMES ou DAS IMAGENS (para CVLI)
     final qtdFotos = fotos?.length ?? 0;
-    buffer.writeln(_gerarSecaoExames(ficha, qtdFotos: qtdFotos));
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(await _gerarSecaoExames(ficha, perito, qtdFotos: qtdFotos));
+    buffer.writeln(_gerarLinhaEmBranco());
 
     // SEÇÃO 6. ANÁLISE E INTERPRETAÇÃO DOS VESTÍGIOS ou DOS EXAMES (para CVLI)
     buffer.writeln(await _gerarSecaoAnaliseInterpretacao(ficha));
-    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(_gerarLinhaEmBranco());
 
     // Para CVLI: seções 7-11 específicas
     if (ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
       // SEÇÃO 7. EXAMES COMPLEMENTARES
       buffer.writeln(_gerarSecaoExamesComplementaresCVLI(ficha));
-      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(_gerarLinhaEmBranco());
 
       // SEÇÃO 8. CONSIDERAÇÕES TÉCNICO-PERICIAIS
       buffer.writeln(_gerarSecaoConsideracoesTecnicoPericiais(ficha));
-      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(_gerarLinhaEmBranco());
 
       // SEÇÃO 9. RESPOSTA AOS QUESITOS
       buffer.writeln(_gerarSecaoRespostaQuesitos(ficha));
-      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(_gerarLinhaEmBranco());
 
       // SEÇÃO 10. CONCLUSÃO
       buffer.writeln(_gerarSecaoConclusaoCVLI(ficha));
-      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(_gerarLinhaEmBranco());
 
       // SEÇÃO 11. REFERÊNCIAS BIBLIOGRÁFICAS
       buffer.writeln(_gerarSecaoReferenciasBibliograficas(ficha));
-      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(_gerarLinhaEmBranco());
     } else {
       // Para outros casos (Furto/Dano)
       // SEÇÃO 7. QUESITOS (obrigatório para casos de Furto ou Dano)
@@ -222,12 +287,12 @@ class LaudoGeneratorService {
         } else {
           buffer.writeln(_gerarSecaoQuesitosFurto(ficha));
         }
-        buffer.writeln(_gerarParagrafoVazio());
+        buffer.writeln(_gerarLinhaEmBranco());
       }
 
       // SEÇÃO 8. CONCLUSÃO
       buffer.writeln(_gerarSecaoConclusao(ficha));
-      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(_gerarLinhaEmBranco());
     }
 
     // PARÁGRAFOS FINAIS
@@ -236,7 +301,14 @@ class LaudoGeneratorService {
 
     // LEVANTAMENTO FOTOGRÁFICO (se houver fotos)
     if (fotos != null && fotos.isNotEmpty) {
-      buffer.writeln(_gerarLevantamentoFotografico(fotos, maxId));
+      buffer.writeln(
+        _gerarLevantamentoFotografico(
+          fotos,
+          maxId,
+          mapaRId: mapaRId,
+          legendas: legendasFotos,
+        ),
+      );
     }
 
     // Montar o documento completo com namespaces e sectPr
@@ -287,6 +359,8 @@ class LaudoGeneratorService {
         return 'LOCAL DE CRIME CONTRA O PATRIMÔNIO';
       case TipoOcorrencia.cvli:
         return 'CRIMES VIOLENTOS LETAIS INTENCIONAIS';
+      case TipoOcorrencia.crimeTransito:
+        return 'CRIME DE TRÂNSITO';
       default:
         return 'EXAME PERICIAL';
     }
@@ -372,6 +446,17 @@ class LaudoGeneratorService {
     }
 
     buffer.writeln('    </w:tbl>');
+    if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito &&
+        ficha.crimeTransitoCondicoes != null) {
+      buffer.writeln(_gerarTituloSubSecao('4.3 Condições da Via'));
+      final resumo = _textoCondicoesCrimeTransito(
+        ficha.crimeTransitoCondicoes!,
+      );
+      buffer.writeln(
+        _gerarParagrafoHistorico(resumo.isNotEmpty ? resumo : 'Não informado.'),
+      );
+    }
+
     return buffer.toString();
   }
 
@@ -455,17 +540,72 @@ class LaudoGeneratorService {
     }
   }
 
+  static const List<String> _mesesPt = [
+    'janeiro',
+    'fevereiro',
+    'março',
+    'abril',
+    'maio',
+    'junho',
+    'julho',
+    'agosto',
+    'setembro',
+    'outubro',
+    'novembro',
+    'dezembro',
+  ];
+
   String _formatarDataExame(FichaCompletaModel ficha) {
-    // Usar a data de início do exame
     final dataHoraInicio = ficha.dataHoraInicio;
-    if (dataHoraInicio != null && dataHoraInicio.isNotEmpty) {
-      // Extrair apenas a data (assumindo formato dd/MM/yyyy HH:mm)
-      final partes = dataHoraInicio.split(' ');
-      if (partes.isNotEmpty) {
-        return partes[0]; // Retorna apenas a data
-      }
+    if (dataHoraInicio == null || dataHoraInicio.isEmpty) return '';
+
+    final partes = dataHoraInicio.trim().split(RegExp(r'\s+'));
+    final dataStr = partes[0].replaceAll('-', '/');
+    if (dataStr.isEmpty) return '';
+
+    DateTime? parsed;
+    try {
+      parsed = DateFormat('dd/MM/yyyy').parse(dataStr);
+    } catch (_) {
+      try {
+        parsed = DateFormat('yyyy/MM/dd').parse(dataStr);
+      } catch (_) {}
     }
-    return '';
+    if (parsed == null) return dataStr;
+
+    final d = parsed.day;
+    final m = parsed.month;
+    final y = parsed.year;
+    if (m < 1 || m > 12) return dataStr;
+    return '$d de ${_mesesPt[m - 1]} de $y';
+  }
+
+  /// Uma linha em branco (entre título/subtítulo/tabela e entre itens principais).
+  /// Sem recuo, sem espaço antes/depois, para não somar com parágrafos do mesmo estilo.
+  String _gerarLinhaEmBranco() {
+    return '''    <w:p>
+      <w:pPr>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
+      </w:pPr>
+    </w:p>''';
+  }
+
+  /// Linha em branco com altura 22pt (para as três linhas iniciais antes do título).
+  static const int _lineHeight22pt = 440; // 22pt em twips (22 * 20)
+
+  String _gerarLinhaEmBrancoTamanho22() {
+    return '''    <w:p>
+      <w:pPr>
+        <w:spacing w:before="0" w:after="0" w:line="$_lineHeight22pt" w:lineRule="auto"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="$_fontSizeTitulo"/>
+          <w:szCs w:val="$_fontSizeTitulo"/>
+        </w:rPr>
+        <w:t></w:t>
+      </w:r>
+    </w:p>''';
   }
 
   String _gerarParagrafoVazio() {
@@ -473,7 +613,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
         <w:ind w:firstLine="708"/>
       </w:pPr>
     </w:p>''';
@@ -543,6 +683,16 @@ class LaudoGeneratorService {
       buffer.writeln(_gerarParagrafoHistorico(equipesResgateTexto));
     }
 
+    // Condições meteorológicas
+    final condicoesMeteo = _formatarCondicoesMeteorologicas(ficha.dadosFichaBase);
+    if (condicoesMeteo.isNotEmpty) {
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'As condições meteorológicas no momento do exame apresentavam-se $condicoesMeteo.',
+        ),
+      );
+    }
+
     // Parágrafo sobre recolhimento do(s) cadáver(es) ao IML (apenas para CVLI)
     if (ficha.tipoOcorrencia == TipoOcorrencia.cvli &&
         ficha.cadaveres != null &&
@@ -575,11 +725,24 @@ class LaudoGeneratorService {
     return buffer.toString();
   }
 
+  String _formatarCondicoesMeteorologicas(FichaBaseModel? fb) {
+    if (fb == null) return '';
+    final condicoes = <String>[];
+    if (fb.condicoesEstavel == true) condicoes.add('tempo estável');
+    if (fb.condicoesNublado == true) condicoes.add('tempo nublado');
+    if (fb.condicoesParcialmenteNublado == true) {
+      condicoes.add('tempo parcialmente nublado');
+    }
+    if (fb.condicoesChuvoso == true) condicoes.add('tempo chuvoso');
+    if (condicoes.isEmpty) return '';
+    return condicoes.join(', com ');
+  }
+
   String _gerarTituloSecao(String titulo) {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
         <w:ind w:firstLine="0"/>
       </w:pPr>
       <w:r>
@@ -595,11 +758,12 @@ class LaudoGeneratorService {
   }
 
   String _gerarParagrafoHistorico(String texto) {
-    // Parágrafo com recuo de primeira linha 1,25 cm, entrelinhas 1,25, justificado
+    // Parágrafo com recuo de primeira linha 1,25 cm, entrelinhas 1,25, justificado.
+    // Sem espaço antes/depois para não adicionar espaço entre parágrafos do mesmo estilo.
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
         <w:ind w:firstLine="708"/>
       </w:pPr>
       <w:r>
@@ -619,11 +783,11 @@ class LaudoGeneratorService {
     String textoDepois,
   ) {
     // Parágrafo com recuo de primeira linha 1,25 cm, entrelinhas 1,25, justificado
-    // com parte do texto em vermelho
+    // com parte do texto em vermelho. Sem espaço antes/depois (mesmo estilo).
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
         <w:ind w:firstLine="708"/>
       </w:pPr>
       <w:r>
@@ -703,7 +867,12 @@ class LaudoGeneratorService {
             MembroEquipeModel(id: '', cargo: '', nome: '', matricula: ''),
       );
       if (fotografo.nome.isNotEmpty) {
-        membros.add('${fotografo.cargo} ${fotografo.nome}');
+        membros.add(
+          _textoMembroComMatricula(
+            '${fotografo.cargo} ${fotografo.nome}',
+            fotografo.matricula,
+          ),
+        );
       }
     }
 
@@ -715,7 +884,12 @@ class LaudoGeneratorService {
             MembroEquipeModel(id: '', cargo: '', nome: '', matricula: ''),
       );
       if (membro.nome.isNotEmpty) {
-        membros.add('${membro.cargo} ${membro.nome}');
+        membros.add(
+          _textoMembroComMatricula(
+            '${membro.cargo} ${membro.nome}',
+            membro.matricula,
+          ),
+        );
       }
     }
 
@@ -764,6 +938,14 @@ class LaudoGeneratorService {
     return 'XXXXXXXXXXXXXX';
   }
 
+  /// Inclui matrícula no texto do membro de forma fluida (ex.: "João Silva, matrícula 12345").
+  String _textoMembroComMatricula(String nomeOuDescricao, String? matricula) {
+    if (matricula == null || matricula.trim().isEmpty) {
+      return nomeOuDescricao;
+    }
+    return '$nomeOuDescricao, matrícula ${matricula.trim()}';
+  }
+
   String _formatarNomeCorreto(String nome) {
     // Converte de CAIXA ALTA para formato correto (primeira letra maiúscula, resto minúsculo)
     // Trata nomes compostos corretamente (ex: "MARIA DA SILVA" -> "Maria da Silva")
@@ -784,10 +966,12 @@ class LaudoGeneratorService {
       final tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
       final membros = equipe.membros
           .map((m) {
-            final posto = m.postoGraduacao != null
-                ? ' (${m.postoGraduacao})'
-                : '';
-            return '${m.nome}$posto';
+            // Patente na frente do nome (ex.: Cabo Xavier, Soldado Figueiredo)
+            final textoMembro =
+                m.postoGraduacao != null && m.postoGraduacao!.trim().isNotEmpty
+                ? '${m.postoGraduacao} ${m.nome}'
+                : m.nome;
+            return _textoMembroComMatricula(textoMembro, m.matricula);
           })
           .join(', ');
 
@@ -814,10 +998,13 @@ class LaudoGeneratorService {
               partesMembro.add(m.cargo!);
             }
             partesMembro.add(m.nome);
-            if (m.crm != null) {
+            if (m.matricula != null && m.matricula!.trim().isNotEmpty) {
+              partesMembro.add('matrícula ${m.matricula!.trim()}');
+            }
+            if (m.crm != null && m.crm!.trim().isNotEmpty) {
               partesMembro.add('CRM ${m.crm}');
             }
-            return partesMembro.join(' ');
+            return partesMembro.join(', ');
           })
           .join(', ');
 
@@ -898,13 +1085,13 @@ class LaudoGeneratorService {
         );
         buffer.writeln(
           _gerarParagrafoHistorico(
-            'Apesar disso, havia no local vestígios que puderam estar relacionados à ação delituosa o que permitiu a realização do levantamento pericial nas condições apresentadas.',
+            'Constatou-se que o local não se encontrava devidamente preservado quando da chegada desta equipe, com indícios de intervenções/alterações anteriores à perícia. Tais circunstâncias podem ter suprimido, deslocado ou modificado vestígios e sua distribuição espacial, afetando a possibilidade de correlação segura entre vestígios materiais e a dinâmica informada no histórico. Assim, os exames concentraram-se no registro técnico do cenário remanescente, com indicação expressa do grau de prejuízo decorrente das condições de preservação.',
           ),
         );
       } else if (fb?.preservacaoInidoneo == true) {
         buffer.writeln(
           _gerarParagrafoHistorico(
-            'Devido à ausência de Preservação do local, não foram encontrados vestígios relacionados aos fatos apontados no histórico, não sendo possível realizar qualquer análise e/ou emitir conclusão segura relativa ao fato.',
+            'Constatou-se que o local não se encontrava devidamente preservado quando da chegada desta equipe, com indícios de intervenções/alterações anteriores à perícia. Tais circunstâncias podem ter suprimido, deslocado ou modificado vestígios e sua distribuição espacial, afetando a possibilidade de correlação segura entre vestígios materiais e a dinâmica informada no histórico. Assim, os exames concentraram-se no registro técnico do cenário remanescente, com indicação expressa do grau de prejuízo decorrente das condições de preservação.',
           ),
         );
       }
@@ -913,11 +1100,11 @@ class LaudoGeneratorService {
     return buffer.toString();
   }
 
-  String _gerarSecaoDescricaoLocal(FichaCompletaModel ficha) {
+  String _gerarSecaoDescricaoLocal(FichaCompletaModel ficha, {int? mapaRId}) {
     final buffer = StringBuffer();
 
-    // Título da seção "4. DESCRIÇÃO DO LOCAL"
-    buffer.writeln(_gerarTituloSecao('4. DESCRIÇÃO DO LOCAL'));
+    // Título da seção "4. DO LOCAL"
+    buffer.writeln(_gerarTituloSecao('4. DO LOCAL'));
 
     // 4.1 Endereço
     buffer.writeln(_gerarTituloSubSecao('4.1 Endereço'));
@@ -938,81 +1125,35 @@ class LaudoGeneratorService {
     if (enderecoCompleto.isEmpty) {
       enderecoCompleto = 'Não informado';
     }
-
-    // Adicionar coordenadas no mesmo formato da ficha (DMS)
-    final coordS = ficha.local?.coordenadasSFormatada;
-    final coordW = ficha.local?.coordenadasWFormatada;
-
-    if (coordS != null && coordW != null) {
-      // Adicionar vírgula no final do endereço, depois as coordenadas e ponto final
-      enderecoCompleto += ', $coordS $coordW.';
-    } else {
-      // Se não houver coordenadas, apenas adicionar ponto final
-      if (enderecoCompleto != 'Não informado') {
-        enderecoCompleto += '.';
-      }
-    }
-
+    enderecoCompleto += enderecoCompleto.endsWith('.') ? '' : '.';
     buffer.writeln(_gerarParagrafoHistorico(enderecoCompleto));
 
-    // 4.2 Descrição
-    buffer.writeln(_gerarTituloSubSecao('4.2 Descrição'));
+    // Coordenadas geográficas: (rótulo + valor em linha separada)
+    final coordS = ficha.local?.coordenadasSFormatada;
+    final coordW = ficha.local?.coordenadasWFormatada;
+    final textoCoordenadas = (coordS != null && coordW != null)
+        ? 'Coordenadas geográficas: $coordS $coordW.'
+        : 'Coordenadas geográficas: Não obtidas.';
+    buffer.writeln(_gerarParagrafoHistorico(textoCoordenadas));
 
-    // Para CVLI: incluir descrições de todos os locais selecionados (mediato, imediato, relacionado)
-    if (ficha.tipoOcorrencia == TipoOcorrencia.cvli &&
-        ficha.localFurto != null) {
-      final lf = ficha.localFurto!;
-      final descricoes = <String>[];
-
-      // Local Mediato
-      if (lf.classificacaoMediato == true &&
-          lf.descricaoLocalMediato != null &&
-          lf.descricaoLocalMediato!.isNotEmpty) {
-        descricoes.add('Mediato: ${lf.descricaoLocalMediato}');
-      }
-
-      // Local Imediato
-      if (lf.classificacaoImediato == true &&
-          lf.descricaoLocalImediato != null &&
-          lf.descricaoLocalImediato!.isNotEmpty) {
-        descricoes.add('Imediato: ${lf.descricaoLocalImediato}');
-      }
-
-      // Local Relacionado
-      if (lf.classificacaoRelacionado == true &&
-          lf.descricaoLocalRelacionado != null &&
-          lf.descricaoLocalRelacionado!.isNotEmpty) {
-        descricoes.add('Relacionado: ${lf.descricaoLocalRelacionado}');
-      }
-
-      if (descricoes.isEmpty) {
-        buffer.writeln(_gerarParagrafoHistorico('Não informado'));
-      } else {
-        // Separar cada descrição em um parágrafo
-        for (final descricao in descricoes) {
-          buffer.writeln(_gerarParagrafoHistorico(descricao));
-        }
-      }
-    } else {
-      // Para outros casos: usar descrição geral
-      final descricaoLocal = ficha.localFurto?.descricaoLocal ?? '';
-
-      if (descricaoLocal.isEmpty) {
-        buffer.writeln(_gerarParagrafoHistorico('Não informado'));
-      } else {
-        buffer.writeln(_gerarParagrafoHistorico(descricaoLocal));
-      }
+    // Legenda e imagem do mapa (captura de tela do local), se houver
+    if (mapaRId != null) {
+      buffer.writeln(_gerarLegendaEImagemMapa(mapaRId));
     }
+
+    // Conforme orientação: na seção 4 (DO LOCAL) constam apenas endereço e coordenadas
+    // do Local Imediato. A descrição detalhada (Mediato, Imediato, Relacionado e vestígios)
+    // fica na seção 6.1 (DOS EXAMES - Do Local).
 
     return buffer.toString();
   }
 
   String _gerarTituloSubSecao(String titulo) {
-    // Subtítulo de seção (4.1, 4.2, etc.) - negrito, sem recuo
+    // Subtítulo de seção (4.1, 4.2, etc.) - negrito, sem recuo. Sem espaço extra para ficar colado ao item pai (4 e 4.1).
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
         <w:ind w:firstLine="0"/>
       </w:pPr>
       <w:r>
@@ -1064,7 +1205,11 @@ class LaudoGeneratorService {
     }
   }
 
-  String _gerarSecaoExames(FichaCompletaModel ficha, {int qtdFotos = 0}) {
+  Future<String> _gerarSecaoExames(
+    FichaCompletaModel ficha,
+    PeritoModel perito, {
+    int qtdFotos = 0,
+  }) async {
     final buffer = StringBuffer();
 
     // Para CVLI: seção "5. DAS IMAGENS"
@@ -1087,6 +1232,43 @@ class LaudoGeneratorService {
       return buffer.toString();
     }
 
+    if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+      buffer.writeln(_gerarTituloSecao('5. EXAMES'));
+      buffer.writeln(_gerarTituloSubSecao('5.1 Condições da Via'));
+      final resumoCondicoes = ficha.crimeTransitoCondicoes != null
+          ? _textoCondicoesCrimeTransito(ficha.crimeTransitoCondicoes!)
+          : '';
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          resumoCondicoes.isNotEmpty ? resumoCondicoes : 'Não informado.',
+        ),
+      );
+      buffer.writeln(_gerarTituloSubSecao('5.2 Veículos e Danos'));
+      final resumoVeiculos = _textoVeiculosCrimeTransito(ficha);
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          resumoVeiculos.isNotEmpty ? resumoVeiculos : 'Não informado.',
+        ),
+      );
+      buffer.writeln(_gerarTituloSubSecao('5.3 Envolvidos'));
+      final resumoEnvolvidos = _textoEnvolvidosCrimeTransito(ficha);
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          resumoEnvolvidos.isNotEmpty ? resumoEnvolvidos : 'Não informado.',
+        ),
+      );
+      buffer.writeln(_gerarTituloSubSecao('5.4 Natureza da Ocorrência'));
+      final resumoNatureza = _textoNaturezaCrimeTransito(
+        ficha.crimeTransitoNatureza,
+      );
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          resumoNatureza.isNotEmpty ? resumoNatureza : 'Não informado.',
+        ),
+      );
+      return buffer.toString();
+    }
+
     // Para outros casos: seção "5. EXAMES" (comportamento original)
     buffer.writeln(_gerarTituloSecao('5. EXAMES'));
 
@@ -1095,9 +1277,7 @@ class LaudoGeneratorService {
 
     // Texto introdutório
     buffer.writeln(
-      _gerarParagrafoHistorico(
-        'Quando da Perícia Criminal, constatou-se que havia:',
-      ),
+      _gerarParagrafoHistorico('Quando da Perícia Criminal, constatou-se:'),
     );
 
     bool evidenciaPresente(EvidenciaModel e) {
@@ -1288,6 +1468,12 @@ class LaudoGeneratorService {
       );
     }
 
+    // 5.1.1 Vestígios do local (mediato, imediato, relacionado) – tela Detalhes do Local
+    if (ficha.localFurto != null && _temVestigiosLocal(ficha.localFurto!)) {
+      buffer.writeln(_gerarTituloSubSecao('5.1.1 Vestígios do local'));
+      buffer.writeln(await _gerarSecaoExamesLocal(ficha));
+    }
+
     // 5.2 EXAMES COMPLEMENTARES (automatizado a partir de Materiais Apreendidos/Encaminhados)
     buffer.writeln(_gerarTituloSubSecao('5.2 Exames Complementares'));
 
@@ -1343,9 +1529,12 @@ class LaudoGeneratorService {
     } else {
       // 5.2.1 Exames na Unidade
       buffer.writeln(_gerarTituloSubSecao('5.2.1 Exames na Unidade'));
+      final nomeUnidade = (perito.unidadePericial).trim().isNotEmpty
+          ? perito.unidadePericial
+          : 'unidade';
       buffer.writeln(
         _gerarParagrafoHistorico(
-          'Os vestígios coletados foram devidamente acondicionados, identificados e encaminhados para processamento na unidade, conforme rotina técnica.',
+          'Os vestígios coletados foram devidamente acondicionados, identificados e encaminhados para processamento na $nomeUnidade, conforme rotina técnica.',
         ),
       );
 
@@ -1415,16 +1604,7 @@ class LaudoGeneratorService {
       }
     }
 
-    // Adicionar rodapés no final da seção (se houver sangue humano)
-    if (materialSangue != null) {
-      buffer.writeln(_gerarParagrafoVazio());
-      buffer.writeln(
-        _gerarRodape(
-          numeroRodape - 1, // Já foi incrementado antes
-          'Feca Cult One Step Teste é um teste imunocromatográfico rápido que detecta qualitativamente e especificamente a hemoglobina humana (hHb). O teste é sensível a concentrações de hHb iguais ou superiores a 40ng/mL, mas, em alguns casos, pode detectar resultados positivos em concentrações menores.',
-        ),
-      );
-    }
+    // Nota de rodapé (Feca Cult) é gerada em word/footnotes.xml pelo gerarLaudo quando materialSangue != null.
 
     return buffer.toString();
   }
@@ -1478,6 +1658,13 @@ class LaudoGeneratorService {
     }
 
     return buffer.toString();
+  }
+
+  bool _temVestigiosLocal(LocalFurtoModel lf) {
+    final mediato = lf.vestigiosMediato?.isNotEmpty ?? false;
+    final imediato = lf.vestigiosImediato?.isNotEmpty ?? false;
+    final relacionado = lf.vestigiosRelacionado?.isNotEmpty ?? false;
+    return mediato || imediato || relacionado;
   }
 
   Future<String> _gerarSecaoExamesLocal(FichaCompletaModel ficha) async {
@@ -1592,6 +1779,14 @@ class LaudoGeneratorService {
     if (vestigio.isSangueHumano) {
       descricao = '${descricao.isNotEmpty ? '$descricao - ' : ''}Sangue humano';
     }
+    final citacaoFotos = _formatarCitacaoFotosVestigio(
+      vestigio.numerosFotografias,
+    );
+    if (citacaoFotos.isNotEmpty) {
+      descricao = descricao.isEmpty
+          ? 'Vestígio registrado ($citacaoFotos)'
+          : '$descricao ($citacaoFotos)';
+    }
     if (descricao.isNotEmpty) {
       partes.add(descricao);
     }
@@ -1633,20 +1828,24 @@ class LaudoGeneratorService {
       // Encaminhamento (destino)
       if (vestigio.tipoDestino != null && vestigio.destinoId != null) {
         String nomeDestino = '';
-        if (vestigio.tipoDestino == TipoDestinoVestigio.unidade) {
-          final unidades = await _unidadeService.listarUnidades();
-          final unidade = unidades.firstWhere(
-            (u) => u.id == vestigio.destinoId,
-            orElse: () => throw Exception('Unidade não encontrada'),
-          );
-          nomeDestino = unidade.nome;
-        } else if (vestigio.tipoDestino == TipoDestinoVestigio.laboratorio) {
-          final laboratorios = await _laboratorioService.listarLaboratorios();
-          final laboratorio = laboratorios.firstWhere(
-            (l) => l.id == vestigio.destinoId,
-            orElse: () => throw Exception('Laboratório não encontrado'),
-          );
-          nomeDestino = laboratorio.nome;
+        try {
+          if (vestigio.tipoDestino == TipoDestinoVestigio.unidade) {
+            final unidades = await _unidadeService.listarUnidades();
+            final unidade = unidades.firstWhere(
+              (u) => u.id == vestigio.destinoId,
+            );
+            nomeDestino = unidade.nome;
+          } else if (vestigio.tipoDestino == TipoDestinoVestigio.laboratorio) {
+            final laboratorios = await _laboratorioService.listarLaboratorios();
+            final laboratorio = laboratorios.firstWhere(
+              (l) => l.id == vestigio.destinoId,
+            );
+            nomeDestino = laboratorio.nome;
+          }
+        } catch (_) {
+          nomeDestino = vestigio.tipoDestino == TipoDestinoVestigio.unidade
+              ? 'Unidade (não localizada)'
+              : 'Laboratório (não localizado)';
         }
 
         if (nomeDestino.isNotEmpty) {
@@ -1664,6 +1863,23 @@ class LaudoGeneratorService {
     }
 
     return '$letra) ${partes.join('. ')}.';
+  }
+
+  String _formatarCitacaoFotosVestigio(List<int> numeros) {
+    if (numeros.isEmpty) return '';
+    final unicosOrdenados = {...numeros}.where((n) => n > 0).toList()..sort();
+    if (unicosOrdenados.isEmpty) return '';
+    final numerosFmt = unicosOrdenados
+        .map((n) => n.toString().padLeft(2, '0'))
+        .toList();
+    if (numerosFmt.length == 1) {
+      return 'foto ${numerosFmt.first}';
+    }
+    if (numerosFmt.length == 2) {
+      return 'fotos ${numerosFmt[0]} e ${numerosFmt[1]}';
+    }
+    final inicio = numerosFmt.sublist(0, numerosFmt.length - 1).join(', ');
+    return 'fotos $inicio e ${numerosFmt.last}';
   }
 
   /// Converte índice (0, 1, 2...) para letra (a, b, c...)
@@ -1797,6 +2013,14 @@ class LaudoGeneratorService {
     if (vestigio.isSangueHumano) {
       descricao = '${descricao.isNotEmpty ? '$descricao - ' : ''}Sangue humano';
     }
+    final citacaoFotosVeiculo = _formatarCitacaoFotosVestigio(
+      vestigio.numerosFotografias ?? [],
+    );
+    if (citacaoFotosVeiculo.isNotEmpty) {
+      descricao = descricao.isEmpty
+          ? 'Vestígio registrado ($citacaoFotosVeiculo)'
+          : '$descricao ($citacaoFotosVeiculo)';
+    }
     if (descricao.isNotEmpty) {
       partes.add(descricao);
     }
@@ -1827,21 +2051,26 @@ class LaudoGeneratorService {
       // Encaminhamento (destino)
       if (vestigio.tipoDestino != null && vestigio.destinoId != null) {
         String nomeDestino = '';
-        if (vestigio.tipoDestino == TipoDestinoVestigioVeiculo.unidade) {
-          final unidades = await _unidadeService.listarUnidades();
-          final unidade = unidades.firstWhere(
-            (u) => u.id == vestigio.destinoId,
-            orElse: () => throw Exception('Unidade não encontrada'),
-          );
-          nomeDestino = unidade.nome;
-        } else if (vestigio.tipoDestino ==
-            TipoDestinoVestigioVeiculo.laboratorio) {
-          final laboratorios = await _laboratorioService.listarLaboratorios();
-          final laboratorio = laboratorios.firstWhere(
-            (l) => l.id == vestigio.destinoId,
-            orElse: () => throw Exception('Laboratório não encontrado'),
-          );
-          nomeDestino = laboratorio.nome;
+        try {
+          if (vestigio.tipoDestino == TipoDestinoVestigioVeiculo.unidade) {
+            final unidades = await _unidadeService.listarUnidades();
+            final unidade = unidades.firstWhere(
+              (u) => u.id == vestigio.destinoId,
+            );
+            nomeDestino = unidade.nome;
+          } else if (vestigio.tipoDestino ==
+              TipoDestinoVestigioVeiculo.laboratorio) {
+            final laboratorios = await _laboratorioService.listarLaboratorios();
+            final laboratorio = laboratorios.firstWhere(
+              (l) => l.id == vestigio.destinoId,
+            );
+            nomeDestino = laboratorio.nome;
+          }
+        } catch (_) {
+          nomeDestino =
+              vestigio.tipoDestino == TipoDestinoVestigioVeiculo.unidade
+                  ? 'Unidade (não localizada)'
+                  : 'Laboratório (não localizado)';
         }
 
         if (nomeDestino.isNotEmpty) {
@@ -1920,13 +2149,13 @@ class LaudoGeneratorService {
     return buffer.toString();
   }
 
-  /// Gera parágrafo com texto em negrito
+  /// Gera parágrafo com texto em negrito - mesmo entrelinhamento e sem espaço entre parágrafos do mesmo estilo.
   String _gerarParagrafoHistoricoNegrito(String texto) {
     final textoEscapado = _escapeXml(texto);
     return '''
 <w:p>
   <w:pPr>
-    <w:spacing w:line="360" w:lineRule="auto"/>
+    <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
     <w:jc w:val="both"/>
     <w:rPr>
       <w:rFonts w:ascii="$_fontName" w:hAnsi="$_fontName"/>
@@ -1945,13 +2174,13 @@ class LaudoGeneratorService {
 </w:p>''';
   }
 
-  /// Gera título de sub-sub-seção (ex: 6.3.1.1)
+  /// Gera título de sub-sub-seção (ex: 6.3.1, 4.1) - sem espaço antes/depois para não separar do item pai (6.3, 4).
   String _gerarTituloSubSubSecao(String titulo) {
     final textoEscapado = _escapeXml(titulo);
     return '''
 <w:p>
   <w:pPr>
-    <w:spacing w:before="200" w:after="100" w:line="360" w:lineRule="auto"/>
+    <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
     <w:jc w:val="both"/>
     <w:rPr>
       <w:rFonts w:ascii="$_fontName" w:hAnsi="$_fontName"/>
@@ -2275,6 +2504,22 @@ class LaudoGeneratorService {
         }
       }
 
+      // Citação das fotografias no anexo
+      if (lesao.numerosFotografias != null &&
+          lesao.numerosFotografias!.isNotEmpty) {
+        final nums = lesao.numerosFotografias!
+            .map((n) => n.toString().padLeft(2, '0'))
+            .toList();
+        if (nums.length == 1) {
+          descricaoLesao += ' (Fotografia ${nums.first}).';
+        } else if (nums.length == 2) {
+          descricaoLesao += ' (Fotografias ${nums[0]} e ${nums[1]}).';
+        } else {
+          descricaoLesao +=
+              ' (Fotografias ${nums.sublist(0, nums.length - 1).join(", ")} e ${nums.last}).';
+        }
+      }
+
       buffer.writeln(_gerarParagrafoLista('$letra) $descricaoLesao'));
     }
 
@@ -2428,6 +2673,371 @@ class LaudoGeneratorService {
     }
 
     return false;
+  }
+
+  String _formatarListaTextoCrime<T>(
+    Iterable<T>? valores,
+    String Function(T) label,
+  ) {
+    if (valores == null || valores.isEmpty) return '';
+    return valores.map(label).join(', ');
+  }
+
+  String _textoCondicoesCrimeTransito(CrimeTransitoCondicoesViaModel cond) {
+    final partes = <String>[];
+    final solo = _formatarListaTextoCrime(
+      cond.condicoesSolo,
+      (v) => switch (v) {
+        CondicaoSoloLocal.seco => 'seco',
+        CondicaoSoloLocal.umido => 'úmido',
+        CondicaoSoloLocal.molhado => 'molhado',
+      },
+    );
+    if (solo.isNotEmpty) {
+      partes.add('O solo apresentava aspecto $solo');
+    }
+
+    final iluminacao = _formatarListaTextoCrime(
+      cond.iluminacao,
+      (v) => switch (v) {
+        IluminacaoLocal.artificial => 'iluminação artificial',
+        IluminacaoLocal.naturalDia => 'iluminação natural (diurna)',
+        IluminacaoLocal.ausente => 'ausência de iluminação',
+      },
+    );
+    if (iluminacao.isNotEmpty) {
+      partes.add(iluminacao);
+    }
+
+    final tracado = _formatarListaTextoCrime(
+      cond.tracados,
+      (v) => switch (v) {
+        TracadoPista.curvaEsquerda => 'curva à esquerda',
+        TracadoPista.curvaDireita => 'curva à direita',
+        TracadoPista.reto => 'trecho reto',
+        TracadoPista.raioAmplo => 'raio amplo',
+        TracadoPista.raioPequeno => 'raio pequeno',
+        TracadoPista.cruzamento => 'cruzamento',
+      },
+    );
+    if (tracado.isNotEmpty) {
+      partes.add('com traçado $tracado');
+    }
+
+    final tipoPista = _formatarListaTextoCrime(
+      cond.tiposPista,
+      (v) => v == TipoPistaRodovia.simples ? 'simples' : 'dupla',
+    );
+    if (tipoPista.isNotEmpty) {
+      partes.add('pista $tipoPista');
+    }
+
+    final sentidos = _formatarListaTextoCrime(
+      cond.sentidos,
+      (v) => v == SentidoPista.unico ? 'sentido único' : 'sentido duplo',
+    );
+    if (sentidos.isNotEmpty) {
+      partes.add('com $sentidos');
+    }
+
+    final perfis = _formatarListaTextoCrime(
+      cond.perfis,
+      (v) => switch (v) {
+        PerfilPista.plano => 'perfil plano',
+        PerfilPista.suave => 'perfil suave',
+        PerfilPista.declive => 'declive',
+        PerfilPista.moderado => 'perfil moderado',
+        PerfilPista.aclive => 'aclive',
+        PerfilPista.acentuado => 'perfil acentuado',
+      },
+    );
+    if (perfis.isNotEmpty) {
+      partes.add(perfis);
+    }
+
+    if (cond.larguraPista != null && cond.larguraPista!.isNotEmpty) {
+      partes.add('largura aproximada de ${cond.larguraPista} m');
+    }
+
+    final condVia = _formatarListaTextoCrime(
+      cond.condicoesVia,
+      (v) => switch (v) {
+        CondicaoViaOpcao.seca => 'seca',
+        CondicaoViaOpcao.molhada => 'molhada',
+        CondicaoViaOpcao.semDefeito => 'sem defeitos aparentes',
+        CondicaoViaOpcao.emObras => 'em obras',
+        CondicaoViaOpcao.cascalho => 'revestida em cascalho',
+        CondicaoViaOpcao.terra => 'revestida em terra',
+        CondicaoViaOpcao.asfaltoRugoso => 'asfalto rugoso',
+        CondicaoViaOpcao.buracos => 'com buracos',
+        CondicaoViaOpcao.ondulacoes => 'com ondulações',
+        CondicaoViaOpcao.contaminantes => 'com contaminantes',
+        CondicaoViaOpcao.asfaltoLiso => 'asfalto liso',
+        CondicaoViaOpcao.outro => 'em outra condição',
+      },
+    );
+    if (condVia.isNotEmpty) {
+      partes.add('via $condVia');
+    }
+
+    if (cond.regimeTrafego != null) {
+      final regime = switch (cond.regimeTrafego!) {
+        RegimeTrafego.intenso => 'regime de tráfego intenso',
+        RegimeTrafego.moderado => 'regime moderado',
+        RegimeTrafego.leve => 'regime leve',
+        RegimeTrafego.outro => 'regime de tráfego atípico',
+      };
+      partes.add(regime);
+    }
+    if (cond.regimeTrafegoOutro != null &&
+        cond.regimeTrafegoOutro!.isNotEmpty) {
+      partes.add(cond.regimeTrafegoOutro!);
+    }
+
+    final visibilidade = cond.visibilidade == null
+        ? ''
+        : (cond.visibilidade == VisibilidadeTipo.boa
+              ? 'visibilidade considerada boa'
+              : 'visibilidade reduzida');
+    if (visibilidade.isNotEmpty) {
+      String texto = visibilidade;
+      if (cond.visibilidadeReducaoDescricao != null &&
+          cond.visibilidadeReducaoDescricao!.isNotEmpty) {
+        texto += ' (${cond.visibilidadeReducaoDescricao})';
+      }
+      partes.add(texto);
+    }
+
+    if (cond.velocidadeMaxima != null && cond.velocidadeMaxima!.isNotEmpty) {
+      partes.add('velocidade máxima sinalizada de ${cond.velocidadeMaxima}');
+    }
+
+    if (cond.velocidadePorSinalizacao == true ||
+        cond.velocidadePorCTB == true) {
+      final refs = <String>[];
+      if (cond.velocidadePorSinalizacao == true) {
+        refs.add('sinalização expressa');
+      }
+      if (cond.velocidadePorCTB == true) refs.add('CTB/1997');
+      partes.add('considerando referências de ${refs.join(" e ")}');
+    }
+
+    if (cond.largurasFaixas != null && cond.largurasFaixas!.isNotEmpty) {
+      partes.add(
+        'faixas com larguras aproximadas de ${cond.largurasFaixas!.join(", ")} m',
+      );
+    }
+
+    if (cond.observacoes != null && cond.observacoes!.isNotEmpty) {
+      partes.add(cond.observacoes!);
+    }
+
+    return partes.join('. ').trim();
+  }
+
+  String _textoVeiculosCrimeTransito(FichaCompletaModel ficha) {
+    final veiculos = ficha.veiculos;
+    if (veiculos == null || veiculos.isEmpty) return '';
+    final frases = <String>[];
+
+    for (final veiculo in veiculos) {
+      final detalhes = <String>[];
+      if (veiculo.tipoVeiculo != null) {
+        detalhes.add('tipo ${veiculo.tipoVeiculo!.label}');
+      }
+      if (veiculo.marcaModelo != null && veiculo.marcaModelo!.isNotEmpty) {
+        detalhes.add(veiculo.marcaModelo!);
+      }
+      if (veiculo.placa != null && veiculo.placa!.isNotEmpty) {
+        detalhes.add('placa ${veiculo.placa}');
+      }
+      if (veiculo.localizacaoAmbiente != null &&
+          veiculo.localizacaoAmbiente!.isNotEmpty) {
+        detalhes.add('localizado em ${veiculo.localizacaoAmbiente}');
+      }
+      final intensidade = veiculo.intensidadeDano == null
+          ? ''
+          : switch (veiculo.intensidadeDano!) {
+              IntensidadeDano.leve => 'danos leves',
+              IntensidadeDano.media => 'danos médios',
+              IntensidadeDano.grave => 'danos graves',
+              IntensidadeDano.gravissima => 'danos gravíssimos',
+            };
+      if (intensidade.isNotEmpty) detalhes.add(intensidade);
+
+      final setores = _formatarListaTextoCrime(
+        veiculo.setoresImpacto,
+        (v) => switch (v) {
+          SetorImpacto.anterior => 'no setor anterior',
+          SetorImpacto.posterior => 'no setor posterior',
+          SetorImpacto.lateralEsquerdo => 'na lateral esquerda',
+          SetorImpacto.lateralDireito => 'na lateral direita',
+          SetorImpacto.angularAnteriorEsquerdo => 'no ângulo anterior esquerdo',
+          SetorImpacto.angularAnteriorDireito => 'no ângulo anterior direito',
+          SetorImpacto.angularPosteriorEsquerdo =>
+            'no ângulo posterior esquerdo',
+          SetorImpacto.angularPosteriorDireito => 'no ângulo posterior direito',
+        },
+      );
+      if (setores.isNotEmpty) detalhes.add(setores);
+
+      if (veiculo.danosObservacoes != null &&
+          veiculo.danosObservacoes!.isNotEmpty) {
+        detalhes.add(veiculo.danosObservacoes!);
+      }
+
+      if (veiculo.tacografoStatus != null) {
+        detalhes.add(
+          'disco de tacógrafo ${veiculo.tacografoStatus == TacografoStatus.recolhido ? 'recolhido' : 'ausente'}',
+        );
+      }
+      if (veiculo.frenagemMetros != null &&
+          veiculo.frenagemMetros!.isNotEmpty) {
+        detalhes.add(
+          'marcas de frenagem próximas a ${veiculo.frenagemMetros} m',
+        );
+      }
+      if (detalhes.isNotEmpty) {
+        frases.add('Veículo ${veiculo.numero}: ${detalhes.join(', ')}.');
+      }
+    }
+
+    return frases.join(' ').trim();
+  }
+
+  String _textoEnvolvidosCrimeTransito(FichaCompletaModel ficha) {
+    final envolvidos = ficha.envolvidosTransito;
+    if (envolvidos == null || envolvidos.isEmpty) return '';
+    final partes = <String>[];
+    for (final envolvido in envolvidos) {
+      final detalhes = <String>[];
+      final nome = envolvido.nome?.trim();
+      if (nome != null && nome.isNotEmpty) detalhes.add(nome);
+      if (envolvido.classificacao != null) {
+        detalhes.add(switch (envolvido.classificacao!) {
+          CrimeTransitoClassificacaoEnvolvido.condutor => 'condutor',
+          CrimeTransitoClassificacaoEnvolvido.passageiro => 'passageiro',
+          CrimeTransitoClassificacaoEnvolvido.pedestre => 'pedestre',
+        });
+      }
+      if (envolvido.situacao != null) {
+        detalhes.add(switch (envolvido.situacao!) {
+          CrimeTransitoSituacaoEnvolvido.semFerimentos =>
+            'sem ferimentos aparentes',
+          CrimeTransitoSituacaoEnvolvido.feridoGrave => 'com ferimentos graves',
+          CrimeTransitoSituacaoEnvolvido.obito => 'em óbito',
+        });
+      }
+      if (envolvido.posicao != null) {
+        detalhes.add(switch (envolvido.posicao!) {
+          CrimeTransitoPosicaoEnvolvido.interiorVeiculo =>
+            'no interior do veículo',
+          CrimeTransitoPosicaoEnvolvido.leitoVia => 'no leito da via',
+          CrimeTransitoPosicaoEnvolvido.exteriorPista => 'no exterior da pista',
+        });
+      }
+      if (envolvido.posicaoDetalhe != null &&
+          envolvido.posicaoDetalhe!.isNotEmpty) {
+        detalhes.add(envolvido.posicaoDetalhe!);
+      }
+      final equipamentos = _formatarListaTextoCrime(
+        envolvido.equipamentosSeguranca,
+        (e) => switch (e) {
+          CrimeTransitoEquipamentoSeguranca.cinto => 'cinto',
+          CrimeTransitoEquipamentoSeguranca.capacete => 'capacete',
+          CrimeTransitoEquipamentoSeguranca.nenhum => 'sem proteção',
+          CrimeTransitoEquipamentoSeguranca.naoSeAplica => 'não se aplica',
+        },
+      );
+      if (equipamentos.isNotEmpty) {
+        detalhes.add('equipamento(s): $equipamentos');
+      }
+      if (detalhes.isNotEmpty) {
+        partes.add('Envolvido: ${detalhes.join(', ')}.');
+      }
+    }
+
+    return partes.join(' ').trim();
+  }
+
+  String _textoNaturezaCrimeTransito(CrimeTransitoNaturezaModel? natureza) {
+    if (natureza == null) return '';
+    final detalhes = <String>[];
+    if (natureza.tipo != null) {
+      detalhes.add(
+        natureza.tipo == CrimeTransitoNaturezaTipo.simples
+            ? 'ocorrência simples'
+            : 'ocorrência composta',
+      );
+    }
+    if (natureza.quantidadeUnidades != null) {
+      detalhes.add('${natureza.quantidadeUnidades} unidade(s) envolvida(s)');
+    }
+    final formas = _formatarListaTextoCrime(
+      natureza.formasInteracao,
+      (f) => switch (f) {
+        CrimeTransitoFormaInteracao.saidaPista => 'saída de pista',
+        CrimeTransitoFormaInteracao.colisao => 'colisão',
+        CrimeTransitoFormaInteracao.colisaoFrontal => 'colisão frontal',
+        CrimeTransitoFormaInteracao.colisaoOposta =>
+          'colisão em sentidos opostos',
+        CrimeTransitoFormaInteracao.objetoFixo => 'choque contra objeto fixo',
+        CrimeTransitoFormaInteracao.capotamento => 'capotamento',
+        CrimeTransitoFormaInteracao.abalroamento => 'abalroamento',
+        CrimeTransitoFormaInteracao.colisaoTraseira => 'colisão traseira',
+        CrimeTransitoFormaInteracao.colisaoTransversal => 'colisão transversal',
+        CrimeTransitoFormaInteracao.veiculoEstacionado =>
+          'impacto em veículo estacionado',
+        CrimeTransitoFormaInteracao.tombamento => 'tombamento',
+        CrimeTransitoFormaInteracao.choque => 'choque',
+        CrimeTransitoFormaInteracao.colisaoLateral => 'colisão lateral',
+        CrimeTransitoFormaInteracao.colisaoObliqua => 'colisão oblíqua',
+        CrimeTransitoFormaInteracao.veiculoParado =>
+          'colisão com veículo parado',
+        CrimeTransitoFormaInteracao.colisaoLongitudinal =>
+          'colisão longitudinal',
+        CrimeTransitoFormaInteracao.colisaoOrtogonal => 'colisão ortogonal',
+        CrimeTransitoFormaInteracao.pedestre => 'atropelamento de pedestre',
+        CrimeTransitoFormaInteracao.queda => 'queda de ocupante',
+        CrimeTransitoFormaInteracao.atropelamento => 'atropelamento',
+        CrimeTransitoFormaInteracao.animal => 'atropelamento de animal',
+        CrimeTransitoFormaInteracao.outro => 'outra interação',
+      },
+    );
+    if (formas.isNotEmpty) {
+      detalhes.add('formas de interação: $formas');
+    }
+    if (natureza.materialRecolhido != null) {
+      detalhes.add(
+        natureza.materialRecolhido!
+            ? 'houve recolhimento de material'
+            : 'não houve recolhimento de material',
+      );
+    }
+    if (natureza.materialDescricao != null &&
+        natureza.materialDescricao!.isNotEmpty) {
+      detalhes.add('material recolhido: ${natureza.materialDescricao}');
+    }
+    if (natureza.solicitacaoExamesComplementares != null) {
+      detalhes.add(
+        natureza.solicitacaoExamesComplementares!
+            ? 'foram solicitados exames complementares'
+            : 'não foram solicitados exames complementares',
+      );
+    }
+    if (natureza.laboratorioDestino != null &&
+        natureza.laboratorioDestino!.isNotEmpty) {
+      detalhes.add('destinados à ${natureza.laboratorioDestino}');
+    }
+    if (natureza.examesDinamica != null &&
+        natureza.examesDinamica!.isNotEmpty) {
+      detalhes.add('dinâmica dos exames: ${natureza.examesDinamica}');
+    }
+    if (natureza.croquiObservacoes != null &&
+        natureza.croquiObservacoes!.isNotEmpty) {
+      detalhes.add('croqui: ${natureza.croquiObservacoes}');
+    }
+    return detalhes.join('. ');
   }
 
   String _gerarSecaoQuesitosFurto(FichaCompletaModel ficha) {
@@ -2832,13 +3442,15 @@ class LaudoGeneratorService {
 
     buffer.writeln(_gerarParagrafoVazio());
 
-    // Usar modus operandi se houver, ou placeholder
-    // (A dinâmica pode ser derivada do modus operandi ou inserida manualmente)
-    buffer.writeln(
-      _gerarParagrafoHistorico(
-        '[Inserir descrição da dinâmica parcial mais provável do evento]',
-      ),
-    );
+    if (ficha.modusOperandi != null && ficha.modusOperandi!.trim().isNotEmpty) {
+      buffer.writeln(_gerarParagrafoHistorico(ficha.modusOperandi!.trim()));
+    } else {
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          '[Inserir descrição da dinâmica parcial mais provável do evento]',
+        ),
+      );
+    }
 
     return buffer.toString();
   }
@@ -2929,10 +3541,17 @@ class LaudoGeneratorService {
       _gerarParagrafoHistorico('(5) COM QUE MEIOS (foi perpetrado): $meios.'),
     );
 
-    // (6) Quem (é/são o/os autor/es)
+    // (6) QUEM (é/são o/os autor/es)
     buffer.writeln(
       _gerarParagrafoHistorico(
         '(6) QUEM (é/são o/os autor/es): A ser apurado mediante investigação policial.',
+      ),
+    );
+
+    // (7) POR QUÊ (motivação)
+    buffer.writeln(
+      _gerarParagrafoHistorico(
+        '(7) POR QUÊ (motivação): A ser apurado mediante investigação policial.',
       ),
     );
 
@@ -3156,24 +3775,57 @@ class LaudoGeneratorService {
     </w:p>''';
   }
 
-  String _gerarRodape(int numero, String texto) {
-    // Rodapé com fonte Gadugi, tamanho 9, entrelinhas simples (1.0), justificado
-    // Tamanho 9 = 18 half-points
-    return '''    <w:p>
+  /// Retorna o próximo rId disponível no XML de relationships (ex.: para adicionar footnotes).
+  int _proximoRIdEmRels(String relsContent) {
+    final idRegex = RegExp(r'Id="rId(\d+)"');
+    int maxId = 0;
+    idRegex.allMatches(relsContent).forEach((m) {
+      final id = int.tryParse(m.group(1) ?? '0') ?? 0;
+      if (id > maxId) maxId = id;
+    });
+    return maxId + 1;
+  }
+
+  /// Gera o XML de word/footnotes.xml com a nota do Feca Cult (w:id="1").
+  String _gerarFootnotesXml() {
+    const textoFecaCult =
+        'Feca Cult One Step Teste é um teste imunocromatográfico rápido que detecta qualitativamente e especificamente a hemoglobina humana (hHb). O teste é sensível a concentrações de hHb iguais ou superiores a 40ng/mL, mas, em alguns casos, pode detectar resultados positivos em concentrações menores.';
+    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:footnotes xmlns:w="$ns">
+  <w:footnote w:type="separator" w:id="-1">
+    <w:p>
+      <w:r>
+        <w:separator/>
+      </w:r>
+    </w:p>
+  </w:footnote>
+  <w:footnote w:type="continuationSeparator" w:id="0">
+    <w:p>
+      <w:r>
+        <w:continuationSeparator/>
+      </w:r>
+    </w:p>
+  </w:footnote>
+  <w:footnote w:id="1">
+    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="240" w:lineRule="auto"/>
-        <w:ind w:firstLine="708"/>
+        <w:spacing w:after="0" w:line="220" w:lineRule="auto"/>
+        <w:ind w:left="284" w:firstLine="0"/>
       </w:pPr>
       <w:r>
         <w:rPr>
           <w:rFonts w:ascii="$_fontName" w:hAnsi="$_fontName" w:cs="$_fontName"/>
           <w:sz w:val="18"/>
           <w:szCs w:val="18"/>
+          <w:i/>
         </w:rPr>
-        <w:t>${_escapeXml('$numero $texto')}</w:t>
+        <w:t>${_escapeXml(textoFecaCult)}</w:t>
       </w:r>
-    </w:p>''';
+    </w:p>
+  </w:footnote>
+</w:footnotes>''';
   }
 
   String _gerarParagrafoLista(String texto) {
@@ -3197,10 +3849,10 @@ class LaudoGeneratorService {
   }
 
   String _gerarParagrafoComSobrescritoLista(String texto, int numeroRodape) {
-    // Parágrafo para lista com sobrescrito e recuo pendente (hanging indent)
+    // Parágrafo para lista com recuo pendente. Se texto contiver '¹', usa nota de rodapé real (footnoteReference).
     final partes = texto.split('¹');
     if (partes.length == 2) {
-      // Tem chamada de rodapé
+      // Nota de rodapé real: referência no corpo e conteúdo em word/footnotes.xml
       return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
@@ -3218,12 +3870,11 @@ class LaudoGeneratorService {
       <w:r>
         <w:rPr>
           <w:rFonts w:ascii="$_fontName" w:hAnsi="$_fontName" w:cs="$_fontName"/>
-          <w:sz w:val="$_fontSizeNormal"/>
-          <w:szCs w:val="$_fontSizeNormal"/>
+          <w:sz w:val="20"/>
+          <w:szCs w:val="20"/>
           <w:vertAlign w:val="superscript"/>
-          <w:color w:val="FF0000"/>
         </w:rPr>
-        <w:t>${_escapeXml(numeroRodape.toString())}</w:t>
+        <w:footnoteReference w:id="1"/>
       </w:r>
       <w:r>
         <w:rPr>
@@ -3235,12 +3886,16 @@ class LaudoGeneratorService {
       </w:r>
     </w:p>''';
     } else {
-      // Sem chamada de rodapé, usar parágrafo de lista normal
       return _gerarParagrafoLista(texto);
     }
   }
 
-  String _gerarLevantamentoFotografico(List<File> fotos, int maxId) {
+  String _gerarLevantamentoFotografico(
+    List<File> fotos,
+    int maxId, {
+    int? mapaRId,
+    List<String>? legendas,
+  }) {
     final buffer = StringBuffer();
 
     // Quebra de página
@@ -3274,11 +3929,18 @@ class LaudoGeneratorService {
     buffer.writeln('      </w:r>');
     buffer.writeln('    </w:p>');
 
-    // Adicionar cada foto
+    // Quando há mapa (seção 4.1), ele usa maxId+1; as fotos do anexo começam em maxId+2.
+    // No anexo exibimos só as fotos (Fotografia 01 = primeira foto, etc.).
+    final rIdOffset = mapaRId != null ? 1 : 0;
     for (int i = 0; i < fotos.length; i++) {
       final numeroFoto = (i + 1).toString().padLeft(2, '0');
-      final rId = maxId + i + 1; // IDs começam após o último existente
-      buffer.writeln(_gerarFotografia(numeroFoto, rId));
+      final rId = maxId + 1 + rIdOffset + i;
+      final legendaDescricao = (legendas != null && i < legendas.length)
+          ? legendas[i]
+          : null;
+      buffer.writeln(
+        _gerarFotografia(numeroFoto, rId, legendaDescricao: legendaDescricao),
+      );
 
       // Espaçamento entre fotos (exceto após a última)
       if (i < fotos.length - 1) {
@@ -3295,14 +3957,90 @@ class LaudoGeneratorService {
     return buffer.toString();
   }
 
-  String _gerarFotografia(String numeroFoto, int rId) {
-    // Legenda ANTES da foto - 10pt, centralizado, espaçamento 1.0, sem espaço antes/depois
-    final legenda = 'Fotografia $numeroFoto:';
+  /// Legenda (Imagem 01 + texto) e imagem do mapa do local para a seção 4.1.
+  /// Fonte 10 (20 half-points), centralizado, espaçamento simples.
+  String _gerarLegendaEImagemMapa(int rId) {
+    const emuPorCm = 914400 / 2.54;
+    final larguraEmu = (16.0 * emuPorCm).round();
+    final alturaEmu = (9.9 * emuPorCm).round();
 
-    // Tamanho da imagem: 6.45 polegadas x 4.094 polegadas (10.4 cm)
-    // Em EMUs (English Metric Units): 1 polegada = 914400 EMUs
-    final larguraEmu = (6.45 * 914400).round(); // ~5896980 EMUs
-    final alturaEmu = (4.094 * 914400).round(); // ~3742474 EMUs
+    const legenda = 'Imagem 01: Captura de tela indicando o local periciado.';
+    return '''    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
+        <w:ind w:firstLine="0"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="$_fontName" w:hAnsi="$_fontName" w:cs="$_fontName"/>
+          <w:sz w:val="20"/>
+          <w:szCs w:val="20"/>
+        </w:rPr>
+        <w:t>${_escapeXml(legenda)}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
+        <w:ind w:firstLine="0"/>
+      </w:pPr>
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+            <wp:extent cx="$larguraEmu" cy="$alturaEmu"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="$rId" name="Imagem mapa"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="$rId" name="Imagem mapa"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId$rId" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+                    <a:stretch>
+                      <a:fillRect/>
+                    </a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="$larguraEmu" cy="$alturaEmu"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst/>
+                    </a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>''';
+  }
+
+  String _gerarFotografia(
+    String numeroFoto,
+    int rId, {
+    String? legendaDescricao,
+  }) {
+    // Legenda ANTES da foto - 10pt, centralizado. Ex.: "Fotografia 01: Vista ampla do local (fachada)."
+    final legenda = legendaDescricao != null && legendaDescricao.isNotEmpty
+        ? 'Fotografia $numeroFoto: $legendaDescricao'
+        : 'Fotografia $numeroFoto:';
+
+    // Tamanho da imagem: 16 cm x 9,9 cm (fixo para todas as fotos do anexo)
+    // Em EMUs (English Metric Units): 1 polegada = 914400 EMUs, 1 pol = 2,54 cm
+    const emuPorCm = 914400 / 2.54;
+    final larguraEmu = (16.0 * emuPorCm).round();
+    final alturaEmu = (9.9 * emuPorCm).round();
 
     return '''    <w:p>
       <w:pPr>
@@ -3367,8 +4105,9 @@ class LaudoGeneratorService {
 
   Future<Map<String, dynamic>> _processarRelationships(
     Archive archive,
-    List<File> fotos,
-  ) async {
+    List<File> fotos, {
+    File? imagemMapaLocal,
+  }) async {
     // Encontrar arquivo de relationships
     final relsIndex = archive.files.indexWhere(
       (f) => f.name == 'word/_rels/document.xml.rels',
@@ -3384,34 +4123,28 @@ class LaudoGeneratorService {
         relationshipsContent = String.fromCharCodes(conteudo);
       }
     } else {
-      // Criar novo arquivo de relationships se não existir
       relationshipsContent =
           '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 </Relationships>''';
     }
 
-    // Extrair o conteúdo dentro de <Relationships>
     final regex = RegExp(
       r'<Relationships[^>]*>(.*?)</Relationships>',
       dotAll: true,
     );
     final match = regex.firstMatch(relationshipsContent);
-    if (match == null) {
-      return {'xml': relationshipsContent, 'maxId': 0};
+    int maxId = 0;
+    final existingRels = match != null ? (match.group(1) ?? '') : '';
+
+    if (match != null) {
+      final idRegex = RegExp(r'Id="rId(\d+)"');
+      idRegex.allMatches(existingRels).forEach((m) {
+        final id = int.tryParse(m.group(1) ?? '0') ?? 0;
+        if (id > maxId) maxId = id;
+      });
     }
 
-    final existingRels = match.group(1) ?? '';
-
-    // Encontrar o próximo ID disponível (Id="rId123")
-    final idRegex = RegExp(r'Id="rId(\d+)"');
-    int maxId = 0;
-    idRegex.allMatches(existingRels).forEach((m) {
-      final id = int.tryParse(m.group(1) ?? '0') ?? 0;
-      if (id > maxId) maxId = id;
-    });
-
-    // Adicionar relationships para as imagens (com nomes únicos)
     final buffer = StringBuffer();
     buffer.writeln('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     buffer.writeln(
@@ -3420,7 +4153,22 @@ class LaudoGeneratorService {
     buffer.write(existingRels);
 
     final fileNames = <String>[];
-    int imageCounter = 1;
+    int? mapaRId;
+    String? mapaFileName;
+
+    // Imagem do mapa (captura de tela do local) em primeiro, rId = maxId+1
+    if (imagemMapaLocal != null && await imagemMapaLocal.exists()) {
+      final ext = imagemMapaLocal.path.split('.').last.toLowerCase();
+      mapaFileName = 'mapa_local_${DateTime.now().microsecondsSinceEpoch}.$ext';
+      mapaRId = maxId + 1;
+      buffer.writeln(
+        '  <Relationship Id="rId$mapaRId" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/$mapaFileName"/>',
+      );
+      fileNames.add(mapaFileName);
+    }
+
+    // Fotos do anexo (rId = maxId+2, maxId+3, ...)
+    int imageCounter = fileNames.length + 1;
     for (final foto in fotos) {
       if (await foto.exists()) {
         final extension = foto.path.split('.').last.toLowerCase();
@@ -3436,7 +4184,13 @@ class LaudoGeneratorService {
     }
 
     buffer.writeln('</Relationships>');
-    return {'xml': buffer.toString(), 'maxId': maxId, 'fileNames': fileNames};
+    return {
+      'xml': buffer.toString(),
+      'maxId': maxId,
+      'fileNames': fileNames,
+      'mapaRId': mapaRId,
+      'mapaFileName': mapaFileName,
+    };
   }
 
   String _escapeXml(String text) {

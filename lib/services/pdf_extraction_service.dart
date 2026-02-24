@@ -123,6 +123,19 @@ class PdfExtractionService {
     return _parsearSolicitacao(texto);
   }
 
+  /// Remove acentos precompostos (português) para normalização do texto.
+  /// Complementa a remoção de marcas combinantes (decompostas) já feita em
+  /// [_parsearSolicitacao], garantindo que os regex funcionem independentemente
+  /// da codificação Unicode usada pelo gerador de PDF (TCPDF, iText, etc.).
+  static String _removeAccents(String s) {
+    const accented = 'áàãâÁÀÃÂéêÉÊíÍóôõÓÔÕúüÚÜçÇñÑ';
+    const plain = 'aaaaAAAAeeEEiIoooOOOuuUUcCnN';
+    for (int i = 0; i < accented.length; i++) {
+      s = s.replaceAll(accented[i], plain[i]);
+    }
+    return s;
+  }
+
   /// Parseia o texto extraído do PDF para criar SolicitacaoModel
   ///
   /// Objetivo: ser tolerante a variações de layout do PDF (1 ou mais páginas),
@@ -135,6 +148,11 @@ class PdfExtractionService {
     // Alguns PDFs vêm com acentos decompostos (ex.: "Conteu\u0301do").
     // Remover marcas combinantes para tornar regex robusta.
     raw = raw.replaceAll(RegExp(r'[\u0300-\u036f]'), '');
+
+    // Também normalizar acentos precompostos (ex.: "ç" U+00E7, "ã" U+00E3)
+    // que NÃO são marcas combinantes mas sim caracteres únicos. Garante que
+    // os regex funcionem independentemente da codificação usada pelo PDF.
+    raw = _removeAccents(raw);
 
     // Remover ruídos comuns do TCPDF
     raw = raw.replaceAll(
@@ -189,8 +207,12 @@ class PdfExtractionService {
             'DIVISÃO DE PERÍCIAS CRIMINAIS EM LOCAIS DE CRIME',
       };
 
-      if (fixes.containsKey(colado)) {
-        return fixes[colado]!;
+      // Comparar com chaves normalizadas (sem acentos), pois o texto
+      // já passou por _removeAccents mas as chaves do mapa podem ter acentos.
+      for (final entry in fixes.entries) {
+        if (_removeAccents(entry.key) == colado) {
+          return entry.value;
+        }
       }
 
       // Fallback conservador: se não há nenhum espaço e o texto é MUITO longo,
@@ -471,9 +493,24 @@ class PdfExtractionService {
     })();
 
     // Endereço
+    // DEBUG: trecho do texto onde deveria estar Cidade/Endereco/Coordenadas
+    final idxCidade = raw.toLowerCase().indexOf('cidade');
+    if (idxCidade >= 0) {
+      final trecho = raw.substring(
+        idxCidade,
+        (idxCidade + 700).clamp(0, raw.length),
+      );
+      debugPrint('[PdfExtraction] Trecho raw (após Cidade):\n$trecho');
+      debugPrint('[PdfExtraction] --- fim trecho ---');
+    } else {
+      debugPrint('[PdfExtraction] "Cidade" não encontrado no raw');
+    }
+
     String? endereco = firstGroup(
       RegExp(r'Endereco\s*:\s*([^\n]+)', caseSensitive: false),
     );
+    debugPrint('[PdfExtraction] Endereco primary regex: "${endereco ?? "(null)"}"');
+
     // Validar se não capturou linha de rótulos
     if (endereco != null) {
       final endLower = endereco.toLowerCase();
@@ -481,31 +518,110 @@ class PdfExtractionService {
           endLower.contains('coordenadas:') ||
           endLower.contains('contato:') ||
           endLower.trim().isEmpty) {
+        debugPrint('[PdfExtraction] Endereco rejeitado pela validação');
         endereco = null;
       }
     }
-    // Fallback ODIN: endereço vem na linha após a cidade e antes de "Latitude:" (quando existir)
+    debugPrint('[PdfExtraction] Endereco após validação: "${endereco ?? "(null)"}"');
+    debugPrint('[PdfExtraction] Municipio (para fallback): "${municipio ?? "(null)"}"');
+
+    // Fallback ODIN: endereço vem na linha após a cidade e antes de um
+    // dos rótulos seguintes (Latitude, Coordenadas, Complemento, Contato, etc.)
     endereco ??= (() {
-      if (municipio == null) return null;
+      if (municipio == null) {
+        debugPrint('[PdfExtraction] Fallback endereco: municipio null, não tenta');
+        return null;
+      }
       final m = RegExp(
         RegExp.escape(municipio) +
-            r'\s*\n\s*([^\n]+?)\s*(?=\n\s*Latitude\s*:|\n\s*Coordenadas\s*:|\n\s*Local\s+de\s+furto|$)',
+            r'\s*\n\s*([^\n]+?)\s*(?=\n\s*Latitude\s*:|\n\s*Coordenadas\s*:|\n\s*Complemento\s*:|\n\s*Contato\s*:|\n\s*Local\s+de\s+furto|$)',
         caseSensitive: false,
         dotAll: true,
       ).firstMatch(raw);
-      final end = m?.group(1)?.trim();
+      if (m == null) {
+        debugPrint('[PdfExtraction] Fallback endereco: regex não deu match ( municipio="$municipio" )');
+        return null;
+      }
+      var end = m.group(1)?.trim();
+      // Remover prefixo "Endereco:" caso o fallback tenha capturado a linha
+      // inteira (inclusive o rótulo) — ex.: quando layout do PDF coloca o
+      // rótulo na mesma linha que o valor, logo após a cidade.
+      if (end != null) {
+        end = end
+            .replaceFirst(
+              RegExp(r'^Endereco\s*:\s*', caseSensitive: false),
+              '',
+            )
+            .trim();
+      }
       // Validar que não é um rótulo
       if (end != null) {
         final endLower = end.toLowerCase();
         if (endLower.contains('complemento:') ||
             endLower.contains('coordenadas:') ||
             endLower.contains('contato:') ||
-            endLower.contains('historico')) {
+            endLower.contains('historico') ||
+            endLower.trim().isEmpty) {
+          debugPrint('[PdfExtraction] Fallback endereco rejeitado: "$end"');
           return null;
         }
       }
+      debugPrint('[PdfExtraction] Fallback endereco capturou: "$end"');
       return end;
     })();
+
+    // Fallback robusto: endereço = linha imediatamente antes de "Latitude:"
+    // Funciona no layout ODIN onde rótulos ficam numa linha e valores em outra.
+    endereco ??= (() {
+      final m = RegExp(
+        r'([^\n]+)\n\s*Latitude\s*:',
+        caseSensitive: false,
+      ).firstMatch(raw);
+      var end = m?.group(1)?.trim();
+      if (end != null && end.isNotEmpty) {
+        final endLower = end.toLowerCase();
+        if (!endLower.contains('complemento:') &&
+            !endLower.contains('coordenadas:') &&
+            !endLower.contains('contato:') &&
+            !endLower.startsWith('cidade:') &&
+            !endLower.contains('historico')) {
+          // Remover prefixo "Endereco:" caso exista
+          end = end
+              .replaceFirst(
+                RegExp(r'^Endereco\s*:\s*', caseSensitive: false),
+                '',
+              )
+              .trim();
+          debugPrint('[PdfExtraction] Fallback linha-antes-Latitude capturou: "$end"');
+          return end.isNotEmpty ? end : null;
+        }
+      }
+      debugPrint('[PdfExtraction] Fallback linha-antes-Latitude: nao encontrou');
+      return null;
+    })();
+
+    // Fallback município: linha imediatamente antes do endereço no texto bruto
+    if (endereco != null && municipio == null) {
+      final endIndex = raw.indexOf(endereco);
+      if (endIndex > 0) {
+        final before = raw.substring(0, endIndex).trimRight();
+        final lastNewline = before.lastIndexOf('\n');
+        if (lastNewline >= 0) {
+          final line = before.substring(lastNewline + 1).trim();
+          if (line.isNotEmpty &&
+              line.length >= 3 &&
+              line.length <= 40 &&
+              !isLinhaRotulos(line) &&
+              !line.contains('->')) {
+            debugPrint('[PdfExtraction] Fallback municipio (linha antes endereco): "$line"');
+            municipio = line;
+          }
+        }
+      }
+    }
+
+    debugPrint('[PdfExtraction] Endereco FINAL: "${endereco ?? "(null)"}"');
+    debugPrint('[PdfExtraction] Municipio FINAL: "${municipio ?? "(null)"}"');
 
     // Coordenadas (aceita vírgula ou ponto)
     String? coordenadasS;

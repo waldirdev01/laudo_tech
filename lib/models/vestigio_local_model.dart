@@ -45,6 +45,14 @@ class VestigioLocalModel {
   // Flag para identificar sangue humano (para textos específicos no laudo)
   final bool isSangueHumano;
 
+  // Números das fotografias do levantamento fotográfico vinculadas ao vestígio.
+  // Exemplo: [3, 5, 6] => (fotos 03, 05 e 06)
+  final List<int> numerosFotografias;
+
+  // Caminhos das fotografias vinculadas ao vestígio.
+  // A numeração do laudo é resolvida automaticamente pela ordem em fotosLevantamento.
+  final List<String> fotosVinculadasPaths;
+
   VestigioLocalModel({
     required this.id,
     this.descricao,
@@ -58,6 +66,8 @@ class VestigioLocalModel {
     this.dataHoraColeta,
     this.numeroLacre,
     this.isSangueHumano = false,
+    this.numerosFotografias = const [],
+    this.fotosVinculadasPaths = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -73,6 +83,8 @@ class VestigioLocalModel {
         'dataHoraColeta': dataHoraColeta,
         'numeroLacre': numeroLacre,
         'isSangueHumano': isSangueHumano,
+        'numerosFotografias': numerosFotografias,
+        'fotosVinculadasPaths': fotosVinculadasPaths,
       };
 
   factory VestigioLocalModel.fromJson(Map<String, dynamic> json) {
@@ -105,6 +117,14 @@ class VestigioLocalModel {
       dataHoraColeta: json['dataHoraColeta'] as String?,
       numeroLacre: json['numeroLacre'] as String?,
       isSangueHumano: (json['isSangueHumano'] as bool?) ?? false,
+      numerosFotografias: (json['numerosFotografias'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          const [],
+      fotosVinculadasPaths: (json['fotosVinculadasPaths'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -121,6 +141,8 @@ class VestigioLocalModel {
     String? dataHoraColeta,
     String? numeroLacre,
     bool? isSangueHumano,
+    List<int>? numerosFotografias,
+    List<String>? fotosVinculadasPaths,
   }) {
     return VestigioLocalModel(
       id: id ?? this.id,
@@ -135,6 +157,8 @@ class VestigioLocalModel {
       dataHoraColeta: dataHoraColeta ?? this.dataHoraColeta,
       numeroLacre: numeroLacre ?? this.numeroLacre,
       isSangueHumano: isSangueHumano ?? this.isSangueHumano,
+      numerosFotografias: numerosFotografias ?? this.numerosFotografias,
+      fotosVinculadasPaths: fotosVinculadasPaths ?? this.fotosVinculadasPaths,
     );
   }
 

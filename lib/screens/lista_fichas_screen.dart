@@ -7,13 +7,18 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../models/cadaver_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
+import '../models/veiculo_model.dart';
+import '../models/vestigio_local_model.dart';
 import '../services/ficha_service.dart';
 import '../services/laudo_generator_service.dart';
 import '../services/perito_service.dart';
 import '../services/word_generator_service.dart';
 import 'condicoes_observacoes_screen.dart';
+import 'crime_transito_condicoes_screen.dart';
+import 'crime_transito_natureza_screen.dart';
 import 'dano_screen.dart';
 import 'detalhes_local_screen.dart';
 import 'equipes_policiais_screen.dart';
@@ -21,6 +26,7 @@ import 'evidencias_furto_screen.dart';
 import 'historico_screen.dart';
 import 'isolamento_screen.dart';
 import 'lista_cadaveres_screen.dart';
+import 'lista_envolvidos_transito_screen.dart';
 import 'lista_veiculos_screen.dart';
 import 'local_screen.dart';
 import 'modus_operandi_screen.dart';
@@ -161,6 +167,28 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                   leading: const Icon(Icons.person),
                   title: const Text('11. Cadáveres'),
                   onTap: () => Navigator.of(context).pop('cadaveres'),
+                ),
+              ],
+              if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) ...[
+                ListTile(
+                  leading: const Icon(Icons.traffic),
+                  title: const Text('9. Condições da Via'),
+                  onTap: () => Navigator.of(context).pop('condicoes_transito'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.directions_car),
+                  title: const Text('10. Veículos'),
+                  onTap: () => Navigator.of(context).pop('veiculos'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.groups),
+                  title: const Text('11. Envolvidos'),
+                  onTap: () => Navigator.of(context).pop('envolvidos_transito'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.assignment),
+                  title: const Text('12. Natureza da Ocorrência'),
+                  onTap: () => Navigator.of(context).pop('natureza_transito'),
                 ),
               ],
               ListTile(
@@ -314,130 +342,350 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       return;
     }
 
-    // Perguntar se deseja incluir fotos (reutilizando fotos persistidas na ficha)
     final fichaService = FichaService();
     var fichaAtual = await fichaService.obterFicha(ficha.id) ?? ficha;
 
-    // Limpar paths inexistentes (se o usuário apagou do app via sistema)
-    final fotosExistentes = <String>[];
-    for (final p in fichaAtual.fotosLevantamento) {
-      final f = File(p);
-      if (await f.exists()) fotosExistentes.add(p);
-    }
-
-    // Se teve limpeza, persistir de volta
-    if (fotosExistentes.length != fichaAtual.fotosLevantamento.length) {
-      await fichaService.salvarFicha(
-        fichaAtual.copyWith(fotosLevantamento: fotosExistentes),
-      );
-    }
-
     List<File>? fotosSelecionadas;
-    if (!mounted) return;
+    List<String>? legendasFotos;
+    final useLevantamentoVestigios = (fichaAtual.tipoOcorrencia ==
+            TipoOcorrencia.furtoDanoExameLocal ||
+        fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli) &&
+        fichaAtual.localFurto != null;
 
-    // Se já existem fotos, oferecer usar/adicionar/nenhuma
-    if (fotosExistentes.isNotEmpty) {
-      final acao = await showDialog<String>(
+    if (useLevantamentoVestigios) {
+      final lf = fichaAtual.localFurto!;
+      final orderedPaths = <String>[];
+
+      final dir = await getApplicationDocumentsDirectory();
+      final basePath = dir.path;
+
+      int vistaAmplaOk = 0;
+      int vestigioFotosOk = 0;
+      int totalVestigios = 0;
+      int vestigiosSemFoto = 0;
+      final pathMap = <String, String>{}; // original → resolved
+      final pathToLegenda = <String, String>{}; // path (resolved) → legenda para anexo
+
+      for (final p in lf.fotosVistaAmplaPaths ?? []) {
+        final resolved = await _resolverPath(p, basePath);
+        if (resolved != null) {
+          orderedPaths.add(resolved);
+          pathMap[p] = resolved;
+          pathToLegenda[resolved] = 'Vista ampla do local (fachada).';
+          vistaAmplaOk++;
+        }
+      }
+
+      Future<void> adicionarFotosVestigios(List<VestigioLocalModel>? lista) async {
+        if (lista == null) return;
+        for (final v in lista) {
+          totalVestigios++;
+          if (v.fotosVinculadasPaths.isEmpty) {
+            vestigiosSemFoto++;
+            continue;
+          }
+          final descVestigio = (v.descricao ?? 'vestígio registrado').trim();
+          final legenda = descVestigio.isEmpty
+              ? 'Vestígio registrado.'
+              : (descVestigio.length > 80 ? '${descVestigio.substring(0, 80)}...' : descVestigio) + (descVestigio.endsWith('.') ? '' : '.');
+          for (final p in v.fotosVinculadasPaths) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] = legenda;
+              vestigioFotosOk++;
+            }
+          }
+        }
+      }
+
+      await adicionarFotosVestigios(lf.vestigiosMediato);
+      await adicionarFotosVestigios(lf.vestigiosImediato);
+      await adicionarFotosVestigios(lf.vestigiosRelacionado);
+
+      // Fotos dos cadáveres (CVLI): vista ambiente, posição, hipóstase, tatuagens, lesões
+      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+          fichaAtual.cadaveres != null) {
+        for (final c in fichaAtual.cadaveres!) {
+          for (final p in c.fotosVistaCadaversAmbiente) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] =
+                  'Vista do cadáver no ambiente (cadáver ${c.numero}).';
+            }
+          }
+          for (final p in c.fotosPosicaoEncontrada) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] =
+                  'Cadáver na posição em que foi encontrado (cadáver ${c.numero}).';
+            }
+          }
+          for (final p in c.fotosHipostaseSecrecoes) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] =
+                  'Manchas de hipóstase e secreções (cadáver ${c.numero}).';
+            }
+          }
+          for (final p in c.fotosTatuagens) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] =
+                  'Tatuagens e marcas corporais (cadáver ${c.numero}).';
+            }
+          }
+          for (final lesao in c.lesoes ?? []) {
+            final descResumo = lesao.descricao ?? lesao.regiao;
+            final legendaTexto = descResumo.length > 60
+                ? '${descResumo.substring(0, 60)}...'
+                : descResumo;
+            final legenda =
+                'Lesão em ${lesao.regiao}: $legendaTexto${legendaTexto.endsWith('.') ? '' : '.'}';
+            for (final p in lesao.fotosPaths) {
+              final resolved = await _resolverPath(p, basePath);
+              if (resolved != null) {
+                orderedPaths.add(resolved);
+                pathMap[p] = resolved;
+                pathToLegenda[resolved] = legenda;
+              }
+            }
+          }
+        }
+      }
+
+      // Fotos dos veículos (CVLI): vista no ambiente + vestígios de cada veículo
+      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+          fichaAtual.veiculos != null) {
+        for (final v in fichaAtual.veiculos!) {
+          for (final p in v.fotosVistaVeiculoAmbiente) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] =
+                  'Vista do veículo no ambiente (veículo ${v.numero}).';
+            }
+          }
+          for (final vest in v.vestigios ?? []) {
+            final descResumo = vest.descricao ?? vest.localizacao ?? 'vestígio';
+            final legendaTexto = descResumo.length > 60
+                ? '${descResumo.substring(0, 60)}...'
+                : descResumo;
+            final legenda =
+                'Vestígio no veículo ${v.numero}: $legendaTexto${legendaTexto.endsWith('.') ? '' : '.'}';
+            for (final p in vest.fotosPaths) {
+              final resolved = await _resolverPath(p, basePath);
+              if (resolved != null) {
+                orderedPaths.add(resolved);
+                pathMap[p] = resolved;
+                pathToLegenda[resolved] = legenda;
+              }
+            }
+          }
+        }
+      }
+
+      if (vestigioFotosOk == 0 && fichaAtual.fotosLevantamento.isNotEmpty) {
+        final setOrdered = orderedPaths.toSet();
+        for (final p in fichaAtual.fotosLevantamento) {
+          if (setOrdered.contains(p)) continue;
+          final resolved = await _resolverPath(p, basePath);
+          if (resolved != null && !setOrdered.contains(resolved)) {
+            orderedPaths.add(resolved);
+            setOrdered.add(resolved);
+            pathToLegenda[resolved] = 'Foto do levantamento.';
+          }
+        }
+      }
+
+      if (orderedPaths.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Adicione a foto da vista ampla do local (tela Local - Detalhes) e as fotos de cada vestígio ao registrá-los.',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      final detalhes = StringBuffer();
+      detalhes.writeln('Vista ampla: $vistaAmplaOk foto(s)');
+      detalhes.writeln('Vestígios: $totalVestigios (fotos: $vestigioFotosOk)');
+      if (vestigiosSemFoto > 0) {
+        detalhes.writeln('(!) $vestigiosSemFoto vestígio(s) sem foto');
+      }
+      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+          fichaAtual.cadaveres != null &&
+          fichaAtual.cadaveres!.isNotEmpty) {
+        detalhes.writeln('Inclui fotos dos cadáveres (exames e lesões) no anexo.');
+      }
+      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+          fichaAtual.veiculos != null &&
+          fichaAtual.veiculos!.isNotEmpty) {
+        detalhes.writeln('Inclui fotos dos veículos (cena e vestígios) no anexo.');
+      }
+      detalhes.write('Total no levantamento: ${orderedPaths.length} foto(s)');
+
+      final confirmar = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Levantamento Fotográfico'),
-          content: Text(
-            'Esta ficha já possui ${fotosExistentes.length} foto(s) salva(s). O que deseja fazer?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop('nao'),
-              child: const Text('Não incluir'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop('adicionar'),
-              child: const Text('Adicionar mais'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop('usar'),
-              child: const Text('Usar salvas'),
-            ),
-          ],
-        ),
-      );
-
-      if (acao == 'usar') {
-        fotosSelecionadas = fotosExistentes.map((p) => File(p)).toList();
-      } else if (acao == 'adicionar') {
-        final novas = await _selecionarFotos();
-        if (novas != null && novas.isNotEmpty) {
-          final novosPaths = await _persistirFotosDaFicha(ficha.id, novas);
-          final atualizadas = [...fotosExistentes, ...novosPaths];
-          await fichaService.salvarFicha(
-            fichaAtual.copyWith(fotosLevantamento: atualizadas),
-          );
-          fotosSelecionadas = atualizadas.map((p) => File(p)).toList();
-        } else {
-          fotosSelecionadas = fotosExistentes.map((p) => File(p)).toList();
-        }
-      } else {
-        fotosSelecionadas = null;
-      }
-    } else {
-      final incluirFotos = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Incluir Fotos'),
-          content: const Text('Deseja incluir fotos no laudo?'),
+          content: Text(detalhes.toString()),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Não'),
+              child: const Text('Cancelar'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Sim'),
+              child: const Text('Gerar laudo'),
             ),
           ],
         ),
       );
+      if (confirmar != true) return;
 
-      if (incluirFotos == true) {
-        final novas = await _selecionarFotos();
-        if (novas != null && novas.isNotEmpty) {
-          final paths = await _persistirFotosDaFicha(ficha.id, novas);
-          await fichaService.salvarFicha(
-            fichaAtual.copyWith(fotosLevantamento: paths),
-          );
-          fotosSelecionadas = paths.map((p) => File(p)).toList();
-        }
-      }
-    }
-
-    // Permitir reordenar/excluir fotos antes de gerar o laudo (isso altera "Fotografia 01/02..." e a contagem)
-    if (fotosSelecionadas != null && fotosSelecionadas.isNotEmpty) {
-      final pathsAtuais = fotosSelecionadas.map((f) => f.path).toList();
-      final novosPaths = await _gerenciarFotosLevantamento(pathsAtuais);
+      // Opcional: reordenar fotos (vista ampla deve ficar primeiro)
+      final pathsAtuais = List<String>.from(orderedPaths);
+      final novosPaths = await _gerenciarFotosLevantamento(pathsAtuais, basePath);
       if (!mounted) return;
+      final pathsFinais = novosPaths ?? pathsAtuais;
 
-      if (novosPaths != null) {
-        final removidas = pathsAtuais.toSet().difference(novosPaths.toSet());
-        for (final p in removidas) {
-          try {
-            final f = File(p);
-            if (await f.exists()) {
-              await f.delete();
-            }
-          } catch (_) {
-            // Ignorar falhas de remoção (permissão/arquivo em uso etc.)
-          }
+      VestigioLocalModel comNumeros(VestigioLocalModel v) {
+        final nums = <int>[];
+        for (final p in v.fotosVinculadasPaths) {
+          final resolved = pathMap[p] ?? p;
+          final idx = pathsFinais.indexOf(resolved);
+          if (idx >= 0) nums.add(idx + 1);
         }
+        nums.sort();
+        return v.copyWith(numerosFotografias: nums);
+      }
 
+      final vestigiosMediato = (lf.vestigiosMediato ?? [])
+          .map(comNumeros)
+          .toList();
+      final vestigiosImediato = (lf.vestigiosImediato ?? [])
+          .map(comNumeros)
+          .toList();
+      final vestigiosRelacionado = (lf.vestigiosRelacionado ?? [])
+          .map(comNumeros)
+          .toList();
+
+      final localFurtoParaLaudo = lf.copyWith(
+        vestigiosMediato: vestigiosMediato,
+        vestigiosImediato: vestigiosImediato,
+        vestigiosRelacionado: vestigiosRelacionado,
+      );
+
+      // Para CVLI: preencher numerosFotografias em cada lesão para citação no laudo
+      List<CadaverModel>? cadaveresParaLaudo;
+      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+          fichaAtual.cadaveres != null) {
+        cadaveresParaLaudo = fichaAtual.cadaveres!.map((c) {
+          final lesoesComNumeros = (c.lesoes ?? []).map((lesao) {
+            final nums = <int>[];
+            for (final p in lesao.fotosPaths) {
+              final resolved = pathMap[p] ?? p;
+              final idx = pathsFinais.indexOf(resolved);
+              if (idx >= 0) nums.add(idx + 1);
+            }
+            nums.sort();
+            return lesao.copyWith(
+              numerosFotografias: nums.isEmpty ? null : nums,
+            );
+          }).toList();
+          return c.copyWith(lesoes: lesoesComNumeros);
+        }).toList();
+      }
+
+      // Para CVLI: preencher numerosFotografias em cada vestígio de veículo
+      List<VeiculoModel>? veiculosParaLaudo;
+      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+          fichaAtual.veiculos != null) {
+        veiculosParaLaudo = fichaAtual.veiculos!.map((v) {
+          final vestigiosComNumeros = (v.vestigios ?? []).map((vest) {
+            final nums = <int>[];
+            for (final p in vest.fotosPaths) {
+              final resolved = pathMap[p] ?? p;
+              final idx = pathsFinais.indexOf(resolved);
+              if (idx >= 0) nums.add(idx + 1);
+            }
+            nums.sort();
+            return vest.copyWith(
+              numerosFotografias: nums.isEmpty ? null : nums,
+            );
+          }).toList();
+          return v.copyWith(vestigios: vestigiosComNumeros);
+        }).toList();
+      }
+
+      fichaAtual = fichaAtual.copyWith(
+        localFurto: localFurtoParaLaudo,
+        cadaveres: cadaveresParaLaudo ?? fichaAtual.cadaveres,
+        veiculos: veiculosParaLaudo ?? fichaAtual.veiculos,
+      );
+      fotosSelecionadas =
+          pathsFinais.isEmpty ? null : pathsFinais.map((p) => File(p)).toList();
+      legendasFotos = pathsFinais.isEmpty
+          ? null
+          : pathsFinais.map((p) => pathToLegenda[p] ?? '').toList();
+    } else {
+      // Outros tipos de ocorrência: usar fotos já salvas na ficha (se houver)
+      final fotosExistentes = <String>[];
+      for (final p in fichaAtual.fotosLevantamento) {
+        final f = File(p);
+        if (await f.exists()) fotosExistentes.add(p);
+      }
+      if (fotosExistentes.length != fichaAtual.fotosLevantamento.length) {
         await fichaService.salvarFicha(
-          fichaAtual.copyWith(fotosLevantamento: novosPaths),
+          fichaAtual.copyWith(fotosLevantamento: fotosExistentes),
         );
-        fichaAtual = fichaAtual.copyWith(fotosLevantamento: novosPaths);
-
-        fotosSelecionadas = novosPaths.isEmpty
-            ? null
-            : novosPaths.map((p) => File(p)).toList();
+      }
+      if (fotosExistentes.isNotEmpty) {
+        if (!mounted) return;
+        final usar = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Levantamento Fotográfico'),
+            content: Text(
+              'Esta ficha possui ${fotosExistentes.length} foto(s). Incluir no laudo?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Não'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Sim'),
+              ),
+            ],
+          ),
+        );
+        if (usar == true) {
+          fotosSelecionadas =
+              fotosExistentes.map((p) => File(p)).toList();
+        }
       }
     }
+
+    if (!mounted) return;
 
     // Mostrar diálogo de carregamento
     if (!mounted) return;
@@ -468,6 +716,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         perito: perito,
         templatePath: templatePath,
         fotos: fotosSelecionadas,
+        legendasFotos: legendasFotos,
       );
 
       if (!mounted) return;
@@ -544,6 +793,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
     }
   }
 
+  // Mantido para eventual uso em outros fluxos (ex.: adicionar fotos em outros tipos de ocorrência).
+  // ignore: unused_element
   Future<List<File>?> _selecionarFotos() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -579,6 +830,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
     }
   }
 
+  // ignore: unused_element
   Future<List<String>> _persistirFotosDaFicha(
     String fichaId,
     List<File> fotos,
@@ -601,15 +853,36 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
     return paths;
   }
 
-  Future<List<String>?> _gerenciarFotosLevantamento(List<String> paths) async {
+  /// Tenta resolver um caminho de foto salvo. Se o caminho original existe, retorna-o.
+  /// Caso contrário (ex.: UUID do container iOS mudou), tenta reconstruir usando
+  /// o diretório de documentos atual + parte relativa 'levantamento_fotografico/...'.
+  Future<String?> _resolverPath(String path, String currentBasePath) async {
+    if (await File(path).exists()) return path;
+    final marker = 'levantamento_fotografico/';
+    final idx = path.indexOf(marker);
+    if (idx >= 0) {
+      final relative = path.substring(idx);
+      final resolved = '$currentBasePath/$relative';
+      if (await File(resolved).exists()) return resolved;
+    }
+    return null;
+  }
+
+  Future<List<String>?> _gerenciarFotosLevantamento(
+    List<String> paths,
+    String basePath,
+  ) async {
     if (paths.isEmpty) return paths;
 
     return showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) =>
-          _GerenciarFotosLevantamentoSheet(pathsIniciais: paths),
+      builder: (context) => _GerenciarFotosLevantamentoSheet(
+        pathsIniciais: paths,
+        basePath: basePath,
+        resolver: (p) => _resolverPath(p, basePath),
+      ),
     );
   }
 
@@ -645,6 +918,11 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       case 'condicoes':
         telaDestino = CondicoesObservacoesScreen(ficha: ficha);
         break;
+      case 'condicoes_transito':
+        if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+          telaDestino = CrimeTransitoCondicoesScreen(ficha: ficha);
+        }
+        break;
       case 'local_furto':
         if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
             ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
@@ -657,7 +935,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }
         break;
       case 'veiculos':
-        if (ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
+        if (ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
+            ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
           telaDestino = ListaVeiculosScreen(ficha: ficha);
         }
         break;
@@ -672,6 +951,16 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       case 'dano':
         if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal) {
           telaDestino = DanoScreen(ficha: ficha);
+        }
+        break;
+      case 'envolvidos_transito':
+        if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+          telaDestino = ListaEnvolvidosTransitoScreen(ficha: ficha);
+        }
+        break;
+      case 'natureza_transito':
+        if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+          telaDestino = CrimeTransitoNaturezaScreen(ficha: ficha);
         }
         break;
     }
@@ -738,215 +1027,227 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : _fichas.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.description_outlined,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Nenhuma ficha salva',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Crie uma nova ocorrência para começar',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _carregarFichas,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _fichas.length,
-                itemBuilder: (context, index) {
-                  final ficha = _fichas[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      leading: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.description,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                        ),
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.description_outlined,
+                        size: 80,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      title: Text(
-                        ficha.dadosSolicitacao.raiNumero ?? 'Sem RAI',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Nenhuma ficha salva',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Text(
-                            ficha.tipoOcorrencia.label,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w500,
+                      const SizedBox(height: 8),
+                      Text(
+                        'Crie uma nova ocorrência para começar',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _carregarFichas,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _fichas.length,
+                    itemBuilder: (context, index) {
+                      final ficha = _fichas[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          leading: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.description,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          if (ficha.dadosSolicitacao.numeroOcorrencia != null)
-                            Text(
-                              'Ocorrência: ${ficha.dadosSolicitacao.numeroOcorrencia}',
+                          title: Text(
+                            ficha.dadosSolicitacao.raiNumero ?? 'Sem RAI',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Criada em: ${DateFormat('dd/MM/yyyy HH:mm').format(ficha.dataCriacao)}',
-                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          if (ficha.dataHoraTermino == null ||
-                              ficha.dataHoraTermino!.isEmpty) ...[
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                ficha.tipoOcorrencia.label,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade100,
-                                borderRadius: BorderRadius.circular(4),
+                              const SizedBox(height: 4),
+                              if (ficha.dadosSolicitacao.numeroOcorrencia !=
+                                  null)
+                                Text(
+                                  'Ocorrência: ${ficha.dadosSolicitacao.numeroOcorrencia}',
+                                ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Criada em: ${DateFormat('dd/MM/yyyy HH:mm').format(ficha.dataCriacao)}',
+                                style: Theme.of(context).textTheme.bodySmall,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.access_time,
-                                    size: 14,
-                                    color: Colors.orange.shade900,
+                              if (ficha.dataHoraTermino == null ||
+                                  ficha.dataHoraTermino!.isEmpty) ...[
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Em atendimento',
-                                    style: TextStyle(
-                                      color: Colors.orange.shade900,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 14,
+                                        color: Colors.orange.shade900,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Em atendimento',
+                                        style: TextStyle(
+                                          color: Colors.orange.shade900,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          trailing: PopupMenuButton(
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'editar',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Editar'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'navegar',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.navigation, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Navegar para Tela'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'gerar_ficha',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.description,
+                                      size: 20,
+                                      color: Colors.blue,
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Gerar Ficha',
+                                      style: TextStyle(color: Colors.blue),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      trailing: PopupMenuButton(
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'editar',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit, size: 20),
-                                SizedBox(width: 8),
-                                Text('Editar'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'navegar',
-                            child: Row(
-                              children: [
-                                Icon(Icons.navigation, size: 20),
-                                SizedBox(width: 8),
-                                Text('Navegar para Tela'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'gerar_ficha',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.description,
-                                  size: 20,
-                                  color: Colors.blue,
+                              const PopupMenuItem(
+                                value: 'gerar_laudo',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.article,
+                                      size: 20,
+                                      color: Colors.green,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Gerar Laudo',
+                                      style: TextStyle(color: Colors.green),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Gerar Ficha',
-                                  style: TextStyle(color: Colors.blue),
+                              ),
+                              const PopupMenuItem(
+                                value: 'excluir',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete,
+                                        size: 20, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Excluir',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
+                            onSelected: (value) {
+                              if (value == 'editar') {
+                                _abrirFicha(ficha);
+                              } else if (value == 'navegar') {
+                                _mostrarMenuNavegacao(ficha);
+                              } else if (value == 'gerar_ficha') {
+                                _gerarDocumentoWord(ficha);
+                              } else if (value == 'gerar_laudo') {
+                                _gerarDocumentoLaudo(ficha);
+                              } else if (value == 'excluir') {
+                                _removerFicha(ficha);
+                              }
+                            },
                           ),
-                          const PopupMenuItem(
-                            value: 'gerar_laudo',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.article,
-                                  size: 20,
-                                  color: Colors.green,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Gerar Laudo',
-                                  style: TextStyle(color: Colors.green),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'excluir',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, size: 20, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Excluir',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        onSelected: (value) {
-                          if (value == 'editar') {
-                            _abrirFicha(ficha);
-                          } else if (value == 'navegar') {
-                            _mostrarMenuNavegacao(ficha);
-                          } else if (value == 'gerar_ficha') {
-                            _gerarDocumentoWord(ficha);
-                          } else if (value == 'gerar_laudo') {
-                            _gerarDocumentoLaudo(ficha);
-                          } else if (value == 'excluir') {
-                            _removerFicha(ficha);
-                          }
-                        },
-                      ),
-                      onTap: () => _abrirFicha(ficha),
-                    ),
-                  );
-                },
-              ),
-            ),
+                          onTap: () => _abrirFicha(ficha),
+                        ),
+                      );
+                    },
+                  ),
+                ),
     );
   }
 }
 
 class _GerenciarFotosLevantamentoSheet extends StatefulWidget {
-  const _GerenciarFotosLevantamentoSheet({required this.pathsIniciais});
+  const _GerenciarFotosLevantamentoSheet({
+    required this.pathsIniciais,
+    required this.basePath,
+    required this.resolver,
+  });
 
   final List<String> pathsIniciais;
+  final String basePath;
+  final Future<String?> Function(String) resolver;
 
   @override
   State<_GerenciarFotosLevantamentoSheet> createState() =>
@@ -956,11 +1257,20 @@ class _GerenciarFotosLevantamentoSheet extends StatefulWidget {
 class _GerenciarFotosLevantamentoSheetState
     extends State<_GerenciarFotosLevantamentoSheet> {
   late final List<String> _paths = [...widget.pathsIniciais];
+  final Map<String, String?> _resolvedPaths = {};
 
-  String _basename(String path) {
-    final idx = path.lastIndexOf(Platform.pathSeparator);
-    if (idx == -1) return path;
-    return path.substring(idx + 1);
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resolvePaths());
+  }
+
+  Future<void> _resolvePaths() async {
+    for (final p in _paths) {
+      if (_resolvedPaths.containsKey(p)) continue;
+      final r = await widget.resolver(p);
+      if (mounted) setState(() => _resolvedPaths[p] = r);
+    }
   }
 
   @override
@@ -1011,8 +1321,10 @@ class _GerenciarFotosLevantamentoSheetState
                       },
                       itemBuilder: (context, index) {
                         final path = _paths[index];
-                        final titulo =
-                            'Fotografia ${(index + 1).toString().padLeft(2, '0')}';
+                        final numero =
+                            (index + 1).toString().padLeft(2, '0');
+                        final displayPath = _resolvedPaths[path] ?? path;
+                        final fileExists = File(displayPath).existsSync();
 
                         return Card(
                           key: ValueKey(path),
@@ -1020,29 +1332,40 @@ class _GerenciarFotosLevantamentoSheetState
                             index: index,
                             child: ListTile(
                               leading: SizedBox(
-                                width: 56,
-                                height: 56,
+                                width: 140,
+                                height: 140,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    File(path),
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) => Container(
-                                          color: Theme.of(
+                                  child: fileExists
+                                      ? Image.file(
+                                          File(displayPath),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (
                                             context,
-                                          ).colorScheme.surfaceContainerHighest,
+                                            error,
+                                            stackTrace,
+                                          ) =>
+                                              Container(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
+                                            child: const Icon(Icons.broken_image),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .surfaceContainerHighest,
                                           child: const Icon(Icons.broken_image),
                                         ),
-                                  ),
                                 ),
                               ),
-                              title: Text(titulo),
-                              subtitle: Text(_basename(path)),
+                              title: Text(
+                                numero,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
