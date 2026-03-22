@@ -116,14 +116,14 @@ class _CadastroMembroEquipePolicialScreenState
               const SizedBox(height: 16),
               TextFormField(
                 controller: _matriculaController,
-                decoration: const InputDecoration(
-                  labelText: 'Matrícula',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.numbers),
+                decoration: InputDecoration(
+                  labelText: precisaPostoGraduacao ? 'RG' : 'Matrícula',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.numbers),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Por favor, informe a matrícula';
+                    return 'Por favor, informe ${precisaPostoGraduacao ? 'o RG' : 'a matrícula'}';
                   }
                   return null;
                 },
