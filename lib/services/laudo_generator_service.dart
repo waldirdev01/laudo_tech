@@ -648,7 +648,7 @@ class LaudoGeneratorService {
       final equipesTexto = _formatarEquipesPoliciais(ficha.equipesPoliciais!);
       buffer.writeln(
         _gerarParagrafoHistorico(
-          'No local, a equipe de Polícia Científica foi recebida pelas equipes policiais: $equipesTexto e segundo apurados pelos policiais $historico',
+          'No local, a equipe de Polícia Científica foi recebida pelas equipes policiais $equipesTexto e, segundo apurados pelos policiais, $historico',
         ),
       );
     } else {
