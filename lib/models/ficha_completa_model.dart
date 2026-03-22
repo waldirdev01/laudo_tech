@@ -263,12 +263,7 @@ class FichaCompletaModel {
       equipesPoliciais: equipesPoliciais ?? this.equipesPoliciais,
       naoHaviaEquipesPoliciais:
           naoHaviaEquipesPoliciais ?? this.naoHaviaEquipesPoliciais,
-      // Se passar uma lista vazia explicitamente ([]), usar null para limpar.
-      // Se passar null, manter o valor anterior.
-      // Se passar uma lista não vazia, usar ela.
-      equipesResgate: equipesResgate == null
-          ? this.equipesResgate
-          : (equipesResgate.isEmpty ? null : equipesResgate),
+      equipesResgate: equipesResgate ?? this.equipesResgate,
       local: local ?? this.local,
       dadosFichaBase: dadosFichaBase ?? this.dadosFichaBase,
       localFurto: localFurto ?? this.localFurto,

@@ -106,17 +106,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
   }
 
   Future<void> _salvarFicha() async {
-    // Validar apenas campos obrigatórios (Data/Hora Término é opcional)
-    if (_dataHoraDeslocamentoController.text.trim().isEmpty ||
-        _dataHoraInicioController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, preencha Data/Hora Deslocamento e Início'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _salvando = true;
@@ -262,6 +252,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                         onTap: () => _selecionarDataHora(
                           _dataHoraDeslocamentoController,
                         ),
+                        obrigatorio: true,
                       ),
                     ]),
                     const Divider(height: 1),
@@ -278,6 +269,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                         _dataHoraInicioController,
                         onTap: () =>
                             _selecionarDataHora(_dataHoraInicioController),
+                        obrigatorio: true,
                       ),
                     ]),
                     const Divider(height: 1),
@@ -437,6 +429,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
     String label,
     TextEditingController controller, {
     VoidCallback? onTap,
+    bool obrigatorio = false,
   }) {
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -461,6 +454,11 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                   isDense: true,
                   suffixIcon: const Icon(Icons.calendar_today, size: 20),
                 ),
+                validator: obrigatorio
+                    ? (value) => (value == null || value.trim().isEmpty)
+                        ? 'Campo obrigatório'
+                        : null
+                    : null,
               ),
             ),
           ),

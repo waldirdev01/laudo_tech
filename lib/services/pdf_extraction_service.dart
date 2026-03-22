@@ -493,23 +493,9 @@ class PdfExtractionService {
     })();
 
     // Endereço
-    // DEBUG: trecho do texto onde deveria estar Cidade/Endereco/Coordenadas
-    final idxCidade = raw.toLowerCase().indexOf('cidade');
-    if (idxCidade >= 0) {
-      final trecho = raw.substring(
-        idxCidade,
-        (idxCidade + 700).clamp(0, raw.length),
-      );
-      debugPrint('[PdfExtraction] Trecho raw (após Cidade):\n$trecho');
-      debugPrint('[PdfExtraction] --- fim trecho ---');
-    } else {
-      debugPrint('[PdfExtraction] "Cidade" não encontrado no raw');
-    }
-
     String? endereco = firstGroup(
       RegExp(r'Endereco\s*:\s*([^\n]+)', caseSensitive: false),
     );
-    debugPrint('[PdfExtraction] Endereco primary regex: "${endereco ?? "(null)"}"');
 
     // Validar se não capturou linha de rótulos
     if (endereco != null) {
@@ -518,30 +504,21 @@ class PdfExtractionService {
           endLower.contains('coordenadas:') ||
           endLower.contains('contato:') ||
           endLower.trim().isEmpty) {
-        debugPrint('[PdfExtraction] Endereco rejeitado pela validação');
         endereco = null;
       }
     }
-    debugPrint('[PdfExtraction] Endereco após validação: "${endereco ?? "(null)"}"');
-    debugPrint('[PdfExtraction] Municipio (para fallback): "${municipio ?? "(null)"}"');
 
     // Fallback ODIN: endereço vem na linha após a cidade e antes de um
     // dos rótulos seguintes (Latitude, Coordenadas, Complemento, Contato, etc.)
     endereco ??= (() {
-      if (municipio == null) {
-        debugPrint('[PdfExtraction] Fallback endereco: municipio null, não tenta');
-        return null;
-      }
+      if (municipio == null) return null;
       final m = RegExp(
         RegExp.escape(municipio) +
             r'\s*\n\s*([^\n]+?)\s*(?=\n\s*Latitude\s*:|\n\s*Coordenadas\s*:|\n\s*Complemento\s*:|\n\s*Contato\s*:|\n\s*Local\s+de\s+furto|$)',
         caseSensitive: false,
         dotAll: true,
       ).firstMatch(raw);
-      if (m == null) {
-        debugPrint('[PdfExtraction] Fallback endereco: regex não deu match ( municipio="$municipio" )');
-        return null;
-      }
+      if (m == null) return null;
       var end = m.group(1)?.trim();
       // Remover prefixo "Endereco:" caso o fallback tenha capturado a linha
       // inteira (inclusive o rótulo) — ex.: quando layout do PDF coloca o
@@ -562,11 +539,9 @@ class PdfExtractionService {
             endLower.contains('contato:') ||
             endLower.contains('historico') ||
             endLower.trim().isEmpty) {
-          debugPrint('[PdfExtraction] Fallback endereco rejeitado: "$end"');
           return null;
         }
       }
-      debugPrint('[PdfExtraction] Fallback endereco capturou: "$end"');
       return end;
     })();
 
@@ -592,11 +567,9 @@ class PdfExtractionService {
                 '',
               )
               .trim();
-          debugPrint('[PdfExtraction] Fallback linha-antes-Latitude capturou: "$end"');
           return end.isNotEmpty ? end : null;
         }
       }
-      debugPrint('[PdfExtraction] Fallback linha-antes-Latitude: nao encontrou');
       return null;
     })();
 
@@ -613,15 +586,11 @@ class PdfExtractionService {
               line.length <= 40 &&
               !isLinhaRotulos(line) &&
               !line.contains('->')) {
-            debugPrint('[PdfExtraction] Fallback municipio (linha antes endereco): "$line"');
             municipio = line;
           }
         }
       }
     }
-
-    debugPrint('[PdfExtraction] Endereco FINAL: "${endereco ?? "(null)"}"');
-    debugPrint('[PdfExtraction] Municipio FINAL: "${municipio ?? "(null)"}"');
 
     // Coordenadas (aceita vírgula ou ponto)
     String? coordenadasS;
