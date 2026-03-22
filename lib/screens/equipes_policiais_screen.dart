@@ -790,6 +790,8 @@ class _EquipesPoliciaisScreenState extends State<EquipesPoliciaisScreen> {
         return Icons.badge;
       case TipoEquipePolicial.prf:
         return Icons.directions_car;
+      case TipoEquipePolicial.gcm:
+        return Icons.security;
       case TipoEquipePolicial.outros:
         return Icons.group;
     }
