@@ -460,17 +460,17 @@ class _LocalScreenState extends State<LocalScreen> {
                               const SizedBox(height: 8),
                               if (_latitude != null && _longitude != null) ...[
                                 Text(
-                                  localModel.coordenadasSFormatada ?? '-',
+                                  'Latitude: ${localModel.coordenadasSFormatada ?? '-'}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  localModel.coordenadasWFormatada ?? '-',
+                                  'Longitude: ${localModel.coordenadasWFormatada ?? '-'}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ] else
                                 Text(
-                                  'S: ___° ___\' ___\'\nW: ___° ___\' ___\'',
+                                  'Latitude: —\nLongitude: —',
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: Theme.of(

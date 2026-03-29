@@ -3,6 +3,7 @@ enum TipoEquipePolicial {
   policiaMilitar('Polícia Militar'),
   policiaCivil('Polícia Civil'),
   prf('PRF'),
+  gcm('GCM - Guarda Civil Municipal'),
   outros('Outros');
 
   final String label;

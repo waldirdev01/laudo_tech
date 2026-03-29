@@ -15,24 +15,17 @@ class LocalFichaModel {
     this.capturaTelaLocalPath,
   });
 
-  /// Converte coordenadas decimais para formato DMS (Graus, Minutos, Segundos)
+  /// Formato único no app: graus decimais com 6 casas (igual ao levantamento da via).
+  static const int _casasDecimaisCoordenada = 6;
+
   String? get coordenadasSFormatada {
     if (latitude == null) return null;
-    return _converterParaDMS(latitude!.abs(), 'S');
+    return latitude!.toStringAsFixed(_casasDecimaisCoordenada);
   }
 
   String? get coordenadasWFormatada {
     if (longitude == null) return null;
-    return _converterParaDMS(longitude!.abs(), 'W');
-  }
-
-  String _converterParaDMS(double decimal, String direcao) {
-    final graus = decimal.floor();
-    final minutosDecimal = (decimal - graus) * 60;
-    final minutos = minutosDecimal.floor();
-    final segundos = ((minutosDecimal - minutos) * 60).toStringAsFixed(2);
-    
-    return '$direcao: $graus° $minutos\' $segundos"';
+    return longitude!.toStringAsFixed(_casasDecimaisCoordenada);
   }
 
   Map<String, dynamic> toJson() => {

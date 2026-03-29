@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -5,6 +6,7 @@ import '../models/ficha_completa_model.dart';
 import '../models/solicitacao_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
+import '../services/pdf_extraction_service.dart';
 import 'selecao_equipe_screen.dart';
 
 class PreenchimentoFichaScreen extends StatefulWidget {
@@ -32,8 +34,17 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
   final _pedidoDilacaoController = TextEditingController();
 
   final _fichaService = FichaService();
+  final _pdfService = PdfExtractionService();
   late final String _fichaId;
   bool _salvando = false;
+
+  /// Quando a requisição é importada por PDF numa ficha já existente
+  SolicitacaoModel? _solicitacaoImportada;
+
+  SolicitacaoModel get _dadosSolicitacaoEfetivos =>
+      _solicitacaoImportada ??
+      widget.fichaExistente?.dadosSolicitacao ??
+      widget.dadosSolicitacao;
 
   @override
   void initState() {
@@ -56,13 +67,13 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
     } else {
       // Se é uma nova ficha, preencher com dados extraídos do PDF (se disponíveis)
       _dataHoraDeslocamentoController.text =
-          widget.dadosSolicitacao.dataHoraDeslocamento ?? '';
+          _dadosSolicitacaoEfetivos.dataHoraDeslocamento ?? '';
       _dataHoraInicioController.text =
-          widget.dadosSolicitacao.dataHoraInicio ?? '';
+          _dadosSolicitacaoEfetivos.dataHoraInicio ?? '';
       _dataHoraTerminoController.text =
-          widget.dadosSolicitacao.dataHoraTermino ?? '';
+          _dadosSolicitacaoEfetivos.dataHoraTermino ?? '';
       _pedidoDilacaoController.text =
-          widget.dadosSolicitacao.pedidoDilacao ?? '';
+          _dadosSolicitacaoEfetivos.pedidoDilacao ?? '';
     }
 
     // Debug: verificar dados recebidos
@@ -126,6 +137,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
       // Se está editando, preservar dados existentes (equipe, equipes policiais, etc.)
       final ficha =
           widget.fichaExistente?.copyWith(
+            dadosSolicitacao: _dadosSolicitacaoEfetivos,
             dataHoraDeslocamento:
                 _dataHoraDeslocamentoController.text.trim().isEmpty
                 ? null
@@ -145,7 +157,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
           FichaCompletaModel(
             id: _fichaId,
             tipoOcorrencia: widget.tipoOcorrencia,
-            dadosSolicitacao: widget.dadosSolicitacao,
+            dadosSolicitacao: _dadosSolicitacaoEfetivos,
             dataHoraDeslocamento:
                 _dataHoraDeslocamentoController.text.trim().isEmpty
                 ? null
@@ -207,10 +219,78 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
     }
   }
 
+  Future<void> _importarRequisicaoPdf() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null ||
+          result.files.isEmpty ||
+          result.files.single.bytes == null) {
+        return;
+      }
+      final bytes = result.files.single.bytes!;
+      setState(() => _salvando = true);
+      final dados = await _pdfService.extrairDadosSolicitacaoBytesAsync(bytes);
+      if (!mounted) return;
+      setState(() {
+        _solicitacaoImportada = dados;
+        // Preservar dados já preenchidos pelo usuário; preencher só o que estiver vazio
+        if (_dataHoraDeslocamentoController.text.trim().isEmpty) {
+          _dataHoraDeslocamentoController.text =
+              dados.dataHoraDeslocamento ?? '';
+        }
+        if (_dataHoraInicioController.text.trim().isEmpty) {
+          _dataHoraInicioController.text = dados.dataHoraInicio ?? '';
+        }
+        if (_dataHoraTerminoController.text.trim().isEmpty) {
+          _dataHoraTerminoController.text = dados.dataHoraTermino ?? '';
+        }
+        if (_pedidoDilacaoController.text.trim().isEmpty) {
+          _pedidoDilacaoController.text = dados.pedidoDilacao ?? '';
+        }
+        _salvando = false;
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Requisição importada do PDF. Revise os campos e salve se necessário.',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _salvando = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao importar PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Preencher Ficha'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Preencher Ficha'),
+        centerTitle: true,
+        actions: [
+          if (widget.fichaExistente != null)
+            IconButton(
+              onPressed: _salvando ? null : _importarRequisicaoPdf,
+              icon: const Icon(Icons.upload_file),
+              tooltip: 'Importar requisição (PDF)',
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -253,7 +333,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                     _buildTableRow([
                       _buildTableCell(
                         'RAI n.:',
-                        widget.dadosSolicitacao.raiNumero ?? '',
+                        _dadosSolicitacaoEfetivos.raiNumero ?? '',
                         isReadOnly: true,
                       ),
                       _buildTableCellEditavel(
@@ -269,7 +349,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                     _buildTableRow([
                       _buildTableCell(
                         'Nat. da Ocorrência:',
-                        widget.dadosSolicitacao.naturezaOcorrencia ??
+                        _dadosSolicitacaoEfetivos.naturezaOcorrencia ??
                             widget.tipoOcorrencia.label,
                         isReadOnly: true,
                       ),
@@ -285,7 +365,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                     _buildTableRow([
                       _buildTableCell(
                         'Data/Hora Comunicação:',
-                        widget.dadosSolicitacao.dataHoraComunicacao ?? '',
+                        _dadosSolicitacaoEfetivos.dataHoraComunicacao ?? '',
                         isReadOnly: true,
                       ),
                       _buildTableCellEditavel(
@@ -300,12 +380,12 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                     _buildTableRow([
                       _buildTableCell(
                         'Unidade Requisitante:',
-                        widget.dadosSolicitacao.unidadeOrigem ?? '',
+                        _dadosSolicitacaoEfetivos.unidadeOrigem ?? '',
                         isReadOnly: true,
                       ),
                       _buildTableCell(
                         'Número da Ocorrência:',
-                        widget.dadosSolicitacao.numeroOcorrencia ?? '',
+                        _dadosSolicitacaoEfetivos.numeroOcorrencia ?? '',
                         isReadOnly: true,
                       ),
                     ]),
@@ -323,10 +403,10 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            widget.dadosSolicitacao.unidadeAfeta?.isEmpty ??
+                            _dadosSolicitacaoEfetivos.unidadeAfeta?.isEmpty ??
                                     true
                                 ? '-'
-                                : widget.dadosSolicitacao.unidadeAfeta!,
+                                : _dadosSolicitacaoEfetivos.unidadeAfeta!,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),

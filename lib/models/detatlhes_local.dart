@@ -72,6 +72,9 @@ class LocalFurtoModel {
   // Foto(s) vista ampla do local (ex.: fachada) – primeira(s) do levantamento (Fotografia 01)
   final List<String>? fotosVistaAmplaPaths;
 
+  /// true = via pública / área aberta; false = imóvel (fechado); null = não definido
+  final bool? localEmViaPublica;
+
   LocalFurtoModel({
     this.classificacaoMediato,
     this.classificacaoImediato,
@@ -114,6 +117,7 @@ class LocalFurtoModel {
     this.sinaisArrombamentoNao,
     this.sinaisArrombamentoNaoSeAplica,
     this.fotosVistaAmplaPaths,
+    this.localEmViaPublica,
   });
 
   Map<String, dynamic> toJson() => {
@@ -158,6 +162,7 @@ class LocalFurtoModel {
         'sinaisArrombamentoNao': sinaisArrombamentoNao,
         'sinaisArrombamentoNaoSeAplica': sinaisArrombamentoNaoSeAplica,
         'fotosVistaAmplaPaths': fotosVistaAmplaPaths,
+        'localEmViaPublica': localEmViaPublica,
       };
 
   factory LocalFurtoModel.fromJson(Map<String, dynamic> json) =>
@@ -217,6 +222,7 @@ class LocalFurtoModel {
         fotosVistaAmplaPaths: (json['fotosVistaAmplaPaths'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList(),
+        localEmViaPublica: json['localEmViaPublica'] as bool?,
       );
 
   LocalFurtoModel copyWith({
@@ -261,6 +267,7 @@ class LocalFurtoModel {
     bool? sinaisArrombamentoNao,
     bool? sinaisArrombamentoNaoSeAplica,
     List<String>? fotosVistaAmplaPaths,
+    bool? localEmViaPublica,
   }) {
     return LocalFurtoModel(
       classificacaoMediato: classificacaoMediato ?? this.classificacaoMediato,
@@ -304,6 +311,7 @@ class LocalFurtoModel {
       sinaisArrombamentoNao: sinaisArrombamentoNao ?? this.sinaisArrombamentoNao,
       sinaisArrombamentoNaoSeAplica: sinaisArrombamentoNaoSeAplica ?? this.sinaisArrombamentoNaoSeAplica,
       fotosVistaAmplaPaths: fotosVistaAmplaPaths ?? this.fotosVistaAmplaPaths,
+      localEmViaPublica: localEmViaPublica ?? this.localEmViaPublica,
     );
   }
 }

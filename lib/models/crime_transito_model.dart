@@ -503,6 +503,9 @@ class CrimeTransitoEnvolvidoModel {
   final IntegridadeItemModel? calcados;
   final IntegridadeItemModel? pertences;
   final String? observacoes;
+  final List<String>? fotosVistaAmplaPosicaoEncontrado;
+  final List<String>? fotosVistaAmplaCenario;
+  final List<String>? fotosLesoesPertences;
 
   const CrimeTransitoEnvolvidoModel({
     required this.id,
@@ -521,6 +524,9 @@ class CrimeTransitoEnvolvidoModel {
     this.calcados,
     this.pertences,
     this.observacoes,
+    this.fotosVistaAmplaPosicaoEncontrado,
+    this.fotosVistaAmplaCenario,
+    this.fotosLesoesPertences,
   });
 
   Map<String, dynamic> toJson() => {
@@ -585,6 +591,18 @@ class CrimeTransitoEnvolvidoModel {
               )
             : null,
         observacoes: json['observacoes'] as String?,
+        fotosVistaAmplaPosicaoEncontrado:
+            (json['fotosVistaAmplaPosicaoEncontrado'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList(),
+        fotosVistaAmplaCenario:
+            (json['fotosVistaAmplaCenario'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList(),
+        fotosLesoesPertences:
+            (json['fotosLesoesPertences'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList(),
       );
 
   CrimeTransitoEnvolvidoModel copyWith({
@@ -604,6 +622,9 @@ class CrimeTransitoEnvolvidoModel {
     IntegridadeItemModel? calcados,
     IntegridadeItemModel? pertences,
     String? observacoes,
+    List<String>? fotosVistaAmplaPosicaoEncontrado,
+    List<String>? fotosVistaAmplaCenario,
+    List<String>? fotosLesoesPertences,
   }) {
     return CrimeTransitoEnvolvidoModel(
       id: id ?? this.id,
@@ -623,6 +644,12 @@ class CrimeTransitoEnvolvidoModel {
       calcados: calcados ?? this.calcados,
       pertences: pertences ?? this.pertences,
       observacoes: observacoes ?? this.observacoes,
+      fotosVistaAmplaPosicaoEncontrado:
+          fotosVistaAmplaPosicaoEncontrado ?? this.fotosVistaAmplaPosicaoEncontrado,
+      fotosVistaAmplaCenario:
+          fotosVistaAmplaCenario ?? this.fotosVistaAmplaCenario,
+      fotosLesoesPertences:
+          fotosLesoesPertences ?? this.fotosLesoesPertences,
     );
   }
 }
@@ -639,6 +666,8 @@ class CrimeTransitoNaturezaModel {
   final String? laboratorioDestino;
   final String? examesDinamica;
   final String? croquiObservacoes;
+  final String? observacoes;
+  final String? complementoDinamicaFato;
 
   const CrimeTransitoNaturezaModel({
     this.tipo,
@@ -651,6 +680,8 @@ class CrimeTransitoNaturezaModel {
     this.laboratorioDestino,
     this.examesDinamica,
     this.croquiObservacoes,
+    this.observacoes,
+    this.complementoDinamicaFato,
   });
 
   Map<String, dynamic> toJson() => {
@@ -665,6 +696,8 @@ class CrimeTransitoNaturezaModel {
         'laboratorioDestino': laboratorioDestino,
         'examesDinamica': examesDinamica,
         'croquiObservacoes': croquiObservacoes,
+        'observacoes': observacoes,
+        'complementoDinamicaFato': complementoDinamicaFato,
       };
 
   factory CrimeTransitoNaturezaModel.fromJson(Map<String, dynamic> json) =>
@@ -686,6 +719,9 @@ class CrimeTransitoNaturezaModel {
         laboratorioDestino: json['laboratorioDestino'] as String?,
         examesDinamica: json['examesDinamica'] as String?,
         croquiObservacoes: json['croquiObservacoes'] as String?,
+        observacoes: json['observacoes'] as String?,
+        complementoDinamicaFato:
+            json['complementoDinamicaFato'] as String?,
       );
 
   CrimeTransitoNaturezaModel copyWith({
@@ -699,6 +735,8 @@ class CrimeTransitoNaturezaModel {
     String? laboratorioDestino,
     String? examesDinamica,
     String? croquiObservacoes,
+    String? observacoes,
+    String? complementoDinamicaFato,
   }) {
     return CrimeTransitoNaturezaModel(
       tipo: tipo ?? this.tipo,
@@ -713,6 +751,9 @@ class CrimeTransitoNaturezaModel {
       laboratorioDestino: laboratorioDestino ?? this.laboratorioDestino,
       examesDinamica: examesDinamica ?? this.examesDinamica,
       croquiObservacoes: croquiObservacoes ?? this.croquiObservacoes,
+      observacoes: observacoes ?? this.observacoes,
+      complementoDinamicaFato:
+          complementoDinamicaFato ?? this.complementoDinamicaFato,
     );
   }
 }

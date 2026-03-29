@@ -182,27 +182,29 @@ class _ListaVeiculosScreenState extends State<ListaVeiculosScreen> {
     if (!mounted) return;
 
     if (widget.ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
-      final resultado = await Navigator.of(context).push(
+      final resultado = await Navigator.of(context).push<bool?>(
         MaterialPageRoute(
           builder: (context) => ListaCadaveresScreen(ficha: _ficha),
         ),
       );
       if (resultado != null) {
         await _carregarDados();
-        Navigator.of(context).pop(_ficha);
+        if (!mounted) return;
+        Navigator.of(context).pop(true);
       }
     } else if (widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
-      final resultado = await Navigator.of(context).push(
+      final resultado = await Navigator.of(context).push<bool?>(
         MaterialPageRoute(
           builder: (context) => ListaEnvolvidosTransitoScreen(ficha: _ficha),
         ),
       );
       if (resultado != null) {
         await _carregarDados();
-        Navigator.of(context).pop(_ficha);
+        if (!mounted) return;
+        Navigator.of(context).pop(true);
       }
     } else {
-      Navigator.of(context).pop(_ficha);
+      Navigator.of(context).pop(true);
     }
   }
 

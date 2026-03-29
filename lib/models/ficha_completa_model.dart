@@ -1,4 +1,6 @@
+import 'atropelamento_calculo_model.dart';
 import 'cadaver_model.dart';
+import 'crime_transito_levantamento_model.dart';
 import 'crime_transito_model.dart';
 import 'dano_model.dart';
 import 'detatlhes_local.dart';
@@ -63,8 +65,12 @@ class FichaCompletaModel {
   final List<VeiculoModel>? veiculos;
   // Dados específicos para Crime de Trânsito
   final CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes;
+  final CrimeTransitoLevantamentoModel? crimeTransitoLevantamento;
   final List<CrimeTransitoEnvolvidoModel>? envolvidosTransito;
   final CrimeTransitoNaturezaModel? crimeTransitoNatureza;
+
+  /// Bloco Atropelamento: vestígios e parâmetros para cálculo de velocidade (Searle)
+  final AtropelamentoCalculoModel? atropelamentoCalculo;
 
   final DateTime dataCriacao;
   final DateTime? dataUltimaAtualizacao;
@@ -92,8 +98,10 @@ class FichaCompletaModel {
     this.cadaveres,
     this.veiculos,
     this.crimeTransitoCondicoes,
+    this.crimeTransitoLevantamento,
     this.envolvidosTransito,
     this.crimeTransitoNatureza,
+    this.atropelamentoCalculo,
     required this.dataCriacao,
     this.dataUltimaAtualizacao,
   });
@@ -121,9 +129,11 @@ class FichaCompletaModel {
         'cadaveres': cadaveres?.map((c) => c.toJson()).toList(),
         'veiculos': veiculos?.map((v) => v.toJson()).toList(),
         'crimeTransitoCondicoes': crimeTransitoCondicoes?.toJson(),
+        'crimeTransitoLevantamento': crimeTransitoLevantamento?.toJson(),
         'envolvidosTransito':
             envolvidosTransito?.map((e) => e.toJson()).toList(),
         'crimeTransitoNatureza': crimeTransitoNatureza?.toJson(),
+        'atropelamentoCalculo': atropelamentoCalculo?.toJson(),
         'dataCriacao': dataCriacao.toIso8601String(),
         'dataUltimaAtualizacao': dataUltimaAtualizacao?.toIso8601String(),
       };
@@ -202,6 +212,11 @@ class FichaCompletaModel {
               json['crimeTransitoCondicoes'] as Map<String, dynamic>,
             )
           : null,
+      crimeTransitoLevantamento: json['crimeTransitoLevantamento'] != null
+          ? CrimeTransitoLevantamentoModel.fromJson(
+              json['crimeTransitoLevantamento'] as Map<String, dynamic>,
+            )
+          : null,
       envolvidosTransito: json['envolvidosTransito'] != null
           ? (json['envolvidosTransito'] as List<dynamic>)
               .map(
@@ -214,6 +229,11 @@ class FichaCompletaModel {
       crimeTransitoNatureza: json['crimeTransitoNatureza'] != null
           ? CrimeTransitoNaturezaModel.fromJson(
               json['crimeTransitoNatureza'] as Map<String, dynamic>,
+            )
+          : null,
+      atropelamentoCalculo: json['atropelamentoCalculo'] != null
+          ? AtropelamentoCalculoModel.fromJson(
+              json['atropelamentoCalculo'] as Map<String, dynamic>,
             )
           : null,
       dataCriacao: DateTime.parse(json['dataCriacao'] as String),
@@ -246,8 +266,10 @@ class FichaCompletaModel {
     List<CadaverModel>? cadaveres,
     List<VeiculoModel>? veiculos,
     CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes,
+    CrimeTransitoLevantamentoModel? crimeTransitoLevantamento,
     List<CrimeTransitoEnvolvidoModel>? envolvidosTransito,
     CrimeTransitoNaturezaModel? crimeTransitoNatureza,
+    AtropelamentoCalculoModel? atropelamentoCalculo,
     DateTime? dataCriacao,
     DateTime? dataUltimaAtualizacao,
   }) {
@@ -281,9 +303,13 @@ class FichaCompletaModel {
       veiculos: veiculos ?? this.veiculos,
       crimeTransitoCondicoes:
           crimeTransitoCondicoes ?? this.crimeTransitoCondicoes,
+      crimeTransitoLevantamento:
+          crimeTransitoLevantamento ?? this.crimeTransitoLevantamento,
       envolvidosTransito: envolvidosTransito ?? this.envolvidosTransito,
       crimeTransitoNatureza:
           crimeTransitoNatureza ?? this.crimeTransitoNatureza,
+      atropelamentoCalculo:
+          atropelamentoCalculo ?? this.atropelamentoCalculo,
       dataCriacao: dataCriacao ?? this.dataCriacao,
       dataUltimaAtualizacao:
           dataUltimaAtualizacao ?? this.dataUltimaAtualizacao,

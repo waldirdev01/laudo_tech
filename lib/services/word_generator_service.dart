@@ -650,17 +650,16 @@ $conteudo
     ]);
 
     // Usar APENAS as coordenadas GPS obtidas na tela LOCAL (não as do PDF)
-    // As coordenadas do PDF (coordenadasS/coordenadasW) são ignoradas intencionalmente
-    // Formatar no mesmo formato DMS que aparece no aplicativo
+    // Formato único: graus decimais com 6 casas (igual ao levantamento da via)
     if (local?.latitude != null && local?.longitude != null) {
       final coordS = local!.coordenadasSFormatada ?? '';
       final coordW = local.coordenadasWFormatada ?? '';
       if (coordS.isNotEmpty && coordW.isNotEmpty) {
-        linhas.add(['Coordenadas GPS', '$coordS\n$coordW']);
+        linhas.add(['Coordenadas GPS', 'Latitude: $coordS\nLongitude: $coordW']);
       } else {
         linhas.add([
           'Coordenadas GPS',
-          'Lat: ${local.latitude}, Long: ${local.longitude}',
+          'Latitude: ${local.latitude}, Longitude: ${local.longitude}',
         ]);
       }
     } else {
@@ -1344,6 +1343,7 @@ $conteudo
   String _labelTacografo(TacografoStatus? status) => switch (status) {
         TacografoStatus.ausente => 'Ausente',
         TacografoStatus.recolhido => 'Recolhido',
+        TacografoStatus.naoSeAplica => 'Não se aplica',
         null => '',
       };
 
@@ -1756,7 +1756,7 @@ $conteudo
       velocidades.add('Por sinalização expressa');
     }
     if (cond.velocidadePorCTB == true) {
-      velocidades.add('Conforme CTB/1997');
+      velocidades.add('Conforme Art. 61, §1º, CTB/1997');
     }
     if (cond.velocidadeMaxima != null && cond.velocidadeMaxima!.isNotEmpty) {
       velocidades.add('Velocidade máxima: ${cond.velocidadeMaxima}');
@@ -1887,8 +1887,12 @@ $conteudo
         linhas.add(['Posição', texto]);
       }
 
-      final vestes = _textoIntegridade('Vestes', envolvido.vestes);
-      if (vestes.isNotEmpty) linhas.add(['Vestes', vestes]);
+      // Vestes: apenas descrição (sem íntegro/não íntegro)
+      if (envolvido.vestes != null &&
+          envolvido.vestes!.observacoes != null &&
+          envolvido.vestes!.observacoes!.trim().isNotEmpty) {
+        linhas.add(['Vestes', envolvido.vestes!.observacoes!.trim()]);
+      }
       final calcados = _textoIntegridade('Calçados', envolvido.calcados);
       if (calcados.isNotEmpty) linhas.add(['Calçados', calcados]);
       final pertences = _textoIntegridade('Pertences', envolvido.pertences);
@@ -1959,6 +1963,14 @@ $conteudo
     if (natureza.croquiObservacoes != null &&
         natureza.croquiObservacoes!.isNotEmpty) {
       linhas.add(['Croqui', natureza.croquiObservacoes!]);
+    }
+    if (natureza.observacoes != null &&
+        natureza.observacoes!.trim().isNotEmpty) {
+      linhas.add(['Observações', natureza.observacoes!.trim()]);
+    }
+    if (natureza.complementoDinamicaFato != null &&
+        natureza.complementoDinamicaFato!.trim().isNotEmpty) {
+      linhas.add(['Complemento / Dinâmica do fato', natureza.complementoDinamicaFato!.trim()]);
     }
 
     if (linhas.isEmpty) return '';

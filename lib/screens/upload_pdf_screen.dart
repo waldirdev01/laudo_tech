@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -38,9 +40,35 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.single;
+
+        Uint8List? bytes = file.bytes;
+
+        // iOS: se bytes não vieram com withData, ler do path manualmente
+        if (bytes == null && file.path != null) {
+          try {
+            bytes = await File(file.path!).readAsBytes();
+          } catch (e) {
+            debugPrint('[PDF] Erro ao ler arquivo do path: $e');
+          }
+        }
+
+        if (bytes == null && file.path == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Não foi possível acessar o arquivo. Tente novamente.',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
         setState(() {
-          _caminhoPdf = file.path; // pode ser null no Android (content URI)
-          _pdfBytes = file.bytes;
+          _caminhoPdf = file.path;
+          _pdfBytes = bytes;
           _nomePdf = file.name;
           _dadosExtraidos = null;
           _erro = null;
@@ -173,6 +201,23 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.all(16),
               ),
+            ),
+            const SizedBox(height: 24),
+            TextButton.icon(
+              onPressed: _processando
+                  ? null
+                  : () {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (context) => PreenchimentoFichaScreen(
+                            tipoOcorrencia: widget.tipoOcorrencia,
+                            dadosSolicitacao: SolicitacaoModel(),
+                          ),
+                        ),
+                      );
+                    },
+              icon: const Icon(Icons.edit_note, size: 20),
+              label: const Text('Não tenho a requisição – preencher tudo manualmente'),
             ),
             if (_pdfBytes != null || _caminhoPdf != null) ...[
               const SizedBox(height: 12),

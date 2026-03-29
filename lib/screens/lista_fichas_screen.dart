@@ -16,9 +16,11 @@ import '../services/ficha_service.dart';
 import '../services/laudo_generator_service.dart';
 import '../services/perito_service.dart';
 import '../services/word_generator_service.dart';
+import 'dinamica_fato_transito_screen.dart';
+import 'natureza_ocorrencia_transito_screen.dart';
 import 'condicoes_observacoes_screen.dart';
 import 'crime_transito_condicoes_screen.dart';
-import 'crime_transito_natureza_screen.dart';
+import 'crime_transito_levantamento_screen.dart';
 import 'dano_screen.dart';
 import 'detalhes_local_screen.dart';
 import 'equipes_policiais_screen.dart';
@@ -176,26 +178,40 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                   onTap: () => Navigator.of(context).pop('condicoes_transito'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('10. Levantamento - Via'),
+                  onTap: () =>
+                      Navigator.of(context).pop('levantamento_transito'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.directions_car),
-                  title: const Text('10. Veículos'),
+                  title: const Text('11. Veículos'),
                   onTap: () => Navigator.of(context).pop('veiculos'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.groups),
-                  title: const Text('11. Envolvidos'),
+                  title: const Text('12. Envolvidos'),
                   onTap: () => Navigator.of(context).pop('envolvidos_transito'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.speed),
+                  title: const Text('13. Natureza da ocorrência / Cálculo de velocidade'),
+                  onTap: () =>
+                      Navigator.of(context).pop('natureza_ocorrencia'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.assignment),
-                  title: const Text('12. Natureza da Ocorrência'),
-                  onTap: () => Navigator.of(context).pop('natureza_transito'),
+                  title: const Text('14. Dinâmica do Fato'),
+                  onTap: () =>
+                      Navigator.of(context).pop('dinamica_fato'),
                 ),
               ],
-              ListTile(
-                leading: const Icon(Icons.psychology),
-                title: const Text('12. Modus Operandi'),
-                onTap: () => Navigator.of(context).pop('modus_operandi'),
-              ),
+              if (ficha.tipoOcorrencia != TipoOcorrencia.crimeTransito)
+                ListTile(
+                  leading: const Icon(Icons.psychology),
+                  title: const Text('Modus Operandi'),
+                  onTap: () => Navigator.of(context).pop('modus_operandi'),
+                ),
               if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal)
                 ListTile(
                   leading: const Icon(Icons.warning),
@@ -923,6 +939,11 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           telaDestino = CrimeTransitoCondicoesScreen(ficha: ficha);
         }
         break;
+      case 'levantamento_transito':
+        if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+          telaDestino = CrimeTransitoLevantamentoScreen(ficha: ficha);
+        }
+        break;
       case 'local_furto':
         if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
             ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
@@ -946,7 +967,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }
         break;
       case 'modus_operandi':
-        telaDestino = ModusOperandiScreen(ficha: ficha);
+        if (ficha.tipoOcorrencia != TipoOcorrencia.crimeTransito) {
+          telaDestino = ModusOperandiScreen(ficha: ficha);
+        }
         break;
       case 'dano':
         if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal) {
@@ -958,9 +981,14 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           telaDestino = ListaEnvolvidosTransitoScreen(ficha: ficha);
         }
         break;
-      case 'natureza_transito':
+      case 'natureza_ocorrencia':
         if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
-          telaDestino = CrimeTransitoNaturezaScreen(ficha: ficha);
+          telaDestino = NaturezaOcorrenciaTransitoScreen(ficha: ficha);
+        }
+        break;
+      case 'dinamica_fato':
+        if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+          telaDestino = DinamicaFatoTransitoScreen(ficha: ficha);
         }
         break;
     }

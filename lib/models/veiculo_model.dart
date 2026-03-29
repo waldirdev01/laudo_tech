@@ -101,7 +101,7 @@ enum AirbagStatus { acionado, naoAcionado, ausente }
 
 enum RetrovisorStatus { presente, ausente }
 
-enum TacografoStatus { ausente, recolhido }
+enum TacografoStatus { ausente, recolhido, naoSeAplica }
 
 /// Modelo para veículo encontrado na cena
 class VeiculoModel {

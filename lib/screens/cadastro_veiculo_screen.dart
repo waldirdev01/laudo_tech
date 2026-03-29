@@ -59,7 +59,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   final _posicaoLivreCtrl = TextEditingController();
   final _condicaoGeralCtrl = TextEditingController();
   final _danosObservacoesCtrl = TextEditingController();
-  final _frenagemCtrl = TextEditingController();
   final _bicicletaCorCtrl = TextEditingController();
   final _bicicletaModeloCtrl = TextEditingController();
   final _bicicletaSinalizacaoCtrl = TextEditingController();
@@ -147,7 +146,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _airbagStatus = v.airbag;
     _retrovisorStatus = v.retrovisor;
     _tacografoStatus = v.tacografoStatus;
-    _frenagemCtrl.text = v.frenagemMetros ?? '';
     _bicicletaCorCtrl.text = v.bicicletaCor ?? '';
     _bicicletaModeloCtrl.text = v.bicicletaMarcaModelo ?? '';
     _bicicletaSinalizacaoCtrl.text = v.bicicletaElementosSinalizacao ?? '';
@@ -184,7 +182,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _posicaoLivreCtrl.dispose();
     _condicaoGeralCtrl.dispose();
     _danosObservacoesCtrl.dispose();
-    _frenagemCtrl.dispose();
     _bicicletaCorCtrl.dispose();
     _bicicletaModeloCtrl.dispose();
     _bicicletaSinalizacaoCtrl.dispose();
@@ -211,8 +208,9 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           : _anoModeloCtrl.text.trim(),
       cor: _corCtrl.text.trim().isEmpty ? null : _corCtrl.text.trim(),
       placa: _placaCtrl.text.trim().isEmpty ? null : _placaCtrl.text.trim(),
-      chassiAparente:
-          _chassiCtrl.text.trim().isEmpty ? null : _chassiCtrl.text.trim(),
+      chassiAparente: _isCrimeTransito
+          ? null
+          : (_chassiCtrl.text.trim().isEmpty ? null : _chassiCtrl.text.trim()),
       localizacaoAmbiente: _localizacaoAmbienteCtrl.text.trim().isEmpty
           ? null
           : _localizacaoAmbienteCtrl.text.trim(),
@@ -267,8 +265,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       airbag: _airbagStatus,
       retrovisor: _retrovisorStatus,
       tacografoStatus: _tacografoStatus,
-      frenagemMetros:
-          _frenagemCtrl.text.trim().isEmpty ? null : _frenagemCtrl.text.trim(),
       bicicletaCor: _bicicletaCorCtrl.text.trim().isEmpty
           ? null
           : _bicicletaCorCtrl.text.trim(),
@@ -378,12 +374,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: _chassiCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Chassi aparente',
-          ),
-        ),
         DropdownButtonFormField<IntensidadeDano>(
           initialValue: _intensidadeDano,
           decoration: const InputDecoration(
@@ -466,11 +456,13 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           valor: _faroisStatus,
           onChanged: (valor) => setState(() => _faroisStatus = valor),
         ),
+        const SizedBox(height: 16),
         _buildStatusDropdown(
           label: 'Cintos de segurança',
           valor: _cintosStatus,
           onChanged: (valor) => setState(() => _cintosStatus = valor),
         ),
+        const SizedBox(height: 16),
         DropdownButtonFormField<EstadoPneumaticos>(
           initialValue: _estadoPneus,
           decoration: const InputDecoration(labelText: 'Pneumáticos'),
@@ -490,18 +482,22 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
               .toList(),
           onChanged: (valor) => setState(() => _estadoPneus = valor),
         ),
+        const SizedBox(height: 16),
         _buildStatusDropdown(
           label: 'Freios',
           valor: _freiosStatus,
           onChanged: (valor) => setState(() => _freiosStatus = valor),
         ),
+        const SizedBox(height: 16),
         _buildStatusDropdown(
           label: 'Direção',
           valor: _direcaoStatus,
           onChanged: (valor) => setState(() => _direcaoStatus = valor),
         ),
+        const SizedBox(height: 16),
         DropdownButtonFormField<AirbagStatus>(
           initialValue: _airbagStatus,
+          isExpanded: true,
           decoration: const InputDecoration(labelText: 'Airbag'),
           items: AirbagStatus.values
               .map(
@@ -519,8 +515,10 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
               .toList(),
           onChanged: (valor) => setState(() => _airbagStatus = valor),
         ),
+        const SizedBox(height: 16),
         DropdownButtonFormField<RetrovisorStatus>(
           initialValue: _retrovisorStatus,
+          isExpanded: true,
           decoration: const InputDecoration(labelText: 'Retrovisor'),
           items: RetrovisorStatus.values
               .map(
@@ -536,27 +534,29 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
               .toList(),
           onChanged: (valor) => setState(() => _retrovisorStatus = valor),
         ),
+        const SizedBox(height: 16),
         DropdownButtonFormField<TacografoStatus>(
           initialValue: _tacografoStatus,
-          decoration: const InputDecoration(labelText: 'Disco de tacógrafo'),
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Disco de tacógrafo',
+            hintText: 'Não se aplica se o veículo não possui',
+          ),
           items: TacografoStatus.values
               .map(
                 (status) => DropdownMenuItem(
                   value: status,
                   child: Text(
-                    status == TacografoStatus.ausente ? 'Ausente' : 'Recolhido',
+                    switch (status) {
+                      TacografoStatus.ausente => 'Ausente',
+                      TacografoStatus.recolhido => 'Recolhido',
+                      TacografoStatus.naoSeAplica => 'Não se aplica',
+                    },
                   ),
                 ),
               )
               .toList(),
           onChanged: (valor) => setState(() => _tacografoStatus = valor),
-        ),
-        TextField(
-          controller: _frenagemCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Frenagem (m)',
-          ),
-          keyboardType: TextInputType.number,
         ),
         const SizedBox(height: 16),
         Text(
@@ -1804,41 +1804,56 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
 
             _buildCrimeTransitoSection(),
 
-            // Relacionamento com o caso
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'RELACIONAMENTO COM O CASO',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
+            // Relacionamento com o caso (oculto em acidente de trânsito)
+            if (widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: TextFormField(
+                    controller: _observacoesCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Observações',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                  ),
+                ),
+              )
+            else
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'RELACIONAMENTO COM O CASO',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    _buildDropdown<RelacaoVeiculo>(
-                      label: 'Relação',
-                      value: _relacao,
-                      items: RelacaoVeiculo.values,
-                      onChanged: (v) => setState(() => _relacao = v),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _observacoesCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Observações',
-                        border: OutlineInputBorder(),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      _buildDropdown<RelacaoVeiculo>(
+                        label: 'Relação',
+                        value: _relacao,
+                        items: RelacaoVeiculo.values,
+                        onChanged: (v) => setState(() => _relacao = v),
                       ),
-                      maxLines: 3,
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _observacoesCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Observações',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 3,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
             const SizedBox(height: 16),
           ],

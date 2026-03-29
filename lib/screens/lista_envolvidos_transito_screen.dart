@@ -4,7 +4,7 @@ import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
 import 'cadastro_envolvido_transito_screen.dart';
-import 'crime_transito_natureza_screen.dart';
+import 'natureza_ocorrencia_transito_screen.dart';
 
 class ListaEnvolvidosTransitoScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -48,7 +48,10 @@ class _ListaEnvolvidosTransitoScreenState
     final resultado =
         await Navigator.of(context).push<CrimeTransitoEnvolvidoModel>(
       MaterialPageRoute(
-        builder: (context) => CadastroEnvolvidoTransitoScreen(envolvido: novo),
+        builder: (context) => CadastroEnvolvidoTransitoScreen(
+          envolvido: novo,
+          ficha: _ficha,
+        ),
       ),
     );
 
@@ -64,8 +67,10 @@ class _ListaEnvolvidosTransitoScreenState
     final resultado =
         await Navigator.of(context).push<CrimeTransitoEnvolvidoModel>(
       MaterialPageRoute(
-        builder: (context) =>
-            CadastroEnvolvidoTransitoScreen(envolvido: envolvido),
+        builder: (context) => CadastroEnvolvidoTransitoScreen(
+          envolvido: envolvido,
+          ficha: _ficha,
+        ),
       ),
     );
 
@@ -117,12 +122,12 @@ class _ListaEnvolvidosTransitoScreenState
     _ficha = fichaAtualizada;
   }
 
-  Future<void> _avancarParaNatureza() async {
+  Future<void> _avancarParaCalculoVelocidade() async {
     await _salvar();
     if (!mounted) return;
     final resultado = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => CrimeTransitoNaturezaScreen(ficha: _ficha),
+        builder: (context) => NaturezaOcorrenciaTransitoScreen(ficha: _ficha),
       ),
     );
     if (resultado == true && mounted) {
@@ -139,8 +144,8 @@ class _ListaEnvolvidosTransitoScreenState
         actions: [
           IconButton(
             icon: const Icon(Icons.arrow_forward),
-            tooltip: 'Avançar para Natureza',
-            onPressed: _envolvidos.isEmpty ? null : _avancarParaNatureza,
+            tooltip: 'Avançar para Natureza da ocorrência / Cálculo de velocidade',
+            onPressed: _envolvidos.isEmpty ? null : _avancarParaCalculoVelocidade,
           ),
         ],
       ),

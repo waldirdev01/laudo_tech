@@ -4,6 +4,7 @@ import '../models/ficha_base_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
+import 'crime_transito_condicoes_screen.dart';
 import 'detalhes_local_screen.dart';
 
 class CondicoesObservacoesScreen extends StatefulWidget {
@@ -177,7 +178,7 @@ class _CondicoesObservacoesScreenState
           ),
         );
 
-        // Navegar para tela de Local Furto (tela 9) para FURTO/DANO e CVLI
+        // Navegar para a próxima tela conforme o tipo de ocorrência
         if (widget.ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
             widget.ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
           if (!mounted) return;
@@ -186,13 +187,22 @@ class _CondicoesObservacoesScreenState
               builder: (context) => LocalFurtoScreen(ficha: fichaAtualizada),
             ),
           );
-
-          // Se voltou do local furto, retornar true para atualizar lista
+          if (mounted && resultado == true) {
+            Navigator.of(context).pop(true);
+          }
+        } else if (widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+          // Crime de Trânsito: ir para Condições da Via (tela 9)
+          if (!mounted) return;
+          final resultado = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  CrimeTransitoCondicoesScreen(ficha: fichaAtualizada),
+            ),
+          );
           if (mounted && resultado == true) {
             Navigator.of(context).pop(true);
           }
         } else {
-          // Para outros tipos de ocorrência, voltar
           if (mounted) {
             Navigator.of(context).pop(true);
           }

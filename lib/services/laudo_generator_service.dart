@@ -17,6 +17,7 @@ import '../models/ficha_completa_model.dart';
 import '../models/membro_equipe_model.dart';
 import '../models/perito_model.dart';
 import '../models/pessoa_envolvida_model.dart';
+import '../models/tipo_equipe_policial.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../models/veiculo_model.dart';
 import '../models/vestigio_local_model.dart';
@@ -634,7 +635,7 @@ class LaudoGeneratorService {
     final membrosEquipe = await _formatarMembrosEquipe(ficha, equipeService);
     buffer.writeln(
       _gerarParagrafoHistorico(
-        'Após solicitação via Sistema ODIN, o(a) Perito(a) Criminal supracitado(a) procedeu ao local às $horaInicio, na data preambular, acompanhado do(s) $membrosEquipe e realizou o levantamento pericial requisitado.',
+        'Em atendimento à solicitação pelo Sistema ODIN, o(a) Perito(a) Criminal acima citado(a) compareceu ao local às $horaInicio na data acima mencionada, acompanhado do(s) $membrosEquipe, realizando o levantamento pericial requerido.',
       ),
     );
 
@@ -648,7 +649,7 @@ class LaudoGeneratorService {
       final equipesTexto = _formatarEquipesPoliciais(ficha.equipesPoliciais!);
       buffer.writeln(
         _gerarParagrafoHistorico(
-          'No local, a equipe de Polícia Científica foi recebida pelas equipes policiais: $equipesTexto e segundo apurados pelos policiais $historico',
+          'No local, a equipe de Polícia Científica foi recebida pelas equipes policiais $equipesTexto e, segundo apurados pelos policiais, $historico',
         ),
       );
     } else {
@@ -897,14 +898,17 @@ class LaudoGeneratorService {
       return 'equipe de perícia';
     }
 
+    // 1 membro: só os dados do membro
     if (membros.length == 1) {
       return membros[0];
-    } else if (membros.length == 2) {
-      return '${membros[0]} e ${membros[1]}';
-    } else {
-      final ultimo = membros.removeLast();
-      return '${membros.join(', ')}, e $ultimo';
     }
+    // 2 membros: "A e B"
+    if (membros.length == 2) {
+      return '${membros[0]} e ${membros[1]}';
+    }
+    // 3 ou mais: vírgula entre os anteriores, "e" antes do último (ex.: "A, B e C")
+    final ultimo = membros.removeLast();
+    return '${membros.join(', ')} e $ultimo';
   }
 
   String _obterVitimaComunicante(List<PessoaEnvolvidaModel>? pessoas) {
@@ -938,21 +942,32 @@ class LaudoGeneratorService {
     return 'XXXXXXXXXXXXXX';
   }
 
-  /// Inclui matrícula no texto do membro de forma fluida (ex.: "João Silva, matrícula 12345").
-  String _textoMembroComMatricula(String nomeOuDescricao, String? matricula) {
+  /// Inclui matrícula ou RG no texto do membro (PM e Bombeiros: RG; demais: matrícula).
+  String _textoMembroComMatricula(
+    String nomeOuDescricao,
+    String? matricula, {
+    bool usarRg = false,
+  }) {
     if (matricula == null || matricula.trim().isEmpty) {
       return nomeOuDescricao;
     }
-    return '$nomeOuDescricao, matrícula ${matricula.trim()}';
+    final id = matricula.trim();
+    if (usarRg) {
+      return '$nomeOuDescricao, RG $id';
+    }
+    return '$nomeOuDescricao, matrícula $id';
   }
 
   String _formatarNomeCorreto(String nome) {
     // Converte de CAIXA ALTA para formato correto (primeira letra maiúscula, resto minúsculo)
     // Trata nomes compostos corretamente (ex: "MARIA DA SILVA" -> "Maria da Silva")
+    const preposicoes = {'da', 'de', 'do', 'dos', 'das', 'e'};
     final palavras = nome.toLowerCase().split(' ');
-    final palavrasFormatadas = palavras.map((palavra) {
+    final palavrasFormatadas = palavras.asMap().entries.map((entry) {
+      final index = entry.key;
+      final palavra = entry.value;
       if (palavra.isEmpty) return palavra;
-      // Primeira letra maiúscula
+      if (index > 0 && preposicoes.contains(palavra)) return palavra;
       return palavra[0].toUpperCase() + palavra.substring(1);
     }).toList();
 
@@ -964,6 +979,7 @@ class LaudoGeneratorService {
 
     for (final equipe in equipes) {
       final tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
+      final usarRg = equipe.tipo == TipoEquipePolicial.policiaMilitar;
       final membros = equipe.membros
           .map((m) {
             // Patente na frente do nome (ex.: Cabo Xavier, Soldado Figueiredo)
@@ -971,11 +987,15 @@ class LaudoGeneratorService {
                 m.postoGraduacao != null && m.postoGraduacao!.trim().isNotEmpty
                 ? '${m.postoGraduacao} ${m.nome}'
                 : m.nome;
-            return _textoMembroComMatricula(textoMembro, m.matricula);
+            return _textoMembroComMatricula(
+              textoMembro,
+              m.matricula,
+              usarRg: usarRg,
+            );
           })
           .join(', ');
 
-      partes.add('$tipoNome: $membros');
+      partes.add(membros.isNotEmpty ? '$tipoNome ($membros)' : tipoNome);
     }
 
     if (partes.isEmpty) return '';
@@ -999,7 +1019,9 @@ class LaudoGeneratorService {
             }
             partesMembro.add(m.nome);
             if (m.matricula != null && m.matricula!.trim().isNotEmpty) {
-              partesMembro.add('matrícula ${m.matricula!.trim()}');
+              final id = m.matricula!.trim();
+              final labelRg = equipe.tipo == TipoEquipeResgate.cbm;
+              partesMembro.add(labelRg ? 'RG $id' : 'matrícula $id');
             }
             if (m.crm != null && m.crm!.trim().isNotEmpty) {
               partesMembro.add('CRM ${m.crm}');
@@ -1011,7 +1033,7 @@ class LaudoGeneratorService {
       String textoEquipe;
       if (equipe.naoEstavaNoLocal) {
         textoEquipe =
-            '$tipoNome (não estava no local, mas esteve presente): $membros';
+            '$tipoNome: $membros. Nota: A equipe esteve presente durante o atendimento à ocorrência, porém não se encontrava no local ao momento da perícia.';
       } else {
         textoEquipe = '$tipoNome: $membros';
       }
@@ -1128,11 +1150,11 @@ class LaudoGeneratorService {
     enderecoCompleto += enderecoCompleto.endsWith('.') ? '' : '.';
     buffer.writeln(_gerarParagrafoHistorico(enderecoCompleto));
 
-    // Coordenadas geográficas: (rótulo + valor em linha separada)
+    // Coordenadas geográficas: formato único (graus decimais, 6 casas)
     final coordS = ficha.local?.coordenadasSFormatada;
     final coordW = ficha.local?.coordenadasWFormatada;
     final textoCoordenadas = (coordS != null && coordW != null)
-        ? 'Coordenadas geográficas: $coordS $coordW.'
+        ? 'Coordenadas geográficas: Latitude $coordS, Longitude $coordW.'
         : 'Coordenadas geográficas: Não obtidas.';
     buffer.writeln(_gerarParagrafoHistorico(textoCoordenadas));
 
@@ -1754,6 +1776,16 @@ class LaudoGeneratorService {
           final textoVestigio = await _gerarTextoVestigioLocal(vestigio, i);
           buffer.writeln(_gerarParagrafoLista(textoVestigio));
         }
+        final temNaoColetados = lf.vestigiosRelacionado!.any(
+          (v) => v.tipoAcao != TipoAcaoVestigio.coletado,
+        );
+        if (temNaoColetados) {
+          buffer.writeln(
+            _gerarParagrafoHistorico(
+              'Os vestígios não coletados foram devidamente documentados por registro fotográfico.',
+            ),
+          );
+        }
       } else if (lf.semVestigiosRelacionado == true) {
         buffer.writeln(
           _gerarParagrafoHistorico(
@@ -1788,7 +1820,7 @@ class LaudoGeneratorService {
           : '$descricao ($citacaoFotos)';
     }
     if (descricao.isNotEmpty) {
-      partes.add(descricao);
+      partes.add('Presença de $descricao');
     }
 
     // Coordenadas (se houver)
@@ -1807,9 +1839,8 @@ class LaudoGeneratorService {
       partes.add('Altura: ${vestigio.alturaRelacaoPiso}');
     }
 
-    // Informações de Cadeia de Custódia
+    // Informações de Cadeia de Custódia (apenas se coletado)
     if (vestigio.tipoAcao == TipoAcaoVestigio.coletado) {
-      // Coletado
       final partesColeta = <String>[];
       partesColeta.add('Coletado');
 
@@ -1857,11 +1888,9 @@ class LaudoGeneratorService {
           partes.add(textoEncaminhamento);
         }
       }
-    } else {
-      // Apenas registrado
-      partes.add('Apenas registrado');
     }
 
+    if (partes.isEmpty) return '$letra) Vestígio registrado.';
     return '$letra) ${partes.join('. ')}.';
   }
 
@@ -1942,6 +1971,8 @@ class LaudoGeneratorService {
       // Descrição do veículo
       final partesDescricao = <String>[];
 
+      // Tipo + marca/modelo juntos sem vírgula entre eles
+      String cabecalhoVeiculo = '';
       if (veiculo.tipoVeiculo != null) {
         String tipo = veiculo.tipoVeiculo!.label;
         if (veiculo.tipoVeiculo == TipoVeiculo.outro &&
@@ -1949,32 +1980,38 @@ class LaudoGeneratorService {
             veiculo.tipoVeiculoOutro!.isNotEmpty) {
           tipo = veiculo.tipoVeiculoOutro!;
         }
-        partesDescricao.add(tipo);
+        cabecalhoVeiculo = tipo;
       }
-
       if (veiculo.marcaModelo != null && veiculo.marcaModelo!.isNotEmpty) {
-        partesDescricao.add(veiculo.marcaModelo!);
+        cabecalhoVeiculo = cabecalhoVeiculo.isEmpty
+            ? veiculo.marcaModelo!
+            : '$cabecalhoVeiculo ${veiculo.marcaModelo!}';
       }
+      if (cabecalhoVeiculo.isNotEmpty) partesDescricao.add(cabecalhoVeiculo);
 
       if (veiculo.anoFabricacao != null && veiculo.anoFabricacao!.isNotEmpty) {
-        partesDescricao.add('Ano Fabricação: ${veiculo.anoFabricacao}');
+        partesDescricao.add('ano de fabricação ${veiculo.anoFabricacao}');
       }
 
       if (veiculo.anoModelo != null && veiculo.anoModelo!.isNotEmpty) {
-        partesDescricao.add('Ano Modelo: ${veiculo.anoModelo}');
+        partesDescricao.add('modelo ${veiculo.anoModelo}');
       }
 
       if (veiculo.cor != null && veiculo.cor!.isNotEmpty) {
-        partesDescricao.add('Cor: ${veiculo.cor}');
+        partesDescricao.add('cor ${veiculo.cor!.toLowerCase()}');
       }
 
       if (veiculo.placa != null && veiculo.placa!.isNotEmpty) {
-        partesDescricao.add('Placa: ${veiculo.placa}');
+        final placaRaw = veiculo.placa!.toUpperCase().replaceAll('-', '');
+        final placaFormatada = placaRaw.length == 7
+            ? '${placaRaw.substring(0, 3)}-${placaRaw.substring(3)}'
+            : placaRaw;
+        partesDescricao.add('placa $placaFormatada');
       }
 
       if (veiculo.localizacaoAmbiente != null &&
           veiculo.localizacaoAmbiente!.isNotEmpty) {
-        partesDescricao.add('Localização: ${veiculo.localizacaoAmbiente}');
+        partesDescricao.add('localização: ${veiculo.localizacaoAmbiente}');
       }
 
       if (partesDescricao.isNotEmpty) {
@@ -1988,6 +2025,16 @@ class LaudoGeneratorService {
           final vestigio = veiculo.vestigios![j];
           final textoVestigio = await _gerarTextoVestigioVeiculo(vestigio, j);
           buffer.writeln(_gerarParagrafoLista(textoVestigio));
+        }
+        final temNaoColetados = veiculo.vestigios!.any(
+          (v) => v.tipoAcao != TipoAcaoVestigioVeiculo.coletado,
+        );
+        if (temNaoColetados) {
+          buffer.writeln(
+            _gerarParagrafoHistorico(
+              'Os vestígios não coletados foram devidamente documentados por registro fotográfico.',
+            ),
+          );
         }
       }
 
@@ -2022,7 +2069,7 @@ class LaudoGeneratorService {
           : '$descricao ($citacaoFotosVeiculo)';
     }
     if (descricao.isNotEmpty) {
-      partes.add(descricao);
+      partes.add('Presença de $descricao');
     }
 
     // Localização no veículo
@@ -2030,9 +2077,8 @@ class LaudoGeneratorService {
       partes.add('Localização no veículo: ${vestigio.localizacao}');
     }
 
-    // Informações de Cadeia de Custódia
+    // Informações de Cadeia de Custódia (apenas se coletado)
     if (vestigio.tipoAcao == TipoAcaoVestigioVeiculo.coletado) {
-      // Coletado
       final partesColeta = <String>[];
       partesColeta.add('Coletado');
 
@@ -2082,11 +2128,9 @@ class LaudoGeneratorService {
           partes.add(textoEncaminhamento);
         }
       }
-    } else {
-      // Apenas registrado
-      partes.add('Apenas registrado');
     }
 
+    if (partes.isEmpty) return '$letra) Vestígio registrado.';
     return '$letra) ${partes.join('. ')}.';
   }
 
@@ -2199,56 +2243,68 @@ class LaudoGeneratorService {
 </w:p>''';
   }
 
-  /// Gera texto de identificação do cadáver
+  /// Gera texto de identificação do cadáver em formato de prosa
   String _gerarIdentificacaoCadaver(CadaverModel cadaver) {
     final buffer = StringBuffer();
-    final partes = <String>[];
 
-    // Nome da vítima
-    if (cadaver.nomeDaVitima != null && cadaver.nomeDaVitima!.isNotEmpty) {
-      partes.add('Nome: ${cadaver.nomeDaVitima}');
+    // --- Parágrafo 1: identificação civil ---
+    final temNome =
+        cadaver.nomeDaVitima != null && cadaver.nomeDaVitima!.isNotEmpty;
+    final StringBuffer frase1 = StringBuffer();
+
+    if (temNome) {
+      frase1.write(
+        'A vítima foi identificada como ${_formatarNomeCorreto(cadaver.nomeDaVitima!)}',
+      );
+      if (cadaver.documentoIdentificacao != null &&
+          cadaver.documentoIdentificacao!.isNotEmpty) {
+        frase1.write(
+          ', portadora do documento ${cadaver.documentoIdentificacao}',
+        );
+      }
+      if (cadaver.dataNascimento != null &&
+          cadaver.dataNascimento!.isNotEmpty) {
+        frase1.write(', nascida em ${cadaver.dataNascimento}');
+      }
+      if (cadaver.filiacao != null && cadaver.filiacao!.isNotEmpty) {
+        frase1.write(', filha(o) de ${cadaver.filiacao}');
+      }
+      frase1.write('.');
     } else {
-      partes.add('Nome: Não identificado');
+      frase1.write('A vítima não foi identificada.');
+      if (cadaver.documentoIdentificacao != null &&
+          cadaver.documentoIdentificacao!.isNotEmpty) {
+        frase1.write(
+          ' Documento localizado: ${cadaver.documentoIdentificacao}.',
+        );
+      }
     }
+    buffer.writeln(_gerarParagrafoHistorico(frase1.toString()));
 
-    // Documento de identificação
-    if (cadaver.documentoIdentificacao != null &&
-        cadaver.documentoIdentificacao!.isNotEmpty) {
-      partes.add('Documento: ${cadaver.documentoIdentificacao}');
-    }
-
-    // Data de nascimento
-    if (cadaver.dataNascimento != null && cadaver.dataNascimento!.isNotEmpty) {
-      partes.add('Data de Nascimento: ${cadaver.dataNascimento}');
-    }
-
-    // Filiação
-    if (cadaver.filiacao != null && cadaver.filiacao!.isNotEmpty) {
-      partes.add('Filiação: ${cadaver.filiacao}');
-    }
-
-    // Número do laudo cadavérico
+    // --- Parágrafo 2: laudo cadavérico (se houver) ---
     if (cadaver.numeroLaudoCadaverico != null &&
         cadaver.numeroLaudoCadaverico!.isNotEmpty) {
-      partes.add('Laudo Cadavérico: ${cadaver.numeroLaudoCadaverico}');
-    }
-
-    // Características físicas
-    final caracteristicas = <String>[];
-
-    if (cadaver.sexo != null) {
-      caracteristicas.add('Sexo ${cadaver.sexo!.label.toLowerCase()}');
-    }
-
-    if (cadaver.faixaEtaria != null) {
-      caracteristicas.add(
-        'faixa etária ${cadaver.faixaEtaria!.label.toLowerCase()}',
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'O laudo cadavérico de n. ${cadaver.numeroLaudoCadaverico} foi associado ao presente exame.',
+        ),
       );
     }
+
+    // --- Parágrafo 3: características físicas ---
+    final caracteristicas = <String>[];
 
     if (cadaver.compleicao != null) {
       caracteristicas.add(
         'compleição ${cadaver.compleicao!.label.toLowerCase()}',
+      );
+    }
+    if (cadaver.sexo != null) {
+      caracteristicas.add('sexo ${cadaver.sexo!.label.toLowerCase()}');
+    }
+    if (cadaver.faixaEtaria != null) {
+      caracteristicas.add(
+        'faixa etária ${cadaver.faixaEtaria!.label.toLowerCase()}',
       );
     }
 
@@ -2279,7 +2335,7 @@ class LaudoGeneratorService {
         );
       }
       if (cabelo.isNotEmpty) {
-        caracteristicas.add('cabelo ${cabelo.join(", ")}');
+        caracteristicas.add('cabelo ${cabelo.join(', ')}');
       }
     }
 
@@ -2306,26 +2362,33 @@ class LaudoGeneratorService {
               : cadaver.corBarba!.label.toLowerCase(),
         );
       }
-      caracteristicas.add('barba ${barba.join(", ")}');
+      caracteristicas.add('barba ${barba.join(', ')}');
     }
 
     if (caracteristicas.isNotEmpty) {
-      partes.add('Características: ${caracteristicas.join(", ")}');
+      // Última característica sem vírgula antes (usa "e")
+      String textoCaracteristicas;
+      if (caracteristicas.length == 1) {
+        textoCaracteristicas = caracteristicas.first;
+      } else {
+        final ultimo = caracteristicas.removeLast();
+        textoCaracteristicas = '${caracteristicas.join(', ')} e $ultimo';
+      }
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Apresentava $textoCaracteristicas.',
+        ),
+      );
     }
 
-    // Tatuagens e marcas
+    // --- Parágrafo 4: tatuagens e marcas ---
     if (cadaver.tatuagensMarcas != null &&
         cadaver.tatuagensMarcas!.isNotEmpty) {
-      partes.add('Tatuagens/Marcas: ${cadaver.tatuagensMarcas}');
-    }
-
-    // Gerar parágrafos
-    for (final parte in partes) {
-      buffer.writeln(_gerarParagrafoHistorico(parte));
-    }
-
-    if (partes.isEmpty) {
-      buffer.writeln(_gerarParagrafoHistorico('Não informado'));
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Tatuagens/marcas: ${cadaver.tatuagensMarcas}.',
+        ),
+      );
     }
 
     return buffer.toString();
@@ -2482,25 +2545,39 @@ class LaudoGeneratorService {
       return buffer.toString();
     }
 
+    buffer.writeln(
+      _gerarParagrafoHistorico('Ao exame perinecroscópico, observou-se:'),
+    );
+
     for (var i = 0; i < cadaver.lesoes!.length; i++) {
       final lesao = cadaver.lesoes![i];
       final letra = _indicePraLetra(i);
 
       String descricaoLesao;
       if (lesao.isPaf && lesao.paf != null) {
-        // Gerar descrição PAF automática
-        descricaoLesao = gerarDescricaoPAF(
+        final textoPaf = gerarDescricaoPAF(
           regiao: lesao.regiao,
           tipo: lesao.paf!.tipo,
           distancia: lesao.paf!.distancia,
           diametro: lesao.paf!.diametro,
           sinais: lesao.paf!.sinais,
         );
+        final textoLower = textoPaf[0].toLowerCase() + textoPaf.substring(1);
+        descricaoLesao = 'Presença de $textoLower';
       } else {
-        // Lesão normal
-        descricaoLesao = lesao.descricao ?? 'Lesão em ${lesao.regiao}';
-        if (lesao.tipo != null && lesao.tipo!.isNotEmpty) {
-          descricaoLesao = '${lesao.tipo}: $descricaoLesao';
+        final tipo = lesao.tipo;
+        final desc = lesao.descricao;
+        if (tipo != null && tipo.isNotEmpty) {
+          final tipoLower = tipo[0].toLowerCase() + tipo.substring(1);
+          if (desc != null && desc.isNotEmpty) {
+            descricaoLesao = 'Presença de $tipoLower — $desc';
+          } else {
+            descricaoLesao = 'Presença de $tipoLower em ${lesao.regiao}';
+          }
+        } else {
+          final base = desc != null && desc.isNotEmpty ? desc : 'lesão em ${lesao.regiao}';
+          final baseLower = base[0].toLowerCase() + base.substring(1);
+          descricaoLesao = 'Presença de $baseLower';
         }
       }
 
@@ -2818,7 +2895,7 @@ class LaudoGeneratorService {
       if (cond.velocidadePorSinalizacao == true) {
         refs.add('sinalização expressa');
       }
-      if (cond.velocidadePorCTB == true) refs.add('CTB/1997');
+      if (cond.velocidadePorCTB == true) refs.add('Art. 61, §1º, CTB/1997');
       partes.add('considerando referências de ${refs.join(" e ")}');
     }
 
@@ -2886,7 +2963,8 @@ class LaudoGeneratorService {
         detalhes.add(veiculo.danosObservacoes!);
       }
 
-      if (veiculo.tacografoStatus != null) {
+      if (veiculo.tacografoStatus != null &&
+          veiculo.tacografoStatus != TacografoStatus.naoSeAplica) {
         detalhes.add(
           'disco de tacógrafo ${veiculo.tacografoStatus == TacografoStatus.recolhido ? 'recolhido' : 'ausente'}',
         );
@@ -3101,7 +3179,7 @@ class LaudoGeneratorService {
                 ev01,
                 'Houve destruição/rompimento de obstáculo.',
               )
-            : 'Sem elementos materiais.',
+            : 'Não foram observados vestígios que indiquem destruição ou rompimento de obstáculo à subtração da coisa.',
       ),
     );
 
@@ -3117,7 +3195,7 @@ class LaudoGeneratorService {
                 ev02,
                 'Houve indícios compatíveis com escalada/destreza.',
               )
-            : 'Sem elementos materiais.',
+            : 'Não foram observados vestígios que indiquem uso de escalada ou destreza especial.',
       ),
     );
 
@@ -3131,7 +3209,7 @@ class LaudoGeneratorService {
                 ev04,
                 'Houve indícios compatíveis com emprego de chave falsa.',
               )
-            : 'Sem elementos materiais.',
+            : 'Não foram observados vestígios que indiquem emprego de chave falsa ou instrumento análogo.',
       ),
     );
 
@@ -3147,7 +3225,7 @@ class LaudoGeneratorService {
                 ev05,
                 'Os vestígios são compatíveis com a presença de dois ou mais indivíduos no local do fato.',
               )
-            : 'Sem elementos materiais. Os vestígios detectados não foram suficientes para concluir acerca da presença de dois ou mais indivíduos no local do fato.',
+            : 'Não foram observados vestígios que indiquem o concurso de duas ou mais pessoas na prática do fato.',
       ),
     );
 
@@ -3163,7 +3241,7 @@ class LaudoGeneratorService {
                 ev07,
                 'Os vestígios indicam recenticidade.',
               )
-            : 'Sem elementos materiais.',
+            : 'Não foram observados vestígios que permitam inferir a recenticidade do fato.',
       ),
     );
 
@@ -3185,7 +3263,8 @@ class LaudoGeneratorService {
         '7.1 Houve o emprego de substância inflamável ou explosiva?',
       ),
     );
-    String resposta1 = 'Sem elementos materiais.';
+    String resposta1 =
+        'Não foram observados vestígios que indiquem o emprego de substância inflamável ou explosiva.';
     if (dano.substanciaInflamavelExplosivaSim == true) {
       resposta1 = 'Sim. Houve o emprego de substância inflamável ou explosiva.';
     } else if (dano.substanciaInflamavelExplosivaNao == true) {
@@ -3200,7 +3279,8 @@ class LaudoGeneratorService {
         '7.2 O dano foi contra o patrimônio da União, Estado, Município, empresa concessionária de serviços públicos ou sociedade de economia mista?',
       ),
     );
-    String resposta2 = 'Sem elementos materiais.';
+    String resposta2 =
+        'Não foram observados vestígios que indiquem dano contra o patrimônio da União, Estado, Município, empresa concessionária de serviços públicos ou sociedade de economia mista.';
     if (dano.danoPatrimonioPublicoSim == true) {
       resposta2 = 'Sim. O dano foi contra o patrimônio público.';
     } else if (dano.danoPatrimonioPublicoNao == true) {
@@ -3212,7 +3292,8 @@ class LaudoGeneratorService {
     buffer.writeln(
       _gerarTituloSubSecao('7.3 Houve prejuízo considerável para a vítima?'),
     );
-    String resposta3 = 'Sem elementos materiais.';
+    String resposta3 =
+        'Não foram observados vestígios que permitam aferir a existência de prejuízo considerável para a vítima.';
     if (dano.prejuizoConsideravelSim == true) {
       resposta3 = 'Sim. Houve prejuízo considerável para a vítima.';
     } else if (dano.prejuizoConsideravelNao == true) {
@@ -3226,7 +3307,8 @@ class LaudoGeneratorService {
         '7.4 É possível identificar o instrumento e/ou substância empregados no evento?',
       ),
     );
-    String resposta4 = 'Sem elementos materiais.';
+    String resposta4 =
+        'Não foram observados vestígios que permitam identificar o instrumento e/ou substância empregados no evento.';
     if (dano.identificarInstrumentoSubstanciaSim == true) {
       final qual = (dano.qualInstrumentoSubstancia ?? '').trim();
       resposta4 = qual.isNotEmpty
@@ -3244,7 +3326,8 @@ class LaudoGeneratorService {
         '7.5 O local examinado possibilitou a identificação de algum vestígio?',
       ),
     );
-    String resposta5 = 'Sem elementos materiais.';
+    String resposta5 =
+        'O exame do local não possibilitou a identificação de vestígios conclusivos.';
     if (dano.identificacaoVestigioSim == true) {
       final qual = (dano.qualVestigio ?? '').trim();
       resposta5 = qual.isNotEmpty
@@ -3262,7 +3345,8 @@ class LaudoGeneratorService {
         '7.6 Qual foi o dano causado e qual é o valor estimado dos prejuízos?',
       ),
     );
-    String resposta6 = 'Sem elementos materiais.';
+    String resposta6 =
+        'Não foram observados elementos que permitam estimar o dano causado ou o valor dos prejuízos.';
     final danoCausado = (dano.danoCausado ?? '').trim();
     final valorEstimado = (dano.valorEstimadoPrejuizos ?? '').trim();
     if (danoCausado.isNotEmpty || valorEstimado.isNotEmpty) {
@@ -3283,7 +3367,8 @@ class LaudoGeneratorService {
         '7.7 É possível identificar o número de pessoas que participaram do evento?',
       ),
     );
-    String resposta7 = 'Sem elementos materiais.';
+    String resposta7 =
+        'Não foram observados vestígios que permitam identificar o número de pessoas que participaram do evento.';
     if (dano.identificarNumeroPessoasSim == true) {
       final numero = (dano.numeroPessoas ?? '').trim();
       resposta7 = numero.isNotEmpty
@@ -3301,7 +3386,8 @@ class LaudoGeneratorService {
         '7.8 Existem vestígios no local que possam indicar a autoria do delito?',
       ),
     );
-    String resposta8 = 'Sem elementos materiais.';
+    String resposta8 =
+        'Não foram observados vestígios que indiquem a autoria do delito.';
     if (dano.vestigiosAutoriaSim == true) {
       final quais = (dano.quaisVestigiosAutoria ?? '').trim();
       resposta8 = quais.isNotEmpty
@@ -3319,7 +3405,8 @@ class LaudoGeneratorService {
         '7.9 É possível identificar como foi a dinâmica do evento?',
       ),
     );
-    String resposta9 = 'Sem elementos materiais.';
+    String resposta9 =
+        'Não foram observados vestígios que permitam identificar a dinâmica do evento.';
     if (dano.identificarDinamicaSim == true) {
       final dinamica = (dano.dinamicaEvento ?? '').trim();
       resposta9 = dinamica.isNotEmpty

@@ -110,10 +110,14 @@ class _CadastroMembroEquipeResgateScreenState
               const SizedBox(height: 16),
               TextFormField(
                 controller: _matriculaController,
-                decoration: const InputDecoration(
-                  labelText: 'Matrícula',
-                  hintText: 'Número de matrícula',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: widget.tipoEquipe == TipoEquipeResgate.cbm
+                      ? 'RG'
+                      : 'Matrícula',
+                  hintText: widget.tipoEquipe == TipoEquipeResgate.cbm
+                      ? 'Número do RG'
+                      : 'Número de matrícula',
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),

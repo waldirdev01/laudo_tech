@@ -209,6 +209,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   bool _semVestigiosRelacionado = false;
   List<String> _fotosVistaAmplaPaths = [];
 
+  /// true = via pública / área aberta; false = imóvel; null = não definido
+  bool? _localEmViaPublica;
+
   @override
   void initState() {
     super.initState();
@@ -281,7 +284,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _semVestigiosImediato = dados.semVestigiosImediato ?? false;
       _semVestigiosRelacionado = dados.semVestigiosRelacionado ?? false;
       _demaisObservacoesController.text = dados.demaisObservacoes ?? '';
-      _fotosVistaAmplaPaths = List<String>.from(dados.fotosVistaAmplaPaths ?? []);
+      _fotosVistaAmplaPaths = List<String>.from(
+        dados.fotosVistaAmplaPaths ?? [],
+      )..removeWhere((p) => !File(p).existsSync());
+      _localEmViaPublica = dados.localEmViaPublica;
     }
   }
 
@@ -1227,7 +1233,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         sinaisArrombamentoSim: _sinaisArrombamentoSim,
         sinaisArrombamentoNao: _sinaisArrombamentoNao,
         sinaisArrombamentoNaoSeAplica: _sinaisArrombamentoNaoSeAplica,
-        fotosVistaAmplaPaths: _fotosVistaAmplaPaths.isEmpty ? null : _fotosVistaAmplaPaths,
+        fotosVistaAmplaPaths: _fotosVistaAmplaPaths.isEmpty
+            ? null
+            : _fotosVistaAmplaPaths,
+        localEmViaPublica: _localEmViaPublica,
       );
 
       // Preservar todos os dados existentes
@@ -1387,7 +1396,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       String frase =
           'O imóvel estava situado em região predominantemente $_tipoRegiaoMediato';
       if (_infraestruturaMediato.isNotEmpty) {
-        frase += ', provida de ${_listarItens(_infraestruturaMediato.toList())}';
+        frase +=
+            ', provida de ${_listarItens(_infraestruturaMediato.toList())}';
       }
       frase += '.';
       partes.add(frase);
@@ -1489,7 +1499,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             isDense: true,
           ),
           items: _opcoesRegiao
-              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .map(
+                (r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))),
+              )
               .toList(),
           onChanged: (v) => setState(() {
             _tipoRegiaoMediato = v;
@@ -1527,7 +1539,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             isDense: true,
           ),
           items: _opcoesTipoImovel
-              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .map(
+                (r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))),
+              )
               .toList(),
           onChanged: (v) => setState(() {
             _tipoImovelMediato = v;
@@ -1544,10 +1558,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             isDense: true,
           ),
           items: List.generate(10, (i) => i + 1)
-              .map((n) => DropdownMenuItem(
-                    value: n,
-                    child: Text(n.toString().padLeft(2, '0')),
-                  ))
+              .map(
+                (n) => DropdownMenuItem(
+                  value: n,
+                  child: Text(n.toString().padLeft(2, '0')),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() {
             _qtdPavimentosMediato = v;
@@ -1626,7 +1642,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             isDense: true,
           ),
           items: _opcoesAbrangenciaImediato
-              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .map(
+                (r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))),
+              )
               .toList(),
           onChanged: (v) => setState(() {
             _abrangenciaImediato = v;
@@ -1676,7 +1694,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             isDense: true,
           ),
           items: _opcoesEstadoConservacao
-              .map((r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))))
+              .map(
+                (r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))),
+              )
               .toList(),
           onChanged: (v) => setState(() {
             _estadoConservacaoImediato = v;
@@ -1787,15 +1807,18 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Column(
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (local == 'mediato') _buildDescricaoAssistidaMediato(),
-                if (local == 'imediato') _buildDescricaoAssistidaImediato(),
+                if (_localEmViaPublica != true && local == 'mediato')
+                  _buildDescricaoAssistidaMediato(),
+                if (_localEmViaPublica != true && local == 'imediato')
+                  _buildDescricaoAssistidaImediato(),
                 const Text('Descrição (do geral para o particular)'),
                 const SizedBox(height: 4),
                 Text(
-                  local == 'mediato' || local == 'imediato'
+                  _localEmViaPublica != true &&
+                          (local == 'mediato' || local == 'imediato')
                       ? 'Texto gerado automaticamente. Edite à vontade.'
                       : 'Descreva o local...',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
@@ -2122,6 +2145,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   }
 
   void _mostrarInstrucoes() {
+    final isViaPublica = _localEmViaPublica == true;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -2130,45 +2154,70 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Descrever objetivamente os seguintes itens:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                '• Classificar o tipo de imóvel (ex.: imóvel residencial, comercial, industrial, religioso, educacional, prisional etc.);',
-              ),
-              const Text(
-                '• Descrever o tipo de delimitação (Ex.: muros de alvenaria);',
-              ),
-              const Text(
-                '• Descrever os acessos de entrada e saída (Ex.: portão e portas); e',
-              ),
-              const Text(
-                '• Descrever as estruturas pertinentes ao exame (Ex.: cadeados, fechaduras, paredes, janelas e coberturas).',
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Exemplo:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'Tratava-se de prédio comercial de 03 pavimentos. Não existia muro ou qualquer outro tipo de cerca delimitando o terreno. As portas eram metálicas de enrolar, sendo que em duas dessas portas existiam portas de vidro temperado, internamente às portas metálicas.',
-                  style: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey.shade900,
-                  ),
-                ),
-              ),
-            ],
+            children: isViaPublica
+                ? [
+                    const Text(
+                      'Para local em via pública ou área aberta:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '• Descreva o trecho da via (rua, avenida, praça, beco etc.);',
+                    ),
+                    const Text(
+                      '• Tipo de piso (calçada, asfalto, terra) e condições (seco, úmido, molhado);',
+                    ),
+                    const Text(
+                      '• Iluminação (artificial, natural ou ausente);',
+                    ),
+                    const Text(
+                      '• Ponto exato do fato (local imediato) e vestígios com posição no cenário.',
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Use as descrições em texto livre por local (Mediato, Imediato, Relacionado) e registre os vestígios em cada um. Itens de imóvel (sinais de arrombamento, tipo de imóvel etc.) não se aplicam e foram ocultados.',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ]
+                : [
+                    const Text(
+                      'Descrever objetivamente os seguintes itens:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '• Classificar o tipo de imóvel (ex.: imóvel residencial, comercial, industrial, religioso, educacional, prisional etc.);',
+                    ),
+                    const Text(
+                      '• Descrever o tipo de delimitação (Ex.: muros de alvenaria);',
+                    ),
+                    const Text(
+                      '• Descrever os acessos de entrada e saída (Ex.: portão e portas); e',
+                    ),
+                    const Text(
+                      '• Descrever as estruturas pertinentes ao exame (Ex.: cadeados, fechaduras, paredes, janelas e coberturas).',
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Exemplo:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Tratava-se de prédio comercial de 03 pavimentos. Não existia muro ou qualquer outro tipo de cerca delimitando o terreno. As portas eram metálicas de enrolar, sendo que em duas dessas portas existiam portas de vidro temperado, internamente às portas metálicas.',
+                        style: TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
           ),
         ),
         actions: [
@@ -2220,6 +2269,67 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
+            // Tipo de local (imóvel vs via pública)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'O local é em imóvel (fechado) ou em via pública / área aberta?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  RadioGroup<bool>(
+                    groupValue: _localEmViaPublica,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _localEmViaPublica = value;
+                          if (value == true) {
+                            _sinaisArrombamentoNaoSeAplica = true;
+                            _sinaisArrombamentoSim = false;
+                            _sinaisArrombamentoNao = false;
+                          }
+                        });
+                      }
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Radio<bool>(value: false),
+                            const Expanded(
+                              child: Text('Imóvel (fechado)', style: TextStyle(fontSize: 14)),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Radio<bool>(value: true),
+                            const Expanded(
+                              child: Text(
+                                'Via pública ou área aberta',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Foto(s) vista ampla do local
             Container(
               margin: const EdgeInsets.only(bottom: 16),
@@ -2233,18 +2343,14 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                 children: [
                   const Text(
                     'Foto(s) vista ampla do local',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Ex.: fachada ou porção anterior do imóvel (será a Fotografia 01 no laudo).',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    _localEmViaPublica == true
+                        ? 'Vista geral do local (ex.: trecho da via, ponto do fato). Será a Fotografia 01 no laudo.'
+                        : 'Ex.: fachada ou porção anterior do imóvel (será a Fotografia 01 no laudo).',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -2272,10 +2378,14 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             type: FileType.image,
                             allowMultiple: true,
                           );
-                          if (result != null && result.files.isNotEmpty && mounted) {
+                          if (result != null &&
+                              result.files.isNotEmpty &&
+                              mounted) {
                             for (final f in result.files) {
                               if (f.path == null) continue;
-                              final path = await _persistirFotoVestigio(XFile(f.path!));
+                              final path = await _persistirFotoVestigio(
+                                XFile(f.path!),
+                              );
                               if (path != null) {
                                 setState(() => _fotosVistaAmplaPaths.add(path));
                               }
@@ -2302,6 +2412,18 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                 width: 72,
                                 height: 72,
                                 fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade800,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white54,
+                                  ),
+                                ),
                               ),
                             ),
                             Positioned(
@@ -2315,7 +2437,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                   padding: const EdgeInsets.all(4),
                                 ),
                                 onPressed: () {
-                                  setState(() => _fotosVistaAmplaPaths.removeAt(e.key));
+                                  setState(
+                                    () => _fotosVistaAmplaPaths.removeAt(e.key),
+                                  );
                                 },
                               ),
                             ),
@@ -2384,52 +2508,66 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     ),
                   ),
                   const Divider(height: 1),
-                  // Sinais de Arrombamento
-                  _buildCheckboxRow('Sinais de Arrombamento', [
-                    {
-                      'label': 'Sim',
-                      'value': _sinaisArrombamentoSim ?? false,
-                      'onChanged': (value) =>
-                          _onSinaisArrombamentoChanged(value, 'sim'),
-                    },
-                    {
-                      'label': 'Não',
-                      'value': _sinaisArrombamentoNao ?? false,
-                      'onChanged': (value) =>
-                          _onSinaisArrombamentoChanged(value, 'nao'),
-                    },
-                    {
-                      'label': 'Não Se Aplica',
-                      'value': _sinaisArrombamentoNaoSeAplica ?? false,
-                      'onChanged': (value) =>
-                          _onSinaisArrombamentoChanged(value, 'naoSeAplica'),
-                    },
-                  ]),
-                  const Divider(height: 1),
-                  // Descrição dos Sinais de Arrombamento
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Descrição dos Sinais de Arrombamento:',
-                          style: TextStyle(fontWeight: FontWeight.w500),
+                  // Sinais de Arrombamento (oculto em via pública)
+                  if (_localEmViaPublica == true) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        'Em via pública estes itens não se aplicam.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey.shade700,
                         ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _sinaisArrombamentoController,
-                          decoration: const InputDecoration(
-                            hintText: 'Descreva os sinais de arrombamento...',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          maxLines: 3,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  const Divider(height: 1),
+                    const Divider(height: 1),
+                  ] else ...[
+                    _buildCheckboxRow('Sinais de Arrombamento', [
+                      {
+                        'label': 'Sim',
+                        'value': _sinaisArrombamentoSim ?? false,
+                        'onChanged': (value) =>
+                            _onSinaisArrombamentoChanged(value, 'sim'),
+                      },
+                      {
+                        'label': 'Não',
+                        'value': _sinaisArrombamentoNao ?? false,
+                        'onChanged': (value) =>
+                            _onSinaisArrombamentoChanged(value, 'nao'),
+                      },
+                      {
+                        'label': 'Não Se Aplica',
+                        'value': _sinaisArrombamentoNaoSeAplica ?? false,
+                        'onChanged': (value) =>
+                            _onSinaisArrombamentoChanged(value, 'naoSeAplica'),
+                      },
+                    ]),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Descrição dos Sinais de Arrombamento:',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _sinaisArrombamentoController,
+                            decoration: const InputDecoration(
+                              hintText: 'Descreva os sinais de arrombamento...',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                  ],
                   // Descrição dos Locais (Mediato, Imediato, Relacionado) + Vestígios
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -2441,9 +2579,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Descrever detalhadamente os Locais Mediato, Imediato e Relacionado (nesta ordem), do geral para o particular. Em cada local, registrar os vestígios encontrados e sua posição no cenário.',
-                          style: TextStyle(fontSize: 12, color: Colors.black87),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                         ),
                         if ((_classificacaoMediato ?? false)) ...[
                           _buildSecaoLocalDetalhado(

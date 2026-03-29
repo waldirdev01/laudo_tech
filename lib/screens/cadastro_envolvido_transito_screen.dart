@@ -1,13 +1,20 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/crime_transito_model.dart';
+import '../models/ficha_completa_model.dart';
 
 class CadastroEnvolvidoTransitoScreen extends StatefulWidget {
   final CrimeTransitoEnvolvidoModel envolvido;
+  final FichaCompletaModel ficha;
 
   const CadastroEnvolvidoTransitoScreen({
     super.key,
     required this.envolvido,
+    required this.ficha,
   });
 
   @override
@@ -18,6 +25,7 @@ class CadastroEnvolvidoTransitoScreen extends StatefulWidget {
 class _CadastroEnvolvidoTransitoScreenState
     extends State<CadastroEnvolvidoTransitoScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _imagePicker = ImagePicker();
   final _nomeCtrl = TextEditingController();
   final _cnhCtrl = TextEditingController();
   final _cnhValidadeCtrl = TextEditingController();
@@ -34,10 +42,13 @@ class _CadastroEnvolvidoTransitoScreenState
   final Set<CrimeTransitoEquipamentoSeguranca> _equipamentos = {};
   CrimeTransitoSituacaoEnvolvido? _situacao;
   CrimeTransitoPosicaoEnvolvido? _posicao;
-  bool? _vestesIntegro;
   bool? _calcadosIntegro;
   bool? _pertencesIntegro;
   bool _salvando = false;
+
+  List<String> _fotosVistaAmplaPosicao = [];
+  List<String> _fotosVistaAmplaCenario = [];
+  List<String> _fotosLesoesPertences = [];
 
   @override
   void initState() {
@@ -58,9 +69,155 @@ class _CadastroEnvolvidoTransitoScreenState
     _equipamentos.addAll(envolvido.equipamentosSeguranca ?? const []);
     _situacao = envolvido.situacao;
     _posicao = envolvido.posicao;
-    _vestesIntegro = envolvido.vestes?.integro;
     _calcadosIntegro = envolvido.calcados?.integro;
     _pertencesIntegro = envolvido.pertences?.integro;
+    _fotosVistaAmplaPosicao =
+        List<String>.from(envolvido.fotosVistaAmplaPosicaoEncontrado ?? []);
+    _fotosVistaAmplaCenario =
+        List<String>.from(envolvido.fotosVistaAmplaCenario ?? []);
+    _fotosLesoesPertences =
+        List<String>.from(envolvido.fotosLesoesPertences ?? []);
+  }
+
+  Future<String?> _persistirFoto(XFile foto, String subpasta) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final pasta = Directory(
+      '${dir.path}/levantamento_transito/${widget.ficha.id}/envolvido_${widget.envolvido.id}/$subpasta',
+    );
+    if (!await pasta.exists()) await pasta.create(recursive: true);
+    final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.jpg';
+    final destino = File('${pasta.path}/$nome');
+    await File(foto.path).copy(destino.path);
+    return destino.path;
+  }
+
+  Widget _buildGrupoFotos({
+    required String titulo,
+    required String subpasta,
+    required List<String> fotos,
+    required ValueChanged<List<String>> onChanged,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              titulo,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final foto = await _imagePicker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 90,
+                    );
+                    if (foto == null || !mounted) return;
+                    final path = await _persistirFoto(foto, subpasta);
+                    if (path != null) {
+                      setState(() {
+                        fotos.add(path);
+                        onChanged(List.from(fotos));
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.photo_camera, size: 18),
+                  label: const Text('Câmera'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final imgs = await _imagePicker.pickMultiImage(
+                      imageQuality: 90,
+                    );
+                    if (imgs.isEmpty || !mounted) return;
+                    for (final img in imgs) {
+                      final path = await _persistirFoto(img, subpasta);
+                      if (path != null) fotos.add(path);
+                    }
+                    setState(() => onChanged(List.from(fotos)));
+                  },
+                  icon: const Icon(Icons.photo_library, size: 18),
+                  label: const Text('Galeria'),
+                ),
+              ],
+            ),
+            if (fotos.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: fotos.asMap().entries.map((e) {
+                  final file = File(e.value);
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: file.existsSync()
+                            ? Image.file(
+                                file,
+                                width: 72,
+                                height: 72,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => _thumbQuebrado(),
+                              )
+                            : _thumbQuebrado(),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              fotos.removeAt(e.key);
+                              onChanged(List.from(fotos));
+                            });
+                          },
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _thumbQuebrado() {
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.broken_image, color: Colors.white54),
+    );
   }
 
   @override
@@ -116,13 +273,11 @@ class _CadastroEnvolvidoTransitoScreenState
       posicaoDetalhe: _posicaoDetalheCtrl.text.trim().isEmpty
           ? null
           : _posicaoDetalheCtrl.text.trim(),
-      vestes: (_vestesIntegro == null && _vestesObsCtrl.text.trim().isEmpty)
+      vestes: _vestesObsCtrl.text.trim().isEmpty
           ? null
           : IntegridadeItemModel(
-              integro: _vestesIntegro,
-              observacoes: _vestesObsCtrl.text.trim().isEmpty
-                  ? null
-                  : _vestesObsCtrl.text.trim(),
+              integro: null,
+              observacoes: _vestesObsCtrl.text.trim(),
             ),
       calcados:
           (_calcadosIntegro == null && _calcadosObsCtrl.text.trim().isEmpty)
@@ -145,6 +300,15 @@ class _CadastroEnvolvidoTransitoScreenState
       observacoes: _observacoesCtrl.text.trim().isEmpty
           ? null
           : _observacoesCtrl.text.trim(),
+      fotosVistaAmplaPosicaoEncontrado: _fotosVistaAmplaPosicao.isEmpty
+          ? null
+          : _fotosVistaAmplaPosicao,
+      fotosVistaAmplaCenario: _fotosVistaAmplaCenario.isEmpty
+          ? null
+          : _fotosVistaAmplaCenario,
+      fotosLesoesPertences: _fotosLesoesPertences.isEmpty
+          ? null
+          : _fotosLesoesPertences,
     );
 
     if (!mounted) return;
@@ -194,6 +358,7 @@ class _CadastroEnvolvidoTransitoScreenState
           ],
           onChanged: onChanged,
         ),
+        const SizedBox(height: 12),
         TextField(
           controller: controller,
           decoration: const InputDecoration(
@@ -224,14 +389,49 @@ class _CadastroEnvolvidoTransitoScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                'Fotografias',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              _buildGrupoFotos(
+                titulo: 'Vista ampla na posição em que foi encontrado',
+                subpasta: 'vista_ampla_posicao',
+                fotos: _fotosVistaAmplaPosicao,
+                onChanged: (v) => setState(() => _fotosVistaAmplaPosicao = v),
+              ),
+              _buildGrupoFotos(
+                titulo: 'Vista ampla do cenário',
+                subpasta: 'vista_ampla_cenario',
+                fotos: _fotosVistaAmplaCenario,
+                onChanged: (v) => setState(() => _fotosVistaAmplaCenario = v),
+              ),
+              _buildGrupoFotos(
+                titulo: 'Lesões e pertences',
+                subpasta: 'lesoes_pertences',
+                fotos: _fotosLesoesPertences,
+                onChanged: (v) => setState(() => _fotosLesoesPertences = v),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Dados do envolvido',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _nomeCtrl,
                 decoration: const InputDecoration(labelText: 'Nome (opcional)'),
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _cnhCtrl,
                 decoration: const InputDecoration(labelText: 'CNH n.º'),
               ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -251,16 +451,18 @@ class _CadastroEnvolvidoTransitoScreenState
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _rgCtrl,
                 decoration: const InputDecoration(labelText: 'RG'),
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _dataNascimentoCtrl,
                 decoration:
                     const InputDecoration(labelText: 'Data de nascimento'),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               DropdownButtonFormField<CrimeTransitoClassificacaoEnvolvido>(
                 initialValue: _classificacao,
                 decoration: const InputDecoration(labelText: 'Classificação'),
@@ -287,7 +489,7 @@ class _CadastroEnvolvidoTransitoScreenState
               Text('Equipamentos de segurança',
                   style: Theme.of(context).textTheme.titleSmall),
               _buildEquipamentos(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               RadioGroup<CrimeTransitoSituacaoEnvolvido>(
                 groupValue: _situacao,
                 onChanged: (v) => setState(() => _situacao = v),
@@ -311,7 +513,7 @@ class _CadastroEnvolvidoTransitoScreenState
                       .toList(),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               RadioGroup<CrimeTransitoPosicaoEnvolvido>(
                 groupValue: _posicao,
                 onChanged: (v) => setState(() => _posicao = v),
@@ -336,32 +538,38 @@ class _CadastroEnvolvidoTransitoScreenState
                       .toList(),
                 ),
               ),
+              const SizedBox(height: 16),
               TextField(
                 controller: _posicaoDetalheCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Detalhe da posição (ex.: banco traseiro direito)',
                 ),
               ),
-              const SizedBox(height: 16),
-              _buildIntegridadeField(
-                titulo: 'Vestes',
-                valor: _vestesIntegro,
-                onChanged: (valor) => setState(() => _vestesIntegro = valor),
+              const SizedBox(height: 20),
+              TextFormField(
                 controller: _vestesObsCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Vestes',
+                  hintText: 'Descreva as vestes do envolvido',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 3,
               ),
+              const SizedBox(height: 20),
               _buildIntegridadeField(
-                titulo: 'Calçados',
+                titulo: 'Calçados (íntegro / não íntegro)',
                 valor: _calcadosIntegro,
                 onChanged: (valor) => setState(() => _calcadosIntegro = valor),
                 controller: _calcadosObsCtrl,
               ),
+              const SizedBox(height: 20),
               _buildIntegridadeField(
                 titulo: 'Pertences',
                 valor: _pertencesIntegro,
                 onChanged: (valor) => setState(() => _pertencesIntegro = valor),
                 controller: _pertencesObsCtrl,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               TextField(
                 controller: _observacoesCtrl,
                 maxLines: 3,
