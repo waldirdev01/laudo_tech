@@ -606,6 +606,13 @@ class CadaverModel {
   // Lesões/Evidências no cadáver
   final List<LesaoCadaverModel>? lesoes;
 
+  // Ausência de lesões de defesa
+  final bool ausenciaLesoesDefesa;
+  final List<String> membrosExaminadosDefesa;
+  final String? observacoesLesoesDefesa;
+  final List<String> fotosLesoesDefesa;
+  final List<int>? numerosFotosLesoesDefesa;
+
   // Vestes
   final List<VesteCadaverModel>? vestes;
 
@@ -670,6 +677,11 @@ class CadaverModel {
     this.fotosHipostaseSecrecoes = const [],
     this.fotosTatuagens = const [],
     this.lesoes,
+    this.ausenciaLesoesDefesa = false,
+    this.membrosExaminadosDefesa = const [],
+    this.observacoesLesoesDefesa,
+    this.fotosLesoesDefesa = const [],
+    this.numerosFotosLesoesDefesa,
     this.vestes,
     this.tatuagensMarcas,
     this.pertences,
@@ -730,6 +742,11 @@ class CadaverModel {
     'fotosHipostaseSecrecoes': fotosHipostaseSecrecoes,
     'fotosTatuagens': fotosTatuagens,
     'lesoes': lesoes?.map((l) => l.toJson()).toList(),
+    'ausenciaLesoesDefesa': ausenciaLesoesDefesa,
+    'membrosExaminadosDefesa': membrosExaminadosDefesa,
+    'observacoesLesoesDefesa': observacoesLesoesDefesa,
+    'fotosLesoesDefesa': fotosLesoesDefesa,
+    'numerosFotosLesoesDefesa': numerosFotosLesoesDefesa,
     'vestes': vestes?.map((v) => v.toJson()).toList(),
     'tatuagensMarcas': tatuagensMarcas,
     'pertences': pertences,
@@ -874,6 +891,22 @@ class CadaverModel {
       lesoes: (json['lesoes'] as List<dynamic>?)
           ?.map((l) => LesaoCadaverModel.fromJson(l as Map<String, dynamic>))
           .toList(),
+      ausenciaLesoesDefesa: json['ausenciaLesoesDefesa'] as bool? ?? false,
+      membrosExaminadosDefesa:
+          (json['membrosExaminadosDefesa'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      observacoesLesoesDefesa: json['observacoesLesoesDefesa'] as String?,
+      fotosLesoesDefesa:
+          (json['fotosLesoesDefesa'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      numerosFotosLesoesDefesa:
+          (json['numerosFotosLesoesDefesa'] as List<dynamic>?)
+              ?.map((e) => e as int)
+              .toList(),
       vestes: (json['vestes'] as List<dynamic>?)
           ?.map((v) => VesteCadaverModel.fromJson(v as Map<String, dynamic>))
           .toList(),
@@ -937,6 +970,11 @@ class CadaverModel {
     List<String>? fotosHipostaseSecrecoes,
     List<String>? fotosTatuagens,
     List<LesaoCadaverModel>? lesoes,
+    bool? ausenciaLesoesDefesa,
+    List<String>? membrosExaminadosDefesa,
+    String? observacoesLesoesDefesa,
+    List<String>? fotosLesoesDefesa,
+    List<int>? numerosFotosLesoesDefesa,
     List<VesteCadaverModel>? vestes,
     String? tatuagensMarcas,
     String? pertences,
@@ -1005,6 +1043,11 @@ class CadaverModel {
           fotosHipostaseSecrecoes ?? this.fotosHipostaseSecrecoes,
       fotosTatuagens: fotosTatuagens ?? this.fotosTatuagens,
       lesoes: lesoes ?? this.lesoes,
+      ausenciaLesoesDefesa: ausenciaLesoesDefesa ?? this.ausenciaLesoesDefesa,
+      membrosExaminadosDefesa: membrosExaminadosDefesa ?? this.membrosExaminadosDefesa,
+      observacoesLesoesDefesa: observacoesLesoesDefesa ?? this.observacoesLesoesDefesa,
+      fotosLesoesDefesa: fotosLesoesDefesa ?? this.fotosLesoesDefesa,
+      numerosFotosLesoesDefesa: numerosFotosLesoesDefesa ?? this.numerosFotosLesoesDefesa,
       vestes: vestes ?? this.vestes,
       tatuagensMarcas: tatuagensMarcas ?? this.tatuagensMarcas,
       pertences: pertences ?? this.pertences,

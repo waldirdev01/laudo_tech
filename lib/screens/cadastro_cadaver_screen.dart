@@ -92,6 +92,13 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   bool? _secrecaoPenianaVaginal;
 
   List<LesaoCadaverModel> _lesoes = [];
+
+  // Ausência de lesões de defesa
+  bool _ausenciaLesoesDefesa = false;
+  final List<String> _membrosExaminadosDefesa = [];
+  final _obsLesoesDefesaCtrl = TextEditingController();
+  List<String> _fotosLesoesDefesa = [];
+
   List<VesteCadaverModel> _vestes = [];
 
   // Fotos dos exames (paths locais)
@@ -165,6 +172,12 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _pertencesCtrl.text = c.pertences ?? '';
 
     _lesoes = List<LesaoCadaverModel>.from(c.lesoes ?? []);
+    _ausenciaLesoesDefesa = c.ausenciaLesoesDefesa;
+    _membrosExaminadosDefesa
+      ..clear()
+      ..addAll(c.membrosExaminadosDefesa);
+    _obsLesoesDefesaCtrl.text = c.observacoesLesoesDefesa ?? '';
+    _fotosLesoesDefesa = List<String>.from(c.fotosLesoesDefesa);
     _vestes = List<VesteCadaverModel>.from(c.vestes ?? []);
 
     _fotosVistaCadaversAmbiente =
@@ -206,6 +219,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _secrecaoAnalTipoCtrl.dispose();
     _secrecaoPenianaVaginalTipoCtrl.dispose();
     _outrasObservacoesCtrl.dispose();
+    _obsLesoesDefesaCtrl.dispose();
     _tatuagensMarcasCtrl.dispose();
     _pertencesCtrl.dispose();
     super.dispose();
@@ -318,6 +332,12 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
           ? null
           : _outrasObservacoesCtrl.text.trim(),
       lesoes: _lesoes,
+      ausenciaLesoesDefesa: _ausenciaLesoesDefesa,
+      membrosExaminadosDefesa: List.from(_membrosExaminadosDefesa),
+      observacoesLesoesDefesa: _obsLesoesDefesaCtrl.text.trim().isEmpty
+          ? null
+          : _obsLesoesDefesaCtrl.text.trim(),
+      fotosLesoesDefesa: _fotosLesoesDefesa,
       vestes: _vestes,
       fotosVistaCadaversAmbiente: _fotosVistaCadaversAmbiente,
       fotosPosicaoEncontrada: _fotosPosicaoEncontrada,
@@ -464,7 +484,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     decoration: const InputDecoration(
                       labelText: 'Número do Laudo Cadavérico',
                       border: OutlineInputBorder(),
-                      prefixText: '/20',
+                      hintText: 'Ex: 123/2026',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1460,6 +1480,84 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         onTap: () => _editarLesao(index),
                       );
                     }),
+                ],
+              ),
+            ),
+          ),
+
+          // Ausência de lesões de defesa
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'LESÕES DE DEFESA',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const Divider(),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Ausência de lesões de defesa'),
+                    subtitle: const Text(
+                      'Nenhuma lesão de defesa observada nos membros examinados',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: _ausenciaLesoesDefesa,
+                    onChanged: (v) => setState(() {
+                      _ausenciaLesoesDefesa = v ?? false;
+                      if (!_ausenciaLesoesDefesa) {
+                        _membrosExaminadosDefesa.clear();
+                      }
+                    }),
+                  ),
+                  if (_ausenciaLesoesDefesa) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Membros examinados:',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    for (final membro in [
+                      'Membro superior direito',
+                      'Membro superior esquerdo',
+                      'Membro inferior direito',
+                      'Membro inferior esquerdo',
+                    ])
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(membro),
+                        value: _membrosExaminadosDefesa.contains(membro),
+                        onChanged: (v) => setState(() {
+                          if (v == true) {
+                            _membrosExaminadosDefesa.add(membro);
+                          } else {
+                            _membrosExaminadosDefesa.remove(membro);
+                          }
+                        }),
+                      ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _obsLesoesDefesaCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Observações (opcional)',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildSecaoFotos(
+                      titulo: 'Fotos dos membros',
+                      paths: _fotosLesoesDefesa,
+                      onChanged: (v) => setState(() => _fotosLesoesDefesa = v),
+                      subpasta: 'lesoes_defesa',
+                    ),
+                  ],
                 ],
               ),
             ),

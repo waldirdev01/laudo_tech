@@ -466,13 +466,25 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                 ? '${descResumo.substring(0, 60)}...'
                 : descResumo;
             final legenda =
-                'Lesão em ${lesao.regiao}: $legendaTexto${legendaTexto.endsWith('.') ? '' : '.'}';
+                '$legendaTexto${legendaTexto.endsWith('.') ? '' : '.'}';
             for (final p in lesao.fotosPaths) {
               final resolved = await _resolverPath(p, basePath);
               if (resolved != null) {
                 orderedPaths.add(resolved);
                 pathMap[p] = resolved;
                 pathToLegenda[resolved] = legenda;
+              }
+            }
+          }
+          // Fotos de ausência de lesões de defesa (sempre por último nas lesões)
+          if (c.ausenciaLesoesDefesa) {
+            for (final p in c.fotosLesoesDefesa) {
+              final resolved = await _resolverPath(p, basePath);
+              if (resolved != null) {
+                orderedPaths.add(resolved);
+                pathMap[p] = resolved;
+                pathToLegenda[resolved] =
+                    'Ausência de lesões de defesa (cadáver ${c.numero}).';
               }
             }
           }
@@ -626,7 +638,18 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
               numerosFotografias: nums.isEmpty ? null : nums,
             );
           }).toList();
-          return c.copyWith(lesoes: lesoesComNumeros);
+          // Números das fotos de ausência de lesões de defesa
+          final numsDefesa = <int>[];
+          for (final p in c.fotosLesoesDefesa) {
+            final resolved = pathMap[p] ?? p;
+            final idx = pathsFinais.indexOf(resolved);
+            if (idx >= 0) numsDefesa.add(idx + 1);
+          }
+          numsDefesa.sort();
+          return c.copyWith(
+            lesoes: lesoesComNumeros,
+            numerosFotosLesoesDefesa: numsDefesa.isEmpty ? null : numsDefesa,
+          );
         }).toList();
       }
 

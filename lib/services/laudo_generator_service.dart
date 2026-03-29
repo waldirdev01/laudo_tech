@@ -2267,7 +2267,7 @@ class LaudoGeneratorService {
         frase1.write(', nascida em ${cadaver.dataNascimento}');
       }
       if (cadaver.filiacao != null && cadaver.filiacao!.isNotEmpty) {
-        frase1.write(', filha(o) de ${cadaver.filiacao}');
+        frase1.write(', filha(o) de ${_formatarNomeCorreto(cadaver.filiacao!)}');
       }
       frase1.write('.');
     } else {
@@ -2598,6 +2598,44 @@ class LaudoGeneratorService {
       }
 
       buffer.writeln(_gerarParagrafoLista('$letra) $descricaoLesao'));
+    }
+
+    // Ausência de lesões de defesa
+    if (cadaver.ausenciaLesoesDefesa) {
+      final membros = cadaver.membrosExaminadosDefesa;
+      String textoMembros;
+      if (membros.isEmpty) {
+        textoMembros = 'nos membros examinados';
+      } else if (membros.length == 1) {
+        textoMembros = 'no ${membros.first.toLowerCase()}';
+      } else {
+        final ultimo = membros.last.toLowerCase();
+        final demais = membros.sublist(0, membros.length - 1).map((m) => m.toLowerCase()).join(', ');
+        textoMembros = 'no $demais e $ultimo';
+      }
+
+      String textoDefesa = 'Não foram observadas lesões de defesa $textoMembros';
+
+      final nums = cadaver.numerosFotosLesoesDefesa;
+      if (nums != null && nums.isNotEmpty) {
+        final numsFmt = nums.map((n) => n.toString().padLeft(2, '0')).toList();
+        if (numsFmt.length == 1) {
+          textoDefesa += ' (Fotografia ${numsFmt.first})';
+        } else if (numsFmt.length == 2) {
+          textoDefesa += ' (Fotografias ${numsFmt[0]} e ${numsFmt[1]})';
+        } else {
+          textoDefesa +=
+              ' (Fotografias ${numsFmt.sublist(0, numsFmt.length - 1).join(', ')} e ${numsFmt.last})';
+        }
+      }
+      textoDefesa += '.';
+
+      if (cadaver.observacoesLesoesDefesa != null &&
+          cadaver.observacoesLesoesDefesa!.isNotEmpty) {
+        textoDefesa += ' ${cadaver.observacoesLesoesDefesa}';
+      }
+
+      buffer.writeln(_gerarParagrafoHistorico(textoDefesa));
     }
 
     // Exames complementares do cadáver (rigidez, hipóstase, secreções)

@@ -302,18 +302,34 @@ class _LocalScreenState extends State<LocalScreen> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: false,
+      withData: true,
     );
     if (result == null || result.files.isEmpty || !mounted) return;
-    final path = result.files.single.path;
-    if (path == null || path.isEmpty) return;
+    final file = result.files.single;
     try {
       final dir = await getApplicationDocumentsDirectory();
       final capturaDir = Directory('${dir.path}/laudo_tech/captura_local');
       if (!await capturaDir.exists()) await capturaDir.create(recursive: true);
-      final ext = path.split('.').last;
+      final ext = (file.extension ?? 'jpg').toLowerCase();
       final destPath =
           '${capturaDir.path}/local_${DateTime.now().millisecondsSinceEpoch}.$ext';
-      await File(path).copy(destPath);
+
+      if (file.path != null && file.path!.isNotEmpty) {
+        await File(file.path!).copy(destPath);
+      } else if (file.bytes != null) {
+        await File(destPath).writeAsBytes(file.bytes!);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Não foi possível acessar a imagem. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       if (mounted) {
         setState(() => _capturaTelaLocalPath = destPath);
         ScaffoldMessenger.of(context).showSnackBar(
