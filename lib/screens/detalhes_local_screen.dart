@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/detatlhes_local.dart';
@@ -15,10 +14,10 @@ import '../models/unidade_model.dart';
 import '../models/vestigio_local_model.dart';
 import '../services/ficha_service.dart';
 import '../services/laboratorio_service.dart';
-import '../services/perito_service.dart';
 import '../services/unidade_service.dart';
 import 'evidencias_furto_screen.dart';
 import 'lista_veiculos_screen.dart';
+import 'vestigio_local_form_screen.dart';
 
 class LocalFurtoScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -31,7 +30,6 @@ class LocalFurtoScreen extends StatefulWidget {
 
 class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   final _fichaService = FichaService();
-  final _peritoService = PeritoService();
   final _unidadeService = UnidadeService();
   final _laboratorioService = LaboratorioService();
   final _imagePicker = ImagePicker();
@@ -207,7 +205,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   bool _semVestigiosMediato = false;
   bool _semVestigiosImediato = false;
   bool _semVestigiosRelacionado = false;
-  List<String> _fotosVistaAmplaPaths = [];
+  final List<String> _fotosVistaAmplaPaths = [];
 
   /// true = via pública / área aberta; false = imóvel; null = não definido
   bool? _localEmViaPublica;
@@ -283,12 +281,44 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _semVestigiosMediato = dados.semVestigiosMediato ?? false;
       _semVestigiosImediato = dados.semVestigiosImediato ?? false;
       _semVestigiosRelacionado = dados.semVestigiosRelacionado ?? false;
-      _demaisObservacoesController.text = dados.demaisObservacoes ?? '';
-      _fotosVistaAmplaPaths = List<String>.from(
-        dados.fotosVistaAmplaPaths ?? [],
-      )..removeWhere((p) => !File(p).existsSync());
-      _localEmViaPublica = dados.localEmViaPublica;
+    } else if (widget.ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) {
+      // Pré-popular vestígios padrão para Morte a Esclarecer (apenas na primeira abertura)
+      _classificacaoImediato = true;
+      _vestigiosImediato = _vestigiosPadraoMorteEsclarecer();
     }
+  }
+
+  List<VestigioLocalModel> _vestigiosPadraoMorteEsclarecer() {
+    return [
+      VestigioLocalModel(
+        id: 'me_01',
+        descricao: 'Presença do corpo da vítima',
+        tipoAcao: TipoAcaoVestigio.registrado,
+      ),
+      VestigioLocalModel(
+        id: 'me_02',
+        descricao:
+            'Ausência de sinais de luta tanto no ambiente externo quanto no interno (objetos e móveis alinhados)',
+        tipoAcao: TipoAcaoVestigio.registrado,
+      ),
+      VestigioLocalModel(
+        id: 'me_03',
+        descricao:
+            'Ausência de objetos do tipo arma eventual ou vestígios do uso de armas',
+        tipoAcao: TipoAcaoVestigio.registrado,
+      ),
+      VestigioLocalModel(
+        id: 'me_04',
+        descricao: 'Ausência de produtos tóxicos nas imediações do local',
+        tipoAcao: TipoAcaoVestigio.registrado,
+      ),
+      VestigioLocalModel(
+        id: 'me_05',
+        descricao:
+            'Ausência de outros elementos relevantes para a perícia criminal',
+        tipoAcao: TipoAcaoVestigio.registrado,
+      ),
+    ];
   }
 
   @override
@@ -520,17 +550,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     });
   }
 
-  String _gerarIdVestigio() => DateTime.now().microsecondsSinceEpoch.toString();
-
-  String _nomeArquivo(String path) {
-    final idx = path.lastIndexOf(Platform.pathSeparator);
-    return idx >= 0 ? path.substring(idx + 1) : path;
-  }
-
   Future<String?> _persistirFotoVestigio(XFile arquivo) async {
     try {
-      final origem = File(arquivo.path);
-      if (!await origem.exists()) return null;
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
         '${dir.path}/levantamento_fotografico/${widget.ficha.id}',
@@ -544,7 +565,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       final destino = File(
         '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
       );
-      await origem.copy(destino.path);
+      final bytes = await arquivo.readAsBytes();
+      await destino.writeAsBytes(bytes);
       return destino.path;
     } catch (_) {
       return null;
@@ -555,545 +577,69 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     String secao, {
     VestigioLocalModel? existente,
   }) async {
-    final descricaoCtrl = TextEditingController(
-      text: existente?.descricao ?? '',
-    );
-    final coordenadaXCtrl = TextEditingController(
-      text: existente?.coordenadaX ?? '',
-    );
-    final coordenadaYCtrl = TextEditingController(
-      text: existente?.coordenadaY ?? '',
-    );
-    final alturaCtrl = TextEditingController(
-      text: existente?.alturaRelacaoPiso ?? '',
-    );
-    final fotosVinculadas = List<String>.from(
-      existente?.fotosVinculadasPaths ?? const <String>[],
-    );
+    final inclusaoContinua = existente == null;
 
-    TipoAcaoVestigio? tipoAcaoSelecionado = existente?.tipoAcao;
-    TipoDestinoVestigio? tipoDestinoSelecionado = existente?.tipoDestino;
-    String? destinoIdSelecionado = existente?.destinoId;
-    final numeroLacreCtrl = TextEditingController(
-      text: existente?.numeroLacre ?? '',
+    final resultado = await Navigator.of(context).push<VestigioLocalModel>(
+      MaterialPageRoute(
+        builder: (ctx) => VestigioLocalFormScreen(
+          fichaId: widget.ficha.id,
+          vestigioExistente: existente,
+          manterNaTelaAposSalvarNovo: inclusaoContinua,
+          onSalvo: inclusaoContinua
+              ? (VestigioLocalModel v) {
+                  if (!mounted) return;
+                  setState(() {
+                    switch (secao) {
+                      case 'mediato':
+                        _vestigiosMediato.add(v);
+                        _semVestigiosMediato = false;
+                        break;
+                      case 'imediato':
+                        _vestigiosImediato.add(v);
+                        _semVestigiosImediato = false;
+                        break;
+                      default:
+                        _vestigiosRelacionado.add(v);
+                        _semVestigiosRelacionado = false;
+                        break;
+                    }
+                  });
+                }
+              : null,
+        ),
+      ),
     );
-    bool isSangueHumano = existente?.isSangueHumano ?? false;
 
     if (!mounted) return;
 
-    // Obter nome do perito
-    final perito = await _peritoService.obterPerito();
-    final nomePerito = perito?.nome ?? '';
+    // Novos vestígios já foram incluídos em [onSalvo] a cada salvamento.
+    if (inclusaoContinua) return;
 
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        String? erroMensagem;
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(
-                existente == null ? 'Adicionar vestígio' : 'Editar vestígio',
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (erroMensagem != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          border: Border.all(color: Colors.red.shade300),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Colors.red.shade700,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                erroMensagem!,
-                                style: TextStyle(
-                                  color: Colors.red.shade900,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    TextFormField(
-                      controller: descricaoCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Descrição do vestígio *',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.newline,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Fotografias do vestígio *',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final foto = await _imagePicker.pickImage(
-                              source: ImageSource.camera,
-                              imageQuality: 90,
-                            );
-                            if (foto == null) return;
-                            final path = await _persistirFotoVestigio(foto);
-                            if (path == null) return;
-                            setDialogState(() {
-                              fotosVinculadas.add(path);
-                            });
-                          },
-                          icon: const Icon(Icons.photo_camera),
-                          label: const Text('Fotografar'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final fotos = await _imagePicker.pickMultiImage(
-                              imageQuality: 90,
-                            );
-                            if (fotos.isEmpty) return;
-                            for (final foto in fotos) {
-                              final path = await _persistirFotoVestigio(foto);
-                              if (path != null) {
-                                setDialogState(() {
-                                  fotosVinculadas.add(path);
-                                });
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.photo_library),
-                          label: const Text('Galeria'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (fotosVinculadas.isEmpty)
-                      Text(
-                        'Nenhuma foto vinculada.',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      )
-                    else
-                      ...fotosVinculadas.asMap().entries.map(
-                        (entry) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.image_outlined, size: 18),
-                          title: Text(
-                            _nomeArquivo(entry.value),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            tooltip: 'Remover foto',
-                            onPressed: () {
-                              setDialogState(() {
-                                fotosVinculadas.removeAt(entry.key);
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: coordenadaXCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Coordenada X *',
-                              border: OutlineInputBorder(),
-                              hintText: 'Ex: -23,5 ou -23.5',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              signed: true,
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: coordenadaYCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Coordenada Y *',
-                              border: OutlineInputBorder(),
-                              hintText: 'Ex: -46,6 ou -46.6',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              signed: true,
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: alturaCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Altura em relação ao piso (opcional)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.text,
-                    ),
-                    const SizedBox(height: 16),
-                    CheckboxListTile(
-                      title: const Text('Sangue humano'),
-                      subtitle: const Text(
-                        'Marque se este vestígio é sangue humano (para textos específicos no laudo)',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      value: isSangueHumano,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          isSangueHumano = value ?? false;
-                        });
-                      },
-                      activeColor: Colors.red.shade700,
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'O vestígio será coletado ou apenas registrado?',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    RadioGroup<TipoAcaoVestigio>(
-                      groupValue: tipoAcaoSelecionado,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          tipoAcaoSelecionado = value;
-                          if (value != TipoAcaoVestigio.coletado) {
-                            tipoDestinoSelecionado = null;
-                            destinoIdSelecionado = null;
-                          }
-                        });
-                      },
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: Radio<TipoAcaoVestigio>(
-                              value: TipoAcaoVestigio.registrado,
-                            ),
-                            title: const Text('Apenas Registrado'),
-                            onTap: () {
-                              setDialogState(() {
-                                tipoAcaoSelecionado =
-                                    TipoAcaoVestigio.registrado;
-                                tipoDestinoSelecionado = null;
-                                destinoIdSelecionado = null;
-                              });
-                            },
-                          ),
-                          ListTile(
-                            leading: Radio<TipoAcaoVestigio>(
-                              value: TipoAcaoVestigio.coletado,
-                            ),
-                            title: const Text('Coletado'),
-                            onTap: () {
-                              setDialogState(() {
-                                tipoAcaoSelecionado = TipoAcaoVestigio.coletado;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (tipoAcaoSelecionado == TipoAcaoVestigio.coletado) ...[
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Será analisado na Unidade ou encaminhado para laboratório?',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 8),
-                      RadioGroup<TipoDestinoVestigio>(
-                        groupValue: tipoDestinoSelecionado,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            tipoDestinoSelecionado = value;
-                            destinoIdSelecionado = null;
-                          });
-                        },
-                        child: Column(
-                          children: [
-                            ListTile(
-                              leading: Radio<TipoDestinoVestigio>(
-                                value: TipoDestinoVestigio.unidade,
-                              ),
-                              title: const Text('Unidade'),
-                              onTap: () {
-                                setDialogState(() {
-                                  tipoDestinoSelecionado =
-                                      TipoDestinoVestigio.unidade;
-                                  destinoIdSelecionado = null;
-                                });
-                              },
-                            ),
-                            ListTile(
-                              leading: Radio<TipoDestinoVestigio>(
-                                value: TipoDestinoVestigio.laboratorio,
-                              ),
-                              title: const Text('Laboratório'),
-                              onTap: () {
-                                setDialogState(() {
-                                  tipoDestinoSelecionado =
-                                      TipoDestinoVestigio.laboratorio;
-                                  destinoIdSelecionado = null;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (tipoDestinoSelecionado != null) ...[
-                        const SizedBox(height: 12),
-                        FutureBuilder<List<dynamic>>(
-                          future:
-                              tipoDestinoSelecionado ==
-                                  TipoDestinoVestigio.unidade
-                              ? _unidadeService.listarUnidades()
-                              : _laboratorioService.listarLaboratorios(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            }
-                            final lista = snapshot.data ?? [];
-                            if (lista.isEmpty) {
-                              final tipoTexto =
-                                  tipoDestinoSelecionado ==
-                                      TipoDestinoVestigio.unidade
-                                  ? 'unidade'
-                                  : 'laboratório';
-                              return Text(
-                                'Nenhuma $tipoTexto cadastrada. Cadastre em Configurações.',
-                                style: const TextStyle(
-                                  color: Colors.orange,
-                                  fontSize: 12,
-                                ),
-                              );
-                            }
-                            return DropdownButtonFormField<String>(
-                              isExpanded: true,
-                              initialValue: destinoIdSelecionado,
-                              decoration: InputDecoration(
-                                labelText:
-                                    tipoDestinoSelecionado ==
-                                        TipoDestinoVestigio.unidade
-                                    ? 'Selecione a Unidade'
-                                    : 'Selecione o Laboratório',
-                                border: const OutlineInputBorder(),
-                              ),
-                              selectedItemBuilder: (context) {
-                                return lista.map<Widget>((item) {
-                                  final nome =
-                                      tipoDestinoSelecionado ==
-                                          TipoDestinoVestigio.unidade
-                                      ? (item as UnidadeModel).nome
-                                      : (item as LaboratorioModel).nome;
-                                  return Text(
-                                    nome,
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                  );
-                                }).toList();
-                              },
-                              items: lista.map<DropdownMenuItem<String>>((
-                                item,
-                              ) {
-                                final nome =
-                                    tipoDestinoSelecionado ==
-                                        TipoDestinoVestigio.unidade
-                                    ? (item as UnidadeModel).nome
-                                    : (item as LaboratorioModel).nome;
-                                final id = item.id;
-                                return DropdownMenuItem<String>(
-                                  value: id,
-                                  child: Text(nome),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setDialogState(() {
-                                  destinoIdSelecionado = value;
-                                });
-                              },
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: numeroLacreCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Número do lacre (opcional)',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    setDialogState(() {
-                      erroMensagem = null;
-                    });
+    if (resultado == null) return;
 
-                    if (descricaoCtrl.text.trim().isEmpty ||
-                        coordenadaXCtrl.text.trim().isEmpty ||
-                        coordenadaYCtrl.text.trim().isEmpty) {
-                      setDialogState(() {
-                        erroMensagem = 'Preencha descrição e coordenadas X e Y';
-                      });
-                      return;
-                    }
-
-                    if (fotosVinculadas.isEmpty) {
-                      setDialogState(() {
-                        erroMensagem =
-                            'Informe ao menos uma fotografia relacionada ao vestígio.';
-                      });
-                      return;
-                    }
-
-                    if (tipoAcaoSelecionado == TipoAcaoVestigio.coletado) {
-                      if (tipoDestinoSelecionado == null) {
-                        setDialogState(() {
-                          erroMensagem =
-                              'Selecione se será analisado na Unidade ou encaminhado para laboratório';
-                        });
-                        return;
-                      }
-
-                      // Verificar se há itens disponíveis
-                      final lista =
-                          tipoDestinoSelecionado == TipoDestinoVestigio.unidade
-                          ? await _unidadeService.listarUnidades()
-                          : await _laboratorioService.listarLaboratorios();
-
-                      if (lista.isEmpty) {
-                        final tipoTexto =
-                            tipoDestinoSelecionado ==
-                                TipoDestinoVestigio.unidade
-                            ? 'unidade'
-                            : 'laboratório';
-                        setDialogState(() {
-                          erroMensagem =
-                              'Nenhuma $tipoTexto cadastrada. Cadastre em Configurações antes de salvar.';
-                        });
-                        return;
-                      }
-
-                      if (destinoIdSelecionado == null) {
-                        setDialogState(() {
-                          final tipoTexto =
-                              tipoDestinoSelecionado ==
-                                  TipoDestinoVestigio.unidade
-                              ? 'unidade'
-                              : 'laboratório';
-                          erroMensagem = 'Selecione a $tipoTexto de destino';
-                        });
-                        return;
-                      }
-                    }
-
-                    String? coletadoPor;
-                    String? dataHoraColeta;
-                    if (tipoAcaoSelecionado == TipoAcaoVestigio.coletado) {
-                      coletadoPor = nomePerito;
-                      final agora = DateTime.now();
-                      dataHoraColeta = DateFormat(
-                        'dd/MM/yyyy HH:mm',
-                      ).format(agora);
-                    }
-
-                    final novo = VestigioLocalModel(
-                      id: existente?.id ?? _gerarIdVestigio(),
-                      descricao: descricaoCtrl.text.trim(),
-                      coordenadaX: coordenadaXCtrl.text.trim(),
-                      coordenadaY: coordenadaYCtrl.text.trim(),
-                      alturaRelacaoPiso: alturaCtrl.text.trim().isEmpty
-                          ? null
-                          : alturaCtrl.text.trim(),
-                      tipoAcao: tipoAcaoSelecionado,
-                      tipoDestino: tipoDestinoSelecionado,
-                      destinoId: destinoIdSelecionado,
-                      coletadoPor: coletadoPor,
-                      dataHoraColeta: dataHoraColeta,
-                      numeroLacre: numeroLacreCtrl.text.trim().isEmpty
-                          ? null
-                          : numeroLacreCtrl.text.trim(),
-                      isSangueHumano: isSangueHumano,
-                      fotosVinculadasPaths: fotosVinculadas,
-                    );
-
-                    setState(() {
-                      List<VestigioLocalModel> alvo;
-                      switch (secao) {
-                        case 'mediato':
-                          alvo = _vestigiosMediato;
-                          _semVestigiosMediato = false;
-                          break;
-                        case 'imediato':
-                          alvo = _vestigiosImediato;
-                          _semVestigiosImediato = false;
-                          break;
-                        default:
-                          alvo = _vestigiosRelacionado;
-                          _semVestigiosRelacionado = false;
-                          break;
-                      }
-
-                      final idx = alvo.indexWhere((e) => e.id == novo.id);
-                      if (idx >= 0) {
-                        alvo[idx] = novo;
-                      } else {
-                        alvo.add(novo);
-                      }
-                    });
-                    if (mounted) {
-                      // ignore: use_build_context_synchronously
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: const Text('Salvar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    setState(() {
+      List<VestigioLocalModel> alvo;
+      switch (secao) {
+        case 'mediato':
+          alvo = _vestigiosMediato;
+          _semVestigiosMediato = false;
+          break;
+        case 'imediato':
+          alvo = _vestigiosImediato;
+          _semVestigiosImediato = false;
+          break;
+        default:
+          alvo = _vestigiosRelacionado;
+          _semVestigiosRelacionado = false;
+          break;
+      }
+      final idx = alvo.indexWhere((e) => e.id == resultado.id);
+      if (idx >= 0) {
+        alvo[idx] = resultado;
+      } else {
+        alvo.add(resultado);
+      }
+    });
   }
 
   void _removerVestigio(String secao, String id) {
@@ -1265,7 +811,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         if (!mounted) return;
 
         // Verificar tipo de ocorrência
-        if (fichaAtualizada.tipoOcorrencia == TipoOcorrencia.cvli) {
+        if (fichaAtualizada.tipoOcorrencia == TipoOcorrencia.cvli ||
+            fichaAtualizada.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) {
           // Para CVLI, navegar para tela de veículos e aguardar retorno
           final resultadoVeiculos = await Navigator.of(context).push(
             MaterialPageRoute(
@@ -1778,6 +1325,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     required bool? iluminacaoAusente,
     required void Function(bool?, String) onPisoChanged,
     required void Function(bool?, String) onIluminacaoChanged,
+    bool showMarcoZero = true,
   }) {
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -1807,7 +1355,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(12),
-              child: Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (_localEmViaPublica != true && local == 'mediato')
@@ -1835,61 +1383,63 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                   minLines: 4,
                   textInputAction: TextInputAction.newline,
                 ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-                const Text(
-                  'Marco Zero',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: marcoZeroDescricaoController,
-                  decoration: const InputDecoration(
-                    labelText: 'Descrição do Marco Zero',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+                if (showMarcoZero) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Marco Zero',
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  maxLines: null,
-                  minLines: 2,
-                  textInputAction: TextInputAction.newline,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: marcoZeroXController,
-                        decoration: const InputDecoration(
-                          labelText: 'Coordenada X',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          hintText: 'Ex: -23,5',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          signed: true,
-                          decimal: true,
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: marcoZeroDescricaoController,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição do Marco Zero',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    maxLines: null,
+                    minLines: 2,
+                    textInputAction: TextInputAction.newline,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: marcoZeroXController,
+                          decoration: const InputDecoration(
+                            labelText: 'Coordenada X',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            hintText: 'Ex: -23,5',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            signed: true,
+                            decimal: true,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: marcoZeroYController,
-                        decoration: const InputDecoration(
-                          labelText: 'Coordenada Y',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          hintText: 'Ex: -46,6',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          signed: true,
-                          decimal: true,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: marcoZeroYController,
+                          decoration: const InputDecoration(
+                            labelText: 'Coordenada Y',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            hintText: 'Ex: -46,6',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            signed: true,
+                            decimal: true,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 12),
@@ -2040,6 +1590,16 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                 ),
                               ],
                             ),
+                            if (v.nome != null && v.nome!.trim().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Nome: ${v.nome}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
                             if (v.descricao != null && v.descricao!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
@@ -2234,7 +1794,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Local - Detalhes do Local'),
+        title: const Text('Descrição do Local'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -2282,10 +1842,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                 children: [
                   const Text(
                     'O local é em imóvel (fechado) ou em via pública / área aberta?',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   const SizedBox(height: 12),
                   RadioGroup<bool>(
@@ -2309,7 +1866,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           children: [
                             Radio<bool>(value: false),
                             const Expanded(
-                              child: Text('Imóvel (fechado)', style: TextStyle(fontSize: 14)),
+                              child: Text(
+                                'Imóvel (fechado)',
+                                style: TextStyle(fontSize: 14),
+                              ),
                             ),
                           ],
                         ),
@@ -2575,21 +2135,26 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Text(
-                          'Descrições por Local e Vestígios:',
+                          'Descrição por Área:',
                           style: TextStyle(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Descrever detalhadamente os Locais Mediato, Imediato e Relacionado (nesta ordem), do geral para o particular. Em cada local, registrar os vestígios encontrados e sua posição no cenário.',
+                          'Descreva os Locais Mediato, Imediato e Relacionado do geral para o particular. Registre aqui vestígios observados durante a descrição física de cada área. Os quesitos periciais obrigatórios (EV01–EV07) e a coleta de materiais são preenchidos na próxima tela.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         if ((_classificacaoMediato ?? false)) ...[
                           _buildSecaoLocalDetalhado(
                             titulo: 'Local Mediato',
                             local: 'mediato',
+                            showMarcoZero:
+                                widget.ficha.tipoOcorrencia !=
+                                TipoOcorrencia.morteEsclarecer,
                             descricaoController: _descricaoMediatoController,
                             marcoZeroDescricaoController:
                                 _marcoZeroDescricaoMediatoController,
@@ -2627,6 +2192,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           _buildSecaoLocalDetalhado(
                             titulo: 'Local Imediato',
                             local: 'imediato',
+                            showMarcoZero:
+                                widget.ficha.tipoOcorrencia !=
+                                TipoOcorrencia.morteEsclarecer,
                             descricaoController: _descricaoImediatoController,
                             marcoZeroDescricaoController:
                                 _marcoZeroDescricaoImediatoController,
@@ -2664,6 +2232,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           _buildSecaoLocalDetalhado(
                             titulo: 'Local Relacionado',
                             local: 'relacionado',
+                            showMarcoZero:
+                                widget.ficha.tipoOcorrencia !=
+                                TipoOcorrencia.morteEsclarecer,
                             descricaoController:
                                 _descricaoRelacionadoController,
                             marcoZeroDescricaoController:

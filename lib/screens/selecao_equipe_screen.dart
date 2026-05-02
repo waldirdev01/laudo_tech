@@ -430,10 +430,17 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
         .where((m) => !_demaisServidoresSelecionados.contains(m.id))
         .toList();
 
+    final idsDemaisOrdenados = [..._demaisServidoresSelecionados]
+      ..sort((a, b) {
+        final na = _obterMembroPorId(a)?.nome ?? '';
+        final nb = _obterMembroPorId(b)?.nome ?? '';
+        return na.toLowerCase().compareTo(nb.toLowerCase());
+      });
+
     return Column(
       children: [
         // Lista de membros selecionados
-        ..._demaisServidoresSelecionados.map((id) {
+        ...idsDemaisOrdenados.map((id) {
           final membro = _obterMembroPorId(id);
           if (membro == null) return const SizedBox.shrink();
           return Card(

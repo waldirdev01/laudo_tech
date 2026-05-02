@@ -4,7 +4,8 @@ import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
 import 'cadastro_envolvido_transito_screen.dart';
-import 'natureza_ocorrencia_transito_screen.dart';
+import 'atropelamento_calculo_screen.dart';
+import 'dinamica_fato_transito_screen.dart';
 
 class ListaEnvolvidosTransitoScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -125,9 +126,16 @@ class _ListaEnvolvidosTransitoScreenState
   Future<void> _avancarParaCalculoVelocidade() async {
     await _salvar();
     if (!mounted) return;
+    final formas = _ficha.crimeTransitoLevantamento?.formasInteracao ??
+        _ficha.crimeTransitoNatureza?.formasInteracao ??
+        [];
+    final temAtropelamento =
+        formas.contains(CrimeTransitoFormaInteracao.atropelamento);
     final resultado = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => NaturezaOcorrenciaTransitoScreen(ficha: _ficha),
+        builder: (context) => temAtropelamento
+            ? AtropelamentoCalculoScreen(ficha: _ficha)
+            : DinamicaFatoTransitoScreen(ficha: _ficha),
       ),
     );
     if (resultado == true && mounted) {

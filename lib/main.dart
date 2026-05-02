@@ -15,6 +15,7 @@ void main() {
 
   // Configurar Edge-to-Edge para Android 15+
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,

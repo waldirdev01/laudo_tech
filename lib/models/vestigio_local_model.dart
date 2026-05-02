@@ -21,6 +21,10 @@ enum TipoDestinoVestigio {
 /// Representa um vestígio associado a um dos locais (mediato, imediato ou relacionado).
 class VestigioLocalModel {
   final String id;
+
+  /// Nome ou título curto do vestígio (opcional), para identificação rápida.
+  final String? nome;
+
   final String? descricao;
   
   // Coordenadas (substitui posicionamento)
@@ -55,6 +59,7 @@ class VestigioLocalModel {
 
   VestigioLocalModel({
     required this.id,
+    this.nome,
     this.descricao,
     this.coordenadaX,
     this.coordenadaY,
@@ -70,8 +75,18 @@ class VestigioLocalModel {
     this.fotosVinculadasPaths = const [],
   });
 
+  /// Nome + descrição para textos de laudo, Word e legendas de foto.
+  String get rotuloNomeDescricao {
+    final n = nome?.trim() ?? '';
+    final d = (descricao ?? '').trim();
+    if (n.isEmpty) return d;
+    if (d.isEmpty) return n;
+    return '$n — $d';
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
+        'nome': nome,
         'descricao': descricao,
         'coordenadaX': coordenadaX,
         'coordenadaY': coordenadaY,
@@ -106,6 +121,7 @@ class VestigioLocalModel {
 
     return VestigioLocalModel(
       id: json['id'] as String? ?? '',
+      nome: json['nome'] as String?,
       descricao: json['descricao'] as String?,
       coordenadaX: json['coordenadaX'] as String?,
       coordenadaY: json['coordenadaY'] as String?,
@@ -130,6 +146,7 @@ class VestigioLocalModel {
 
   VestigioLocalModel copyWith({
     String? id,
+    String? nome,
     String? descricao,
     String? coordenadaX,
     String? coordenadaY,
@@ -146,6 +163,7 @@ class VestigioLocalModel {
   }) {
     return VestigioLocalModel(
       id: id ?? this.id,
+      nome: nome ?? this.nome,
       descricao: descricao ?? this.descricao,
       coordenadaX: coordenadaX ?? this.coordenadaX,
       coordenadaY: coordenadaY ?? this.coordenadaY,

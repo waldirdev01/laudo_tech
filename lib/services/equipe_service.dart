@@ -35,9 +35,13 @@ class EquipeService {
     final prefs = await SharedPreferences.getInstance();
     final equipeJson = prefs.getStringList(_equipeKey) ?? [];
     
-    return equipeJson
+    final list = equipeJson
         .map((json) => MembroEquipeModel.fromJson(jsonDecode(json)))
         .toList();
+    list.sort(
+      (a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()),
+    );
+    return list;
   }
 
   /// Lista membros por cargo

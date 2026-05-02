@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/cadaver_model.dart';
+import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../models/veiculo_model.dart';
@@ -16,8 +17,8 @@ import '../services/ficha_service.dart';
 import '../services/laudo_generator_service.dart';
 import '../services/perito_service.dart';
 import '../services/word_generator_service.dart';
+import 'atropelamento_calculo_screen.dart';
 import 'dinamica_fato_transito_screen.dart';
-import 'natureza_ocorrencia_transito_screen.dart';
 import 'condicoes_observacoes_screen.dart';
 import 'crime_transito_condicoes_screen.dart';
 import 'crime_transito_levantamento_screen.dart';
@@ -146,7 +147,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                 onTap: () => Navigator.of(context).pop('condicoes'),
               ),
               if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
-                  ficha.tipoOcorrencia == TipoOcorrencia.cvli) ...[
+                  ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
+                  ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) ...[
                 ListTile(
                   leading: const Icon(Icons.home),
                   title: const Text('9. Local - Detalhes do Local'),
@@ -159,7 +161,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                   title: const Text('10. Evidências'),
                   onTap: () => Navigator.of(context).pop('evidencias'),
                 ),
-              if (ficha.tipoOcorrencia == TipoOcorrencia.cvli) ...[
+              if (ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
+                  ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) ...[
                 ListTile(
                   leading: const Icon(Icons.directions_car),
                   title: const Text('10. Veículos'),
@@ -189,21 +192,24 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                   onTap: () => Navigator.of(context).pop('veiculos'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.person),
+                  title: const Text('11b. Vítima em Óbito'),
+                  onTap: () => Navigator.of(context).pop('cadaveres'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.groups),
                   title: const Text('12. Envolvidos'),
                   onTap: () => Navigator.of(context).pop('envolvidos_transito'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.speed),
-                  title: const Text('13. Natureza da ocorrência / Cálculo de velocidade'),
-                  onTap: () =>
-                      Navigator.of(context).pop('natureza_ocorrencia'),
+                  title: const Text('13. Cálculo de velocidade'),
+                  onTap: () => Navigator.of(context).pop('natureza_ocorrencia'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.assignment),
                   title: const Text('14. Dinâmica do Fato'),
-                  onTap: () =>
-                      Navigator.of(context).pop('dinamica_fato'),
+                  onTap: () => Navigator.of(context).pop('dinamica_fato'),
                 ),
               ],
               if (ficha.tipoOcorrencia != TipoOcorrencia.crimeTransito)
@@ -363,13 +369,17 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
 
     List<File>? fotosSelecionadas;
     List<String>? legendasFotos;
-    final useLevantamentoVestigios = (fichaAtual.tipoOcorrencia ==
-            TipoOcorrencia.furtoDanoExameLocal ||
-        fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli) &&
-        fichaAtual.localFurto != null;
+    final isTransito =
+        fichaAtual.tipoOcorrencia == TipoOcorrencia.crimeTransito;
+    final useLevantamentoVestigios =
+        (fichaAtual.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
+            fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+            fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
+            isTransito) &&
+        (fichaAtual.localFurto != null || isTransito);
 
     if (useLevantamentoVestigios) {
-      final lf = fichaAtual.localFurto!;
+      final lf = fichaAtual.localFurto;
       final orderedPaths = <String>[];
 
       final dir = await getApplicationDocumentsDirectory();
@@ -380,9 +390,10 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       int totalVestigios = 0;
       int vestigiosSemFoto = 0;
       final pathMap = <String, String>{}; // original → resolved
-      final pathToLegenda = <String, String>{}; // path (resolved) → legenda para anexo
+      final pathToLegenda =
+          <String, String>{}; // path (resolved) → legenda para anexo
 
-      for (final p in lf.fotosVistaAmplaPaths ?? []) {
+      for (final p in lf?.fotosVistaAmplaPaths ?? []) {
         final resolved = await _resolverPath(p, basePath);
         if (resolved != null) {
           orderedPaths.add(resolved);
@@ -392,7 +403,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }
       }
 
-      Future<void> adicionarFotosVestigios(List<VestigioLocalModel>? lista) async {
+      Future<void> adicionarFotosVestigios(
+        List<VestigioLocalModel>? lista,
+      ) async {
         if (lista == null) return;
         for (final v in lista) {
           totalVestigios++;
@@ -400,10 +413,15 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
             vestigiosSemFoto++;
             continue;
           }
-          final descVestigio = (v.descricao ?? 'vestígio registrado').trim();
+          final descVestigio = v.rotuloNomeDescricao.trim().isEmpty
+              ? 'vestígio registrado'
+              : v.rotuloNomeDescricao.trim();
           final legenda = descVestigio.isEmpty
               ? 'Vestígio registrado.'
-              : (descVestigio.length > 80 ? '${descVestigio.substring(0, 80)}...' : descVestigio) + (descVestigio.endsWith('.') ? '' : '.');
+              : (descVestigio.length > 80
+                        ? '${descVestigio.substring(0, 80)}...'
+                        : descVestigio) +
+                    (descVestigio.endsWith('.') ? '' : '.');
           for (final p in v.fotosVinculadasPaths) {
             final resolved = await _resolverPath(p, basePath);
             if (resolved != null) {
@@ -416,12 +434,90 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }
       }
 
-      await adicionarFotosVestigios(lf.vestigiosMediato);
-      await adicionarFotosVestigios(lf.vestigiosImediato);
-      await adicionarFotosVestigios(lf.vestigiosRelacionado);
+      await adicionarFotosVestigios(lf?.vestigiosMediato);
+      await adicionarFotosVestigios(lf?.vestigiosImediato);
+      await adicionarFotosVestigios(lf?.vestigiosRelacionado);
 
-      // Fotos dos cadáveres (CVLI): vista ambiente, posição, hipóstase, tatuagens, lesões
-      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+      // Fotos do levantamento da via (Crime de Trânsito)
+      if (isTransito && fichaAtual.crimeTransitoLevantamento != null) {
+        final lev = fichaAtual.crimeTransitoLevantamento!;
+
+        for (final f in lev.marcoZero?.fotos ?? []) {
+          final resolved = await _resolverPath(f, basePath);
+          if (resolved != null) {
+            orderedPaths.add(resolved);
+            pathMap[f] = resolved;
+            pathToLegenda[resolved] = 'Marco zero do levantamento.';
+            vistaAmplaOk++;
+          }
+        }
+
+        for (final f in lev.fotosLocalEncontrado?.fotos ?? []) {
+          final resolved = await _resolverPath(f.path, basePath);
+          if (resolved != null) {
+            orderedPaths.add(resolved);
+            pathMap[f.path] = resolved;
+            pathToLegenda[resolved] =
+                f.legendaIndividual ??
+                lev.fotosLocalEncontrado?.legendaGrupo ??
+                'Vista do local do evento.';
+            vistaAmplaOk++;
+          }
+        }
+
+        for (final grupo in lev.fotosContextuais) {
+          for (final f in grupo.fotos) {
+            final resolved = await _resolverPath(f.path, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[f.path] = resolved;
+              pathToLegenda[resolved] =
+                  f.legendaIndividual ?? grupo.legendaGrupo;
+            }
+          }
+        }
+
+        for (final f in lev.fotosSinalizacao?.fotos ?? []) {
+          final resolved = await _resolverPath(f.path, basePath);
+          if (resolved != null) {
+            orderedPaths.add(resolved);
+            pathMap[f.path] = resolved;
+            pathToLegenda[resolved] =
+                f.legendaIndividual ??
+                lev.fotosSinalizacao?.legendaGrupo ??
+                'Sinalização viária.';
+          }
+        }
+
+        for (final v in lev.vestigios) {
+          for (final f in v.fotos) {
+            final resolved = await _resolverPath(f.path, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[f.path] = resolved;
+              pathToLegenda[resolved] =
+                  f.legendaIndividual ?? 'Vestígio na via.';
+              vestigioFotosOk++;
+            }
+          }
+        }
+
+        for (final f in lev.fotosComplementares?.fotos ?? []) {
+          final resolved = await _resolverPath(f.path, basePath);
+          if (resolved != null) {
+            orderedPaths.add(resolved);
+            pathMap[f.path] = resolved;
+            pathToLegenda[resolved] =
+                f.legendaIndividual ??
+                lev.fotosComplementares?.legendaGrupo ??
+                'Foto complementar.';
+          }
+        }
+      }
+
+      // Fotos dos cadáveres (CVLI / Morte a Esclarecer): vista ambiente, posição, hipóstase, tatuagens, lesões
+      if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) &&
           fichaAtual.cadaveres != null) {
         for (final c in fichaAtual.cadaveres!) {
           for (final p in c.fotosVistaCadaversAmbiente) {
@@ -461,10 +557,12 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
             }
           }
           for (final lesao in c.lesoes ?? []) {
-            final descResumo = lesao.descricao ?? lesao.regiao;
-            final legendaTexto = descResumo.length > 60
-                ? '${descResumo.substring(0, 60)}...'
-                : descResumo;
+            final descResumo = lesao.textoLegendaFoto;
+            final comContexto =
+                'Lesão no cadáver ${c.numero}: $descResumo';
+            final legendaTexto = comContexto.length > 60
+                ? '${comContexto.substring(0, 60)}...'
+                : comContexto;
             final legenda =
                 '$legendaTexto${legendaTexto.endsWith('.') ? '' : '.'}';
             for (final p in lesao.fotosPaths) {
@@ -491,8 +589,10 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }
       }
 
-      // Fotos dos veículos (CVLI): vista no ambiente + vestígios de cada veículo
-      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+      // Fotos dos veículos (CVLI / Morte a Esclarecer / Crime de Trânsito)
+      if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.crimeTransito) &&
           fichaAtual.veiculos != null) {
         for (final v in fichaAtual.veiculos!) {
           for (final p in v.fotosVistaVeiculoAmbiente) {
@@ -505,7 +605,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
             }
           }
           for (final vest in v.vestigios ?? []) {
-            final descResumo = vest.descricao ?? vest.localizacao ?? 'vestígio';
+            final descResumo = vest.textoLegendaFoto;
             final legendaTexto = descResumo.length > 60
                 ? '${descResumo.substring(0, 60)}...'
                 : descResumo;
@@ -518,6 +618,41 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
                 pathMap[p] = resolved;
                 pathToLegenda[resolved] = legenda;
               }
+            }
+          }
+        }
+      }
+
+      // Fotos dos envolvidos (Crime de Trânsito): cenário, posição, lesões/pertences
+      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.crimeTransito &&
+          fichaAtual.envolvidosTransito != null) {
+        for (final env in fichaAtual.envolvidosTransito!) {
+          final id = env.nome?.isNotEmpty == true
+              ? env.nome!
+              : 'envolvido ${fichaAtual.envolvidosTransito!.indexOf(env) + 1}';
+          for (final p in env.fotosVistaAmplaCenario ?? []) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] = 'Vista ampla do cenário ($id).';
+            }
+          }
+          for (final p in env.fotosVistaAmplaPosicaoEncontrado ?? []) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] =
+                  'Vista ampla na posição em que foi encontrado ($id).';
+            }
+          }
+          for (final p in env.fotosLesoesPertences ?? []) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] = 'Lesões e pertences ($id).';
             }
           }
         }
@@ -557,15 +692,22 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       if (vestigiosSemFoto > 0) {
         detalhes.writeln('(!) $vestigiosSemFoto vestígio(s) sem foto');
       }
-      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+      if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) &&
           fichaAtual.cadaveres != null &&
           fichaAtual.cadaveres!.isNotEmpty) {
-        detalhes.writeln('Inclui fotos dos cadáveres (exames e lesões) no anexo.');
+        detalhes.writeln(
+          'Inclui fotos dos cadáveres (exames e lesões) no anexo.',
+        );
       }
-      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+      if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.crimeTransito) &&
           fichaAtual.veiculos != null &&
           fichaAtual.veiculos!.isNotEmpty) {
-        detalhes.writeln('Inclui fotos dos veículos (cena e vestígios) no anexo.');
+        detalhes.writeln(
+          'Inclui fotos dos veículos (cena e vestígios) no anexo.',
+        );
       }
       detalhes.write('Total no levantamento: ${orderedPaths.length} foto(s)');
 
@@ -590,7 +732,10 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
 
       // Opcional: reordenar fotos (vista ampla deve ficar primeiro)
       final pathsAtuais = List<String>.from(orderedPaths);
-      final novosPaths = await _gerenciarFotosLevantamento(pathsAtuais, basePath);
+      final novosPaths = await _gerenciarFotosLevantamento(
+        pathsAtuais,
+        basePath,
+      );
       if (!mounted) return;
       final pathsFinais = novosPaths ?? pathsAtuais;
 
@@ -605,25 +750,26 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         return v.copyWith(numerosFotografias: nums);
       }
 
-      final vestigiosMediato = (lf.vestigiosMediato ?? [])
+      final vestigiosMediato = (lf?.vestigiosMediato ?? [])
           .map(comNumeros)
           .toList();
-      final vestigiosImediato = (lf.vestigiosImediato ?? [])
+      final vestigiosImediato = (lf?.vestigiosImediato ?? [])
           .map(comNumeros)
           .toList();
-      final vestigiosRelacionado = (lf.vestigiosRelacionado ?? [])
+      final vestigiosRelacionado = (lf?.vestigiosRelacionado ?? [])
           .map(comNumeros)
           .toList();
 
-      final localFurtoParaLaudo = lf.copyWith(
+      final localFurtoParaLaudo = lf?.copyWith(
         vestigiosMediato: vestigiosMediato,
         vestigiosImediato: vestigiosImediato,
         vestigiosRelacionado: vestigiosRelacionado,
       );
 
-      // Para CVLI: preencher numerosFotografias em cada lesão para citação no laudo
+      // Para CVLI / Morte a Esclarecer: preencher numerosFotografias em cada lesão para citação no laudo
       List<CadaverModel>? cadaveresParaLaudo;
-      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+      if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) &&
           fichaAtual.cadaveres != null) {
         cadaveresParaLaudo = fichaAtual.cadaveres!.map((c) {
           final lesoesComNumeros = (c.lesoes ?? []).map((lesao) {
@@ -653,9 +799,11 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }).toList();
       }
 
-      // Para CVLI: preencher numerosFotografias em cada vestígio de veículo
+      // Para CVLI / Morte a Esclarecer / Crime de Trânsito: preencher numerosFotografias em cada vestígio de veículo
       List<VeiculoModel>? veiculosParaLaudo;
-      if (fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli &&
+      if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
+              fichaAtual.tipoOcorrencia == TipoOcorrencia.crimeTransito) &&
           fichaAtual.veiculos != null) {
         veiculosParaLaudo = fichaAtual.veiculos!.map((v) {
           final vestigiosComNumeros = (v.vestigios ?? []).map((vest) {
@@ -675,12 +823,13 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       }
 
       fichaAtual = fichaAtual.copyWith(
-        localFurto: localFurtoParaLaudo,
+        localFurto: localFurtoParaLaudo ?? fichaAtual.localFurto,
         cadaveres: cadaveresParaLaudo ?? fichaAtual.cadaveres,
         veiculos: veiculosParaLaudo ?? fichaAtual.veiculos,
       );
-      fotosSelecionadas =
-          pathsFinais.isEmpty ? null : pathsFinais.map((p) => File(p)).toList();
+      fotosSelecionadas = pathsFinais.isEmpty
+          ? null
+          : pathsFinais.map((p) => File(p)).toList();
       legendasFotos = pathsFinais.isEmpty
           ? null
           : pathsFinais.map((p) => pathToLegenda[p] ?? '').toList();
@@ -718,8 +867,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           ),
         );
         if (usar == true) {
-          fotosSelecionadas =
-              fotosExistentes.map((p) => File(p)).toList();
+          fotosSelecionadas = fotosExistentes.map((p) => File(p)).toList();
         }
       }
     }
@@ -969,7 +1117,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         break;
       case 'local_furto':
         if (ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
-            ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
+            ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
+            ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) {
           telaDestino = LocalFurtoScreen(ficha: ficha);
         }
         break;
@@ -980,12 +1129,15 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         break;
       case 'veiculos':
         if (ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
+            ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
             ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
           telaDestino = ListaVeiculosScreen(ficha: ficha);
         }
         break;
       case 'cadaveres':
-        if (ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
+        if (ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
+            ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
+            ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
           telaDestino = ListaCadaveresScreen(ficha: ficha);
         }
         break;
@@ -1006,7 +1158,14 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         break;
       case 'natureza_ocorrencia':
         if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
-          telaDestino = NaturezaOcorrenciaTransitoScreen(ficha: ficha);
+          final formas =
+              ficha.crimeTransitoLevantamento?.formasInteracao ??
+              ficha.crimeTransitoNatureza?.formasInteracao ??
+              [];
+          telaDestino =
+              formas.contains(CrimeTransitoFormaInteracao.atropelamento)
+              ? AtropelamentoCalculoScreen(ficha: ficha)
+              : DinamicaFatoTransitoScreen(ficha: ficha);
         }
         break;
       case 'dinamica_fato':
@@ -1078,213 +1237,207 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : _fichas.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.description_outlined,
-                        size: 80,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Nenhuma ficha salva',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Crie uma nova ocorrência para começar',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.description_outlined,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _carregarFichas,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _fichas.length,
-                    itemBuilder: (context, index) {
-                      final ficha = _fichas[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(16),
-                          leading: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.description,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onPrimaryContainer,
+                  const SizedBox(height: 16),
+                  Text(
+                    'Nenhuma ficha salva',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Crie uma nova ocorrência para começar',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _carregarFichas,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _fichas.length,
+                itemBuilder: (context, index) {
+                  final ficha = _fichas[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16),
+                      leading: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.description,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      title: Text(
+                        ficha.dadosSolicitacao.raiNumero ?? 'Sem RAI',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text(
+                            ficha.tipoOcorrencia.label,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          title: Text(
-                            ficha.dadosSolicitacao.raiNumero ?? 'Sem RAI',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                          const SizedBox(height: 4),
+                          if (ficha.dadosSolicitacao.numeroOcorrencia != null)
+                            Text(
+                              'Ocorrência: ${ficha.dadosSolicitacao.numeroOcorrencia}',
                             ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Criada em: ${DateFormat('dd/MM/yyyy HH:mm').format(ficha.dataCriacao)}',
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                ficha.tipoOcorrencia.label,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                          if (ficha.dataHoraTermino == null ||
+                              ficha.dataHoraTermino!.isEmpty) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
                               ),
-                              const SizedBox(height: 4),
-                              if (ficha.dadosSolicitacao.numeroOcorrencia !=
-                                  null)
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 14,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Em atendimento',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      trailing: PopupMenuButton(
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'editar',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit, size: 20),
+                                SizedBox(width: 8),
+                                Text('Editar'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'navegar',
+                            child: Row(
+                              children: [
+                                Icon(Icons.navigation, size: 20),
+                                SizedBox(width: 8),
+                                Text('Navegar para Tela'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'gerar_ficha',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.description,
+                                  size: 20,
+                                  color: Colors.blue,
+                                ),
+                                SizedBox(width: 8),
                                 Text(
-                                  'Ocorrência: ${ficha.dadosSolicitacao.numeroOcorrencia}',
-                                ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Criada em: ${DateFormat('dd/MM/yyyy HH:mm').format(ficha.dataCriacao)}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              if (ficha.dataHoraTermino == null ||
-                                  ficha.dataHoraTermino!.isEmpty) ...[
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.shade100,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.access_time,
-                                        size: 14,
-                                        color: Colors.orange.shade900,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Em atendimento',
-                                        style: TextStyle(
-                                          color: Colors.orange.shade900,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  'Gerar Ficha',
+                                  style: TextStyle(color: Colors.blue),
                                 ),
                               ],
-                            ],
+                            ),
                           ),
-                          trailing: PopupMenuButton(
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'editar',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit, size: 20),
-                                    SizedBox(width: 8),
-                                    Text('Editar'),
-                                  ],
+                          const PopupMenuItem(
+                            value: 'gerar_laudo',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.article,
+                                  size: 20,
+                                  color: Colors.green,
                                 ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'navegar',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.navigation, size: 20),
-                                    SizedBox(width: 8),
-                                    Text('Navegar para Tela'),
-                                  ],
+                                SizedBox(width: 8),
+                                Text(
+                                  'Gerar Laudo',
+                                  style: TextStyle(color: Colors.green),
                                 ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'gerar_ficha',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.description,
-                                      size: 20,
-                                      color: Colors.blue,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Gerar Ficha',
-                                      style: TextStyle(color: Colors.blue),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'gerar_laudo',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.article,
-                                      size: 20,
-                                      color: Colors.green,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Gerar Laudo',
-                                      style: TextStyle(color: Colors.green),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'excluir',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete,
-                                        size: 20, color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Excluir',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onSelected: (value) {
-                              if (value == 'editar') {
-                                _abrirFicha(ficha);
-                              } else if (value == 'navegar') {
-                                _mostrarMenuNavegacao(ficha);
-                              } else if (value == 'gerar_ficha') {
-                                _gerarDocumentoWord(ficha);
-                              } else if (value == 'gerar_laudo') {
-                                _gerarDocumentoLaudo(ficha);
-                              } else if (value == 'excluir') {
-                                _removerFicha(ficha);
-                              }
-                            },
+                              ],
+                            ),
                           ),
-                          onTap: () => _abrirFicha(ficha),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                          const PopupMenuItem(
+                            value: 'excluir',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, size: 20, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Excluir',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onSelected: (value) {
+                          if (value == 'editar') {
+                            _abrirFicha(ficha);
+                          } else if (value == 'navegar') {
+                            _mostrarMenuNavegacao(ficha);
+                          } else if (value == 'gerar_ficha') {
+                            _gerarDocumentoWord(ficha);
+                          } else if (value == 'gerar_laudo') {
+                            _gerarDocumentoLaudo(ficha);
+                          } else if (value == 'excluir') {
+                            _removerFicha(ficha);
+                          }
+                        },
+                      ),
+                      onTap: () => _abrirFicha(ficha),
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }
@@ -1372,8 +1525,7 @@ class _GerenciarFotosLevantamentoSheetState
                       },
                       itemBuilder: (context, index) {
                         final path = _paths[index];
-                        final numero =
-                            (index + 1).toString().padLeft(2, '0');
+                        final numero = (index + 1).toString().padLeft(2, '0');
                         final displayPath = _resolvedPaths[path] ?? path;
                         final fileExists = File(displayPath).existsSync();
 
@@ -1391,31 +1543,32 @@ class _GerenciarFotosLevantamentoSheetState
                                       ? Image.file(
                                           File(displayPath),
                                           fit: BoxFit.cover,
-                                          errorBuilder: (
-                                            context,
-                                            error,
-                                            stackTrace,
-                                          ) =>
-                                              Container(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .surfaceContainerHighest,
-                                            child: const Icon(Icons.broken_image),
-                                          ),
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => Container(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .surfaceContainerHighest,
+                                                child: const Icon(
+                                                  Icons.broken_image,
+                                                ),
+                                              ),
                                         )
                                       : Container(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .surfaceContainerHighest,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.surfaceContainerHighest,
                                           child: const Icon(Icons.broken_image),
                                         ),
                                 ),
                               ),
                               title: Text(
                                 numero,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,

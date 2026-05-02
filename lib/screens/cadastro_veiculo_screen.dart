@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/ficha_completa_model.dart';
@@ -10,8 +9,8 @@ import '../models/laboratorio_model.dart';
 import '../models/unidade_model.dart';
 import '../models/veiculo_model.dart';
 import '../models/vestigio_veiculo_model.dart';
+import 'vestigio_veiculo_form_screen.dart';
 import '../services/laboratorio_service.dart';
-import '../services/perito_service.dart';
 import '../services/unidade_service.dart';
 import '../models/tipo_ocorrencia.dart';
 
@@ -30,7 +29,6 @@ class CadastroVeiculoScreen extends StatefulWidget {
 }
 
 class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
-  final _peritoService = PeritoService();
   final _unidadeService = UnidadeService();
   final _laboratorioService = LaboratorioService();
 
@@ -285,7 +283,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     );
   }
 
-  String _gerarIdVestigio() => DateTime.now().microsecondsSinceEpoch.toString();
 
   void _alternarEnum<T>(Set<T> conjunto, T valor) {
     setState(() {
@@ -593,456 +590,39 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   Future<void> _adicionarOuEditarVestigio({
     VestigioVeiculoModel? existente,
   }) async {
-    final descricaoCtrl = TextEditingController(
-      text: existente?.descricao ?? '',
-    );
-    final localizacaoCtrl = TextEditingController(
-      text: existente?.localizacao ?? '',
-    );
+    final inclusaoContinua = existente == null;
 
-    TipoAcaoVestigioVeiculo? tipoAcaoSelecionado = existente?.tipoAcao;
-    TipoDestinoVestigioVeiculo? tipoDestinoSelecionado = existente?.tipoDestino;
-    String? destinoIdSelecionado = existente?.destinoId;
-    final numeroLacreCtrl = TextEditingController(
-      text: existente?.numeroLacre ?? '',
+    final resultado = await Navigator.of(context).push<VestigioVeiculoModel>(
+      MaterialPageRoute(
+        builder: (ctx) => VestigioVeiculoFormScreen(
+          fichaId: widget.ficha.id,
+          veiculoNumero: widget.veiculo.numero,
+          vestigioExistente: existente,
+          manterNaTelaAposSalvarNovo: inclusaoContinua,
+          onSalvo: inclusaoContinua
+              ? (VestigioVeiculoModel v) {
+                  if (!mounted) return;
+                  setState(() => _vestigios.add(v));
+                }
+              : null,
+        ),
+      ),
     );
-    bool isSangueHumano = existente?.isSangueHumano ?? false;
-    final fotosVestigio = List<String>.from(existente?.fotosPaths ?? []);
-    final subpastaVestigio =
-        existente != null ? 'vestigio_${existente.id}' : 'vestigio_novo_${DateTime.now().microsecondsSinceEpoch}';
 
     if (!mounted) return;
 
-    // Obter nome do perito
-    final perito = await _peritoService.obterPerito();
-    final nomePerito = perito?.nome ?? '';
+    if (inclusaoContinua) return;
 
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        String? erroMensagem;
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(
-                existente == null ? 'Adicionar vestígio' : 'Editar vestígio',
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (erroMensagem != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          border: Border.all(color: Colors.red.shade300),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Colors.red.shade700,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                erroMensagem!,
-                                style: TextStyle(
-                                  color: Colors.red.shade900,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    TextFormField(
-                      controller: descricaoCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Descrição do vestígio *',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.newline,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: localizacaoCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Localização no veículo *',
-                        border: OutlineInputBorder(),
-                        hintText: 'Ex: porta do motorista, banco traseiro',
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const Text(
-                      'Fotos do vestígio',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final foto = await _imagePicker.pickImage(
-                              source: ImageSource.camera,
-                              imageQuality: 90,
-                            );
-                            if (foto == null || !mounted) return;
-                            final path = await _persistirFotoVeiculo(
-                              foto,
-                              subpastaVestigio,
-                            );
-                            if (path != null) {
-                              fotosVestigio.add(path);
-                              setDialogState(() {});
-                            }
-                          },
-                          icon: const Icon(Icons.photo_camera, size: 18),
-                          label: const Text('Câmera'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final fotos = await _imagePicker.pickMultiImage(
-                              imageQuality: 90,
-                            );
-                            if (fotos.isEmpty || !mounted) return;
-                            for (final foto in fotos) {
-                              final path = await _persistirFotoVeiculo(
-                                foto,
-                                subpastaVestigio,
-                              );
-                              if (path != null) {
-                                fotosVestigio.add(path);
-                                setDialogState(() {});
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.photo_library, size: 18),
-                          label: const Text('Galeria'),
-                        ),
-                      ],
-                    ),
-                    if (fotosVestigio.isNotEmpty)
-                      ...fotosVestigio.asMap().entries.map(
-                            (e) => ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.image_outlined, size: 18),
-                              title: Text(
-                                _nomeArquivoFoto(e.value),
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                tooltip: 'Remover foto',
-                                onPressed: () {
-                                  fotosVestigio.removeAt(e.key);
-                                  setDialogState(() {});
-                                },
-                              ),
-                            ),
-                          ),
-                    const SizedBox(height: 16),
-                    CheckboxListTile(
-                      title: const Text('Sangue humano'),
-                      subtitle: const Text(
-                        'Marque se este vestígio é sangue humano (para textos específicos no laudo)',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      value: isSangueHumano,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          isSangueHumano = value ?? false;
-                        });
-                      },
-                      activeColor: Colors.red.shade700,
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'O vestígio será coletado ou apenas registrado?',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    RadioGroup<TipoAcaoVestigioVeiculo>(
-                      groupValue: tipoAcaoSelecionado,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          tipoAcaoSelecionado = value;
-                          if (value != TipoAcaoVestigioVeiculo.coletado) {
-                            tipoDestinoSelecionado = null;
-                            destinoIdSelecionado = null;
-                          }
-                        });
-                      },
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: Radio<TipoAcaoVestigioVeiculo>(
-                              value: TipoAcaoVestigioVeiculo.registrado,
-                            ),
-                            title: const Text('Apenas Registrado'),
-                            onTap: () {
-                              setDialogState(() {
-                                tipoAcaoSelecionado =
-                                    TipoAcaoVestigioVeiculo.registrado;
-                                tipoDestinoSelecionado = null;
-                                destinoIdSelecionado = null;
-                              });
-                            },
-                          ),
-                          ListTile(
-                            leading: Radio<TipoAcaoVestigioVeiculo>(
-                              value: TipoAcaoVestigioVeiculo.coletado,
-                            ),
-                            title: const Text('Coletado'),
-                            onTap: () {
-                              setDialogState(() {
-                                tipoAcaoSelecionado =
-                                    TipoAcaoVestigioVeiculo.coletado;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (tipoAcaoSelecionado ==
-                        TipoAcaoVestigioVeiculo.coletado) ...[
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Será analisado na Unidade ou encaminhado para laboratório?',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 8),
-                      RadioGroup<TipoDestinoVestigioVeiculo>(
-                        groupValue: tipoDestinoSelecionado,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            tipoDestinoSelecionado = value;
-                            destinoIdSelecionado = null;
-                          });
-                        },
-                        child: Column(
-                          children: [
-                            ListTile(
-                              leading: Radio<TipoDestinoVestigioVeiculo>(
-                                value: TipoDestinoVestigioVeiculo.unidade,
-                              ),
-                              title: const Text('Unidade'),
-                              onTap: () {
-                                setDialogState(() {
-                                  tipoDestinoSelecionado =
-                                      TipoDestinoVestigioVeiculo.unidade;
-                                  destinoIdSelecionado = null;
-                                });
-                              },
-                            ),
-                            ListTile(
-                              leading: Radio<TipoDestinoVestigioVeiculo>(
-                                value: TipoDestinoVestigioVeiculo.laboratorio,
-                              ),
-                              title: const Text('Laboratório'),
-                              onTap: () {
-                                setDialogState(() {
-                                  tipoDestinoSelecionado =
-                                      TipoDestinoVestigioVeiculo.laboratorio;
-                                  destinoIdSelecionado = null;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (tipoDestinoSelecionado != null) ...[
-                        const SizedBox(height: 16),
-                        FutureBuilder<List<dynamic>>(
-                          future: tipoDestinoSelecionado ==
-                                  TipoDestinoVestigioVeiculo.unidade
-                              ? _unidadeService.listarUnidades()
-                              : _laboratorioService.listarLaboratorios(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            }
+    if (resultado == null) return;
 
-                            if (snapshot.hasError || !snapshot.hasData) {
-                              return const Text('Erro ao carregar opções');
-                            }
-
-                            final opcoes = snapshot.data!;
-                            if (opcoes.isEmpty) {
-                              return const Text(
-                                'Nenhuma opção disponível. Cadastre em Configurações.',
-                              );
-                            }
-
-                            return DropdownButtonFormField<String>(
-                              isExpanded: true,
-                              initialValue: destinoIdSelecionado,
-                              decoration: const InputDecoration(
-                                labelText: 'Selecione o destino *',
-                                border: OutlineInputBorder(),
-                              ),
-                              items: opcoes.map((opcao) {
-                                final id = tipoDestinoSelecionado ==
-                                        TipoDestinoVestigioVeiculo.unidade
-                                    ? (opcao as UnidadeModel).id
-                                    : (opcao as LaboratorioModel).id;
-                                final nome = tipoDestinoSelecionado ==
-                                        TipoDestinoVestigioVeiculo.unidade
-                                    ? (opcao as UnidadeModel).nome
-                                    : (opcao as LaboratorioModel).nome;
-                                return DropdownMenuItem<String>(
-                                  value: id,
-                                  child: Text(nome),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setDialogState(() {
-                                  destinoIdSelecionado = value;
-                                });
-                              },
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: numeroLacreCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Número do lacre (opcional)',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Coletado por: $nomePerito',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (descricaoCtrl.text.trim().isEmpty) {
-                      setDialogState(() {
-                        erroMensagem = 'A descrição é obrigatória';
-                      });
-                      return;
-                    }
-
-                    if (localizacaoCtrl.text.trim().isEmpty) {
-                      setDialogState(() {
-                        erroMensagem = 'A localização no veículo é obrigatória';
-                      });
-                      return;
-                    }
-
-                    if (tipoAcaoSelecionado == null) {
-                      setDialogState(() {
-                        erroMensagem =
-                            'Selecione se será coletado ou apenas registrado';
-                      });
-                      return;
-                    }
-
-                    if (tipoAcaoSelecionado ==
-                            TipoAcaoVestigioVeiculo.coletado &&
-                        tipoDestinoSelecionado == null) {
-                      setDialogState(() {
-                        erroMensagem = 'Selecione o destino';
-                      });
-                      return;
-                    }
-
-                    if (tipoAcaoSelecionado ==
-                            TipoAcaoVestigioVeiculo.coletado &&
-                        destinoIdSelecionado == null) {
-                      setDialogState(() {
-                        erroMensagem = 'Selecione a unidade ou laboratório';
-                      });
-                      return;
-                    }
-
-                    String? coletadoPor;
-                    String? dataHoraColeta;
-                    if (tipoAcaoSelecionado ==
-                        TipoAcaoVestigioVeiculo.coletado) {
-                      coletadoPor = nomePerito;
-                      final agora = DateTime.now();
-                      dataHoraColeta = DateFormat(
-                        'dd/MM/yyyy HH:mm',
-                      ).format(agora);
-                    }
-
-                    final novo = VestigioVeiculoModel(
-                      id: existente?.id ?? _gerarIdVestigio(),
-                      descricao: descricaoCtrl.text.trim(),
-                      localizacao: localizacaoCtrl.text.trim(),
-                      tipoAcao: tipoAcaoSelecionado,
-                      tipoDestino: tipoDestinoSelecionado,
-                      destinoId: destinoIdSelecionado,
-                      coletadoPor: coletadoPor,
-                      dataHoraColeta: dataHoraColeta,
-                      numeroLacre: numeroLacreCtrl.text.trim().isEmpty
-                          ? null
-                          : numeroLacreCtrl.text.trim(),
-                      isSangueHumano: isSangueHumano,
-                      fotosPaths: List<String>.from(fotosVestigio),
-                    );
-
-                    setState(() {
-                      final idx = _vestigios.indexWhere((e) => e.id == novo.id);
-                      if (idx >= 0) {
-                        _vestigios[idx] = novo;
-                      } else {
-                        _vestigios.add(novo);
-                      }
-                    });
-                    if (mounted) {
-                      // ignore: use_build_context_synchronously
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: const Text('Salvar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    setState(() {
+      final idx = _vestigios.indexWhere((e) => e.id == resultado.id);
+      if (idx >= 0) {
+        _vestigios[idx] = resultado;
+      } else {
+        _vestigios.add(resultado);
+      }
+    });
   }
 
   void _removerVestigio(String id) {
@@ -1053,8 +633,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
 
   Future<String?> _persistirFotoVeiculo(XFile arquivo, String subpasta) async {
     try {
-      final origem = File(arquivo.path);
-      if (!await origem.exists()) return null;
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
         '${dir.path}/levantamento_fotografico/${widget.ficha.id}/veiculo_${widget.veiculo.numero}/$subpasta',
@@ -1066,7 +644,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       final destino = File(
         '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
       );
-      await origem.copy(destino.path);
+      final bytes = await arquivo.readAsBytes();
+      await destino.writeAsBytes(bytes);
       return destino.path;
     } catch (_) {
       return null;
@@ -1692,7 +1271,9 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    vestigio.descricao ?? 'Vestígio',
+                                    vestigio.rotuloNomeDescricao.isEmpty
+                                        ? 'Vestígio'
+                                        : vestigio.rotuloNomeDescricao,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),

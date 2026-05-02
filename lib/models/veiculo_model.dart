@@ -11,10 +11,7 @@ T? _enumFromName<T extends Enum>(Iterable<T> values, String? name) {
   return null;
 }
 
-List<T>? _enumListFromJson<T extends Enum>(
-  List<dynamic>? raw,
-  List<T> values,
-) {
+List<T>? _enumListFromJson<T extends Enum>(List<dynamic>? raw, List<T> values) {
   if (raw == null) return null;
   final result = <T>[];
   for (final entry in raw) {
@@ -27,10 +24,16 @@ List<T>? _enumListFromJson<T extends Enum>(
 }
 
 enum TipoVeiculo {
-  automovel('Automóvel'),
   motocicleta('Motocicleta'),
+  motoneta('Motoneta'),
+  automovel('Automóvel'),
+  camioneta('Camioneta'),
+  caminhonete('Caminhonete'),
   caminhao('Caminhão'),
-  onibus('Ônibus'),
+  caminhaoTrator('Caminhão-trator'),
+  onibusMicroonibus('Ônibus / micro-ônibus'),
+  reboquesSemirreboque('Reboque / semirreboque'),
+  utilitario('Utilitário'),
   outro('Outro');
 
   final String label;
@@ -120,7 +123,7 @@ class VeiculoModel {
 
   // Localização no ambiente
   final String?
-      localizacaoAmbiente; // ex: "estacionado na rua", "no centro da via"
+  localizacaoAmbiente; // ex: "estacionado na rua", "no centro da via"
 
   // Coordenadas opcionais
   final String? coordenadaFrenteX;
@@ -165,10 +168,10 @@ class VeiculoModel {
   // Vestígios/Evidências (campos antigos - mantidos para compatibilidade)
   final bool? presencaSangue;
   final String?
-      localizacaoSangue; // Campo condicional se presencaSangue == true
+  localizacaoSangue; // Campo condicional se presencaSangue == true
   final bool? presencaProjeteisImpactos;
   final String?
-      localizacaoProjeteisImpactos; // Campo condicional se presencaProjeteisImpactos == true
+  localizacaoProjeteisImpactos; // Campo condicional se presencaProjeteisImpactos == true
   final String? descricaoDanos;
   final String? outrosVestigios;
 
@@ -231,60 +234,62 @@ class VeiculoModel {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'numero': numero,
-        'tipoVeiculo': tipoVeiculo?.name,
-        'tipoVeiculoOutro': tipoVeiculoOutro,
-        'marcaModelo': marcaModelo,
-        'anoFabricacao': anoFabricacao,
-        'anoModelo': anoModelo,
-        'cor': cor,
-        'placa': placa,
-        'chassiAparente': chassiAparente,
-        'localizacaoAmbiente': localizacaoAmbiente,
-        'coordenadaFrenteX': coordenadaFrenteX,
-        'coordenadaFrenteY': coordenadaFrenteY,
-        'alturaFrente': alturaFrente,
-        'coordenadaTraseiraX': coordenadaTraseiraX,
-        'coordenadaTraseiraY': coordenadaTraseiraY,
-        'alturaTraseira': alturaTraseira,
-        'coordenadaCentroX': coordenadaCentroX,
-        'coordenadaCentroY': coordenadaCentroY,
-        'alturaCentro': alturaCentro,
-        'posicao': posicao?.name,
-        'posicaoLivre': posicaoLivre,
-        'condicaoGeral': condicaoGeral,
-        'intensidadeDano': intensidadeDano?.name,
-        'setoresImpacto': setoresImpacto?.map((e) => e.name).toList(),
-        'tipificacoesDeformacoes':
-            tipificacoesDeformacoes?.map((e) => e.name).toList(),
-        'orientacoesDeformacoes':
-            orientacoesDeformacoes?.map((e) => e.name).toList(),
-        'danosObservacoes': danosObservacoes,
-        'faroisLanternas': faroisLanternas?.name,
-        'cintosSeguranca': cintosSeguranca?.name,
-        'estadoPneumaticos': estadoPneumaticos?.name,
-        'freios': freios?.name,
-        'direcao': direcao?.name,
-        'airbag': airbag?.name,
-        'retrovisor': retrovisor?.name,
-        'tacografoStatus': tacografoStatus?.name,
-        'frenagemMetros': frenagemMetros,
-        'bicicletaCor': bicicletaCor,
-        'bicicletaMarcaModelo': bicicletaMarcaModelo,
-        'bicicletaElementosSinalizacao': bicicletaElementosSinalizacao,
-        'bicicletaPossuiCampainha': bicicletaPossuiCampainha,
-        'fotosVistaVeiculoAmbiente': fotosVistaVeiculoAmbiente,
-        'vestigios': vestigios?.map((v) => v.toJson()).toList(),
-        'presencaSangue': presencaSangue,
-        'localizacaoSangue': localizacaoSangue,
-        'presencaProjeteisImpactos': presencaProjeteisImpactos,
-        'localizacaoProjeteisImpactos': localizacaoProjeteisImpactos,
-        'descricaoDanos': descricaoDanos,
-        'outrosVestigios': outrosVestigios,
-        'relacao': relacao?.name,
-        'observacoes': observacoes,
-      };
+    'id': id,
+    'numero': numero,
+    'tipoVeiculo': tipoVeiculo?.name,
+    'tipoVeiculoOutro': tipoVeiculoOutro,
+    'marcaModelo': marcaModelo,
+    'anoFabricacao': anoFabricacao,
+    'anoModelo': anoModelo,
+    'cor': cor,
+    'placa': placa,
+    'chassiAparente': chassiAparente,
+    'localizacaoAmbiente': localizacaoAmbiente,
+    'coordenadaFrenteX': coordenadaFrenteX,
+    'coordenadaFrenteY': coordenadaFrenteY,
+    'alturaFrente': alturaFrente,
+    'coordenadaTraseiraX': coordenadaTraseiraX,
+    'coordenadaTraseiraY': coordenadaTraseiraY,
+    'alturaTraseira': alturaTraseira,
+    'coordenadaCentroX': coordenadaCentroX,
+    'coordenadaCentroY': coordenadaCentroY,
+    'alturaCentro': alturaCentro,
+    'posicao': posicao?.name,
+    'posicaoLivre': posicaoLivre,
+    'condicaoGeral': condicaoGeral,
+    'intensidadeDano': intensidadeDano?.name,
+    'setoresImpacto': setoresImpacto?.map((e) => e.name).toList(),
+    'tipificacoesDeformacoes': tipificacoesDeformacoes
+        ?.map((e) => e.name)
+        .toList(),
+    'orientacoesDeformacoes': orientacoesDeformacoes
+        ?.map((e) => e.name)
+        .toList(),
+    'danosObservacoes': danosObservacoes,
+    'faroisLanternas': faroisLanternas?.name,
+    'cintosSeguranca': cintosSeguranca?.name,
+    'estadoPneumaticos': estadoPneumaticos?.name,
+    'freios': freios?.name,
+    'direcao': direcao?.name,
+    'airbag': airbag?.name,
+    'retrovisor': retrovisor?.name,
+    'tacografoStatus': tacografoStatus?.name,
+    'frenagemMetros': frenagemMetros,
+    'bicicletaCor': bicicletaCor,
+    'bicicletaMarcaModelo': bicicletaMarcaModelo,
+    'bicicletaElementosSinalizacao': bicicletaElementosSinalizacao,
+    'bicicletaPossuiCampainha': bicicletaPossuiCampainha,
+    'fotosVistaVeiculoAmbiente': fotosVistaVeiculoAmbiente,
+    'vestigios': vestigios?.map((v) => v.toJson()).toList(),
+    'presencaSangue': presencaSangue,
+    'localizacaoSangue': localizacaoSangue,
+    'presencaProjeteisImpactos': presencaProjeteisImpactos,
+    'localizacaoProjeteisImpactos': localizacaoProjeteisImpactos,
+    'descricaoDanos': descricaoDanos,
+    'outrosVestigios': outrosVestigios,
+    'relacao': relacao?.name,
+    'observacoes': observacoes,
+  };
 
   factory VeiculoModel.fromJson(Map<String, dynamic> json) {
     TipoVeiculo? tipoVeiculo;
@@ -324,7 +329,8 @@ class VeiculoModel {
       tipoVeiculo: tipoVeiculo,
       tipoVeiculoOutro: json['tipoVeiculoOutro'] as String?,
       marcaModelo: json['marcaModelo'] as String?,
-      anoFabricacao: json['anoFabricacao'] as String? ??
+      anoFabricacao:
+          json['anoFabricacao'] as String? ??
           json['ano'] as String?, // Compatibilidade com dados antigos
       anoModelo: json['anoModelo'] as String?,
       cor: json['cor'] as String?,
@@ -344,7 +350,9 @@ class VeiculoModel {
       posicaoLivre: json['posicaoLivre'] as String?,
       condicaoGeral: json['condicaoGeral'] as String?,
       intensidadeDano: _enumFromName(
-          IntensidadeDano.values, json['intensidadeDano'] as String?),
+        IntensidadeDano.values,
+        json['intensidadeDano'] as String?,
+      ),
       setoresImpacto: _enumListFromJson(
         json['setoresImpacto'] as List<dynamic>?,
         SetorImpacto.values,
@@ -395,9 +403,9 @@ class VeiculoModel {
       bicicletaPossuiCampainha: json['bicicletaPossuiCampainha'] as bool?,
       fotosVistaVeiculoAmbiente:
           (json['fotosVistaVeiculoAmbiente'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       vestigios: vestigios,
       presencaSangue: json['presencaSangue'] as bool?,
       localizacaoSangue: json['localizacaoSangue'] as String?,

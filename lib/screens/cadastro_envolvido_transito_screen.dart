@@ -36,6 +36,7 @@ class _CadastroEnvolvidoTransitoScreenState
   final _vestesObsCtrl = TextEditingController();
   final _calcadosObsCtrl = TextEditingController();
   final _pertencesObsCtrl = TextEditingController();
+  final _pertencesEntregueCtrl = TextEditingController();
   final _observacoesCtrl = TextEditingController();
 
   CrimeTransitoClassificacaoEnvolvido? _classificacao;
@@ -43,7 +44,8 @@ class _CadastroEnvolvidoTransitoScreenState
   CrimeTransitoSituacaoEnvolvido? _situacao;
   CrimeTransitoPosicaoEnvolvido? _posicao;
   bool? _calcadosIntegro;
-  bool? _pertencesIntegro;
+  bool _pertencesEncontrados = false;
+  DestinoPertences? _destinoPertences;
   bool _salvando = false;
 
   List<String> _fotosVistaAmplaPosicao = [];
@@ -63,14 +65,16 @@ class _CadastroEnvolvidoTransitoScreenState
     _posicaoDetalheCtrl.text = envolvido.posicaoDetalhe ?? '';
     _vestesObsCtrl.text = envolvido.vestes?.observacoes ?? '';
     _calcadosObsCtrl.text = envolvido.calcados?.observacoes ?? '';
-    _pertencesObsCtrl.text = envolvido.pertences?.observacoes ?? '';
+    _pertencesObsCtrl.text = envolvido.pertencesDescricao ?? '';
+    _pertencesEntregueCtrl.text = envolvido.pertencesEntregueIdentificacao ?? '';
     _observacoesCtrl.text = envolvido.observacoes ?? '';
     _classificacao = envolvido.classificacao;
     _equipamentos.addAll(envolvido.equipamentosSeguranca ?? const []);
     _situacao = envolvido.situacao;
     _posicao = envolvido.posicao;
     _calcadosIntegro = envolvido.calcados?.integro;
-    _pertencesIntegro = envolvido.pertences?.integro;
+    _pertencesEncontrados = envolvido.pertencesEncontrados ?? false;
+    _destinoPertences = envolvido.destinoPertences;
     _fotosVistaAmplaPosicao =
         List<String>.from(envolvido.fotosVistaAmplaPosicaoEncontrado ?? []);
     _fotosVistaAmplaCenario =
@@ -80,15 +84,20 @@ class _CadastroEnvolvidoTransitoScreenState
   }
 
   Future<String?> _persistirFoto(XFile foto, String subpasta) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final pasta = Directory(
-      '${dir.path}/levantamento_transito/${widget.ficha.id}/envolvido_${widget.envolvido.id}/$subpasta',
-    );
-    if (!await pasta.exists()) await pasta.create(recursive: true);
-    final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.jpg';
-    final destino = File('${pasta.path}/$nome');
-    await File(foto.path).copy(destino.path);
-    return destino.path;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_transito/${widget.ficha.id}/envolvido_${widget.envolvido.id}/$subpasta',
+      );
+      if (!await pasta.exists()) await pasta.create(recursive: true);
+      final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      final destino = File('${pasta.path}/$nome');
+      final bytes = await foto.readAsBytes();
+      await destino.writeAsBytes(bytes);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _buildGrupoFotos({
@@ -232,6 +241,7 @@ class _CadastroEnvolvidoTransitoScreenState
     _vestesObsCtrl.dispose();
     _calcadosObsCtrl.dispose();
     _pertencesObsCtrl.dispose();
+    _pertencesEntregueCtrl.dispose();
     _observacoesCtrl.dispose();
     super.dispose();
   }
@@ -288,15 +298,16 @@ class _CadastroEnvolvidoTransitoScreenState
                       ? null
                       : _calcadosObsCtrl.text.trim(),
                 ),
-      pertences:
-          (_pertencesIntegro == null && _pertencesObsCtrl.text.trim().isEmpty)
-              ? null
-              : IntegridadeItemModel(
-                  integro: _pertencesIntegro,
-                  observacoes: _pertencesObsCtrl.text.trim().isEmpty
-                      ? null
-                      : _pertencesObsCtrl.text.trim(),
-                ),
+      pertencesEncontrados: _pertencesEncontrados,
+      pertencesDescricao: (_pertencesEncontrados && _pertencesObsCtrl.text.trim().isNotEmpty)
+          ? _pertencesObsCtrl.text.trim()
+          : null,
+      destinoPertences: _pertencesEncontrados ? _destinoPertences : null,
+      pertencesEntregueIdentificacao: (_pertencesEncontrados &&
+              _destinoPertences == DestinoPertences.entregueAPessoa &&
+              _pertencesEntregueCtrl.text.trim().isNotEmpty)
+          ? _pertencesEntregueCtrl.text.trim()
+          : null,
       observacoes: _observacoesCtrl.text.trim().isEmpty
           ? null
           : _observacoesCtrl.text.trim(),
@@ -397,16 +408,16 @@ class _CadastroEnvolvidoTransitoScreenState
               ),
               const SizedBox(height: 8),
               _buildGrupoFotos(
-                titulo: 'Vista ampla na posição em que foi encontrado',
-                subpasta: 'vista_ampla_posicao',
-                fotos: _fotosVistaAmplaPosicao,
-                onChanged: (v) => setState(() => _fotosVistaAmplaPosicao = v),
-              ),
-              _buildGrupoFotos(
                 titulo: 'Vista ampla do cenário',
                 subpasta: 'vista_ampla_cenario',
                 fotos: _fotosVistaAmplaCenario,
                 onChanged: (v) => setState(() => _fotosVistaAmplaCenario = v),
+              ),
+              _buildGrupoFotos(
+                titulo: 'Vista ampla na posição em que foi encontrado',
+                subpasta: 'vista_ampla_posicao',
+                fotos: _fotosVistaAmplaPosicao,
+                onChanged: (v) => setState(() => _fotosVistaAmplaPosicao = v),
               ),
               _buildGrupoFotos(
                 titulo: 'Lesões e pertences',
@@ -563,12 +574,53 @@ class _CadastroEnvolvidoTransitoScreenState
                 controller: _calcadosObsCtrl,
               ),
               const SizedBox(height: 20),
-              _buildIntegridadeField(
-                titulo: 'Pertences',
-                valor: _pertencesIntegro,
-                onChanged: (valor) => setState(() => _pertencesIntegro = valor),
-                controller: _pertencesObsCtrl,
+              SwitchListTile(
+                title: const Text('Pertences encontrados'),
+                value: _pertencesEncontrados,
+                onChanged: (v) => setState(() => _pertencesEncontrados = v),
+                contentPadding: EdgeInsets.zero,
               ),
+              if (_pertencesEncontrados) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _pertencesObsCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Descrição dos pertences',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text('Destino dos pertences',
+                    style: Theme.of(context).textTheme.bodyMedium),
+                RadioGroup<DestinoPertences>(
+                  groupValue: _destinoPertences,
+                  onChanged: (v) => setState(() => _destinoPertences = v),
+                  child: Column(
+                    children: [
+                      RadioListTile<DestinoPertences>(
+                        title: const Text('Recolhido'),
+                        value: DestinoPertences.recolhido,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      RadioListTile<DestinoPertences>(
+                        title: const Text('Entregue a alguém'),
+                        value: DestinoPertences.entregueAPessoa,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_destinoPertences == DestinoPertences.entregueAPessoa) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _pertencesEntregueCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Identificação da pessoa',
+                    ),
+                  ),
+                ],
+              ],
               const SizedBox(height: 20),
               TextField(
                 controller: _observacoesCtrl,

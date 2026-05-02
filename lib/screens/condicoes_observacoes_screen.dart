@@ -190,7 +190,8 @@ class _CondicoesObservacoesScreenState
           if (mounted && resultado == true) {
             Navigator.of(context).pop(true);
           }
-        } else if (widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
+        } else if (widget.ficha.tipoOcorrencia ==
+            TipoOcorrencia.crimeTransito) {
           // Crime de Trânsito: ir para Condições da Via (tela 9)
           if (!mounted) return;
           final resultado = await Navigator.of(context).push(

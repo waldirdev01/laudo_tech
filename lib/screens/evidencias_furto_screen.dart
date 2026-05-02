@@ -1148,7 +1148,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Instruções de Uso - Evidências'),
+        title: const Text('Instruções - Quesitos e Coleta'),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1210,7 +1210,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Evidências'),
+        title: const Text('Quesitos e Coleta'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -1239,7 +1239,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                 ),
               ),
               child: const Text(
-                'EVIDÊNCIAS',
+                'QUESITOS PERICIAIS (EV01–EV07)',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -1259,7 +1259,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '• Descrever detalhadamente os vestígios detectados em cada local e posicioná-los no cenário; e',
+                    '• Estes são os quesitos obrigatórios do laudo de furto (EV01–EV07). Para cada um, informe se foi constatado, posicione-o no cenário e indique se foi recolhido; e',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).brightness == Brightness.dark
@@ -1269,7 +1269,7 @@ class _EvidenciasFurtoScreenState extends State<EvidenciasFurtoScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '• Especificar as informações de Cadeia de Custódia de cada vestígio, informando acerca de sua coleta e encaminhamento.',
+                    '• Especifique a Cadeia de Custódia de cada vestígio recolhido (coleta e encaminhamento). Vestígios livres observados durante a descrição do local foram registrados na tela anterior.',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).brightness == Brightness.dark

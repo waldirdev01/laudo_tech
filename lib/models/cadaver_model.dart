@@ -97,6 +97,18 @@ enum TamanhoBarba {
   const TamanhoBarba(this.label);
 }
 
+enum CorPele {
+  branca('Branca'),
+  parda('Parda'),
+  preta('Preta'),
+  amarela('Amarela'),
+  indigena('Indígena'),
+  prejudicada('Prejudicada');
+
+  final String label;
+  const CorPele(this.label);
+}
+
 enum EstadoRigidez {
   naoInstalada('Não Instalada'),
   emInstalacao('Em Instalação'),
@@ -168,7 +180,8 @@ class VesteCadaverModel {
         bolsos: json['bolsos'] as bool?,
         bolsosVazios: json['bolsosVazios'] as bool?,
         notas: json['notas'] as String?,
-        fotosPaths: (json['fotosPaths'] as List<dynamic>?)
+        fotosPaths:
+            (json['fotosPaths'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
@@ -452,18 +465,24 @@ String gerarTextoPosicaoCorpo({required String? preset, String? textoLivre}) {
 /// Modelo para lesão/evidência no cadáver
 class LesaoCadaverModel {
   final String? id;
+
+  /// Nome ou identificação curta da evidência (opcional; laudo e legendas).
+  final String? nome;
   final String regiao; // ex: "Frontal", "Torácicas", etc.
   final String? descricao;
   final String? tipo; // PAF, PAB, contusão, etc.
   final bool isPaf;
   final PafData? paf;
+
   /// Fotos vinculadas a esta lesão (paths locais).
   final List<String> fotosPaths;
+
   /// Números das fotografias no anexo do laudo (preenchido na geração do laudo).
   final List<int>? numerosFotografias;
 
   LesaoCadaverModel({
     this.id,
+    this.nome,
     required this.regiao,
     this.descricao,
     this.tipo,
@@ -475,6 +494,7 @@ class LesaoCadaverModel {
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'nome': nome,
     'regiao': regiao,
     'descricao': descricao,
     'tipo': tipo,
@@ -486,6 +506,7 @@ class LesaoCadaverModel {
   factory LesaoCadaverModel.fromJson(Map<String, dynamic> json) =>
       LesaoCadaverModel(
         id: json['id'] as String?,
+        nome: json['nome'] as String?,
         regiao: json['regiao'] as String? ?? '',
         descricao: json['descricao'] as String?,
         tipo: json['tipo'] as String?,
@@ -493,14 +514,33 @@ class LesaoCadaverModel {
         paf: json['paf'] != null
             ? PafData.fromJson(json['paf'] as Map<String, dynamic>)
             : null,
-        fotosPaths: (json['fotosPaths'] as List<dynamic>?)
+        fotosPaths:
+            (json['fotosPaths'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
       );
 
+  /// Título na lista (cadastro): nome (região) ou só região.
+  String get rotuloTituloLista {
+    final n = nome?.trim();
+    final r = regiao.trim();
+    if (n != null && n.isNotEmpty) return '$n ($r)';
+    return r;
+  }
+
+  /// Texto para legenda de fotos no anexo.
+  String get textoLegendaFoto {
+    final n = nome?.trim();
+    final desc = descricao?.trim();
+    final base = (desc != null && desc.isNotEmpty) ? desc : regiao.trim();
+    if (n != null && n.isNotEmpty) return '$n: $base';
+    return base;
+  }
+
   LesaoCadaverModel copyWith({
     String? id,
+    String? nome,
     String? regiao,
     String? descricao,
     String? tipo,
@@ -511,6 +551,7 @@ class LesaoCadaverModel {
   }) {
     return LesaoCadaverModel(
       id: id ?? this.id,
+      nome: nome ?? this.nome,
       regiao: regiao ?? this.regiao,
       descricao: descricao ?? this.descricao,
       tipo: tipo ?? this.tipo,
@@ -538,6 +579,7 @@ class CadaverModel {
   final FaixaEtaria? faixaEtaria;
   final SexoCadaver? sexo;
   final Compleicao? compleicao;
+  final CorPele? corPele;
   final CorCabelo? corCabelo;
   final String? corCabeloOutro;
   final TipoCabelo? tipoCabelo;
@@ -598,8 +640,10 @@ class CadaverModel {
   final String? outrasObservacoes;
 
   // Fotos dos exames (paths locais)
-  final List<String> fotosVistaCadaversAmbiente; // obrigatório: vista do cadáver no ambiente
-  final List<String> fotosPosicaoEncontrada; // obrigatório: posição em que foi encontrado
+  final List<String>
+  fotosVistaCadaversAmbiente; // obrigatório: vista do cadáver no ambiente
+  final List<String>
+  fotosPosicaoEncontrada; // obrigatório: posição em que foi encontrado
   final List<String> fotosHipostaseSecrecoes; // opcional
   final List<String> fotosTatuagens; // opcional (tatuagens e marcas corporais)
 
@@ -633,6 +677,7 @@ class CadaverModel {
     this.faixaEtaria,
     this.sexo,
     this.compleicao,
+    this.corPele,
     this.corCabelo,
     this.corCabeloOutro,
     this.tipoCabelo,
@@ -698,6 +743,7 @@ class CadaverModel {
     'faixaEtaria': faixaEtaria?.name,
     'sexo': sexo?.name,
     'compleicao': compleicao?.name,
+    'corPele': corPele?.name,
     'corCabelo': corCabelo?.name,
     'corCabeloOutro': corCabeloOutro,
     'tipoCabelo': tipoCabelo?.name,
@@ -777,6 +823,12 @@ class CadaverModel {
           ? Compleicao.values.firstWhere(
               (e) => e.name == json['compleicao'],
               orElse: () => Compleicao.normolinea,
+            )
+          : null,
+      corPele: json['corPele'] != null
+          ? CorPele.values.firstWhere(
+              (e) => e.name == json['corPele'],
+              orElse: () => CorPele.parda,
             )
           : null,
       corCabelo: json['corCabelo'] != null
@@ -870,39 +922,40 @@ class CadaverModel {
       outrasObservacoes: json['outrasObservacoes'] as String?,
       fotosVistaCadaversAmbiente:
           (json['fotosVistaCadaversAmbiente'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       fotosPosicaoEncontrada:
           (json['fotosPosicaoEncontrada'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       fotosHipostaseSecrecoes:
           (json['fotosHipostaseSecrecoes'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       fotosTatuagens:
-          ((json['fotosTatuagens'] ?? json['fotosTatuagensLesoes']) as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
+          ((json['fotosTatuagens'] ?? json['fotosTatuagensLesoes'])
+                  as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       lesoes: (json['lesoes'] as List<dynamic>?)
           ?.map((l) => LesaoCadaverModel.fromJson(l as Map<String, dynamic>))
           .toList(),
       ausenciaLesoesDefesa: json['ausenciaLesoesDefesa'] as bool? ?? false,
       membrosExaminadosDefesa:
           (json['membrosExaminadosDefesa'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       observacoesLesoesDefesa: json['observacoesLesoesDefesa'] as String?,
       fotosLesoesDefesa:
           (json['fotosLesoesDefesa'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       numerosFotosLesoesDefesa:
           (json['numerosFotosLesoesDefesa'] as List<dynamic>?)
               ?.map((e) => e as int)
@@ -926,6 +979,7 @@ class CadaverModel {
     FaixaEtaria? faixaEtaria,
     SexoCadaver? sexo,
     Compleicao? compleicao,
+    CorPele? corPele,
     CorCabelo? corCabelo,
     String? corCabeloOutro,
     TipoCabelo? tipoCabelo,
@@ -992,6 +1046,7 @@ class CadaverModel {
       faixaEtaria: faixaEtaria ?? this.faixaEtaria,
       sexo: sexo ?? this.sexo,
       compleicao: compleicao ?? this.compleicao,
+      corPele: corPele ?? this.corPele,
       corCabelo: corCabelo ?? this.corCabelo,
       corCabeloOutro: corCabeloOutro ?? this.corCabeloOutro,
       tipoCabelo: tipoCabelo ?? this.tipoCabelo,
@@ -1044,10 +1099,13 @@ class CadaverModel {
       fotosTatuagens: fotosTatuagens ?? this.fotosTatuagens,
       lesoes: lesoes ?? this.lesoes,
       ausenciaLesoesDefesa: ausenciaLesoesDefesa ?? this.ausenciaLesoesDefesa,
-      membrosExaminadosDefesa: membrosExaminadosDefesa ?? this.membrosExaminadosDefesa,
-      observacoesLesoesDefesa: observacoesLesoesDefesa ?? this.observacoesLesoesDefesa,
+      membrosExaminadosDefesa:
+          membrosExaminadosDefesa ?? this.membrosExaminadosDefesa,
+      observacoesLesoesDefesa:
+          observacoesLesoesDefesa ?? this.observacoesLesoesDefesa,
       fotosLesoesDefesa: fotosLesoesDefesa ?? this.fotosLesoesDefesa,
-      numerosFotosLesoesDefesa: numerosFotosLesoesDefesa ?? this.numerosFotosLesoesDefesa,
+      numerosFotosLesoesDefesa:
+          numerosFotosLesoesDefesa ?? this.numerosFotosLesoesDefesa,
       vestes: vestes ?? this.vestes,
       tatuagensMarcas: tatuagensMarcas ?? this.tatuagensMarcas,
       pertences: pertences ?? this.pertences,

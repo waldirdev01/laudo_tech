@@ -8,6 +8,7 @@ import '../constants/evidencias_cadaver_regioes.dart';
 import '../constants/tipos_barba_referencia.dart';
 import '../models/cadaver_model.dart';
 import '../models/ficha_completa_model.dart';
+import 'lesao_cadaver_form_screen.dart';
 
 class CadastroCadaverScreen extends StatefulWidget {
   final CadaverModel cadaver;
@@ -70,6 +71,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   FaixaEtaria? _faixaEtaria;
   SexoCadaver? _sexo;
   Compleicao? _compleicao;
+  CorPele? _corPele;
   CorCabelo? _corCabelo;
   TipoCabelo? _tipoCabelo;
   TamanhoCabelo? _tamanhoCabelo;
@@ -127,6 +129,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _faixaEtaria = c.faixaEtaria;
     _sexo = c.sexo;
     _compleicao = c.compleicao;
+    _corPele = c.corPele;
     _corCabelo = c.corCabelo;
     _corCabeloOutroCtrl.text = c.corCabeloOutro ?? '';
     _tipoCabelo = c.tipoCabelo;
@@ -245,6 +248,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       faixaEtaria: _faixaEtaria,
       sexo: _sexo,
       compleicao: _compleicao,
+      corPele: _corPele,
       corCabelo: _corCabelo,
       corCabeloOutro: _corCabeloOutroCtrl.text.trim().isEmpty
           ? null
@@ -354,8 +358,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
 
   Future<String?> _persistirFotoCadaver(XFile arquivo, String subpasta) async {
     try {
-      final origem = File(arquivo.path);
-      if (!await origem.exists()) return null;
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
         '${dir.path}/levantamento_fotografico/${widget.ficha.id}/cadaver_${widget.cadaver.numero}/$subpasta',
@@ -367,7 +369,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       final destino = File(
         '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
       );
-      await origem.copy(destino.path);
+      final bytes = await arquivo.readAsBytes();
+      await destino.writeAsBytes(bytes);
       return destino.path;
     } catch (_) {
       return null;
@@ -570,6 +573,15 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     value: _compleicao,
                     items: Compleicao.values,
                     onChanged: (v) => setState(() => _compleicao = v),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Cor
+                  _buildDropdown<CorPele>(
+                    label: 'Cor',
+                    value: _corPele,
+                    items: CorPele.values,
+                    onChanged: (v) => setState(() => _corPele = v),
                   ),
                   const SizedBox(height: 12),
 
@@ -1441,7 +1453,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     ...List.generate(_lesoes.length, (index) {
                       final lesao = _lesoes[index];
                       return ListTile(
-                        title: Text(lesao.regiao),
+                        title: Text(lesao.rotuloTituloLista),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -2116,355 +2128,38 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     );
   }
 
-  void _adicionarLesao() {
-    _mostrarDialogoLesao(null);
-  }
-
-  void _editarLesao(int index) {
-    _mostrarDialogoLesao(index);
-  }
-
-  void _mostrarDialogoLesao(int? index) {
-    final lesaoExistente = index != null ? _lesoes[index] : null;
-    final regiaoCtrl = TextEditingController(
-      text: lesaoExistente?.regiao ?? '',
-    );
-    final descricaoCtrl = TextEditingController(
-      text: lesaoExistente?.descricao ?? '',
-    );
-    final tipoCtrl = TextEditingController(
-      text: lesaoExistente?.tipo ?? '',
-    );
-    final diametroCtrl = TextEditingController(
-      text: lesaoExistente?.paf?.diametro?.toString() ?? '',
-    );
-
-    // Estados para PAF
-    bool isPaf = lesaoExistente?.isPaf ?? false;
-    TipoLesaoPaf tipoLesaoPaf = lesaoExistente?.paf?.tipo ?? TipoLesaoPaf.entrada;
-    DistanciaTiro? distanciaTiro = lesaoExistente?.paf?.distancia;
-    Set<String> sinaisSelecionados =
-        Set<String>.from(lesaoExistente?.paf?.sinais ?? []);
-
-    final fotosLesao = List<String>.from(lesaoExistente?.fotosPaths ?? []);
-    final subpasta = lesaoExistente != null
-        ? 'lesao_${lesaoExistente.id}'
-        : 'lesao_novo_${DateTime.now().microsecondsSinceEpoch}';
-
-    void atualizarPresets(StateSetter setDialogState) {
-      final novosSinais = aplicarPresetPAF(tipoLesaoPaf, distanciaTiro);
-      setDialogState(() {
-        sinaisSelecionados = novosSinais;
-      });
-    }
-
-    void atualizarDescricaoAutomatica(StateSetter setDialogState) {
-      if (isPaf && regiaoCtrl.text.trim().isNotEmpty) {
-        final descricao = gerarDescricaoPAF(
-          regiao: regiaoCtrl.text.trim(),
-          tipo: tipoLesaoPaf,
-          distancia: tipoLesaoPaf != TipoLesaoPaf.saida ? distanciaTiro : null,
-          diametro: double.tryParse(diametroCtrl.text),
-          sinais: sinaisSelecionados,
-        );
-        setDialogState(() {
-          descricaoCtrl.text = descricao;
-        });
-      }
-    }
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: Text(index == null ? 'Nova Lesão' : 'Editar Lesão'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Campo Região
-                  TextField(
-                    controller: regiaoCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Região *',
-                      border: OutlineInputBorder(),
-                      hintText: 'Ex: Anterior 12 - Epigástricas ou texto livre',
-                    ),
-                    onChanged: (_) =>
-                        atualizarDescricaoAutomatica(setDialogState),
-                  ),
-                  const SizedBox(height: 6),
-                  TextButton.icon(
-                    onPressed: () {
-                      _mostrarNumeracaoCorpoCvli(dialogContext, regiaoCtrl);
-                    },
-                    icon: const Icon(Icons.help_outline, size: 20),
-                    label: const Text('Consultar numeração do corpo (figura CVLI)'),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Campo Tipo (desabilitado se PAF)
-                  TextField(
-                    controller: tipoCtrl,
-                    enabled: !isPaf,
-                    decoration: InputDecoration(
-                      labelText: 'Tipo',
-                      border: const OutlineInputBorder(),
-                      hintText: isPaf ? 'PAF' : 'Ex: PAB, contusão, etc.',
-                      filled: isPaf,
-                      fillColor: isPaf ? Colors.grey.shade800 : null,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Checkbox PAF
-                  CheckboxListTile(
-                    title: const Text('Lesão por PAF'),
-                    value: isPaf,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    onChanged: (value) {
-                      setDialogState(() {
-                        isPaf = value ?? false;
-                        if (isPaf) {
-                          tipoCtrl.text = 'PAF';
-                          atualizarPresets(setDialogState);
-                          atualizarDescricaoAutomatica(setDialogState);
-                        } else {
-                          tipoCtrl.clear();
-                          descricaoCtrl.clear();
-                          sinaisSelecionados.clear();
-                          distanciaTiro = null;
-                        }
-                      });
-                    },
-                  ),
-
-                  // Painel PAF (visível apenas se isPaf)
-                  if (isPaf) ...[
-                    const Divider(),
-                    const SizedBox(height: 8),
-
-                    // A) Tipo de lesão PAF
-                    Text(
-                      'Tipo de lesão',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: TipoLesaoPaf.values.map((tipo) {
-                        final isSelected = tipoLesaoPaf == tipo;
-                        return ChoiceChip(
-                          label: Text(tipo.label),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setDialogState(() {
-                                tipoLesaoPaf = tipo;
-                                // Se for SAÍDA, limpar distância
-                                if (tipo == TipoLesaoPaf.saida) {
-                                  distanciaTiro = null;
-                                }
-                              });
-                              atualizarPresets(setDialogState);
-                              atualizarDescricaoAutomatica(setDialogState);
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // B) Distância do disparo (desabilitado se SAÍDA)
-                    Text(
-                      'Distância do disparo',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: tipoLesaoPaf == TipoLesaoPaf.saida
-                            ? Colors.grey
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: DistanciaTiro.values.map((dist) {
-                        final isSelected = distanciaTiro == dist;
-                        final isDisabled = tipoLesaoPaf == TipoLesaoPaf.saida;
-                        return ChoiceChip(
-                          label: Text(
-                            dist.label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDisabled ? Colors.grey : null,
-                            ),
-                          ),
-                          selected: isSelected && !isDisabled,
-                          onSelected: isDisabled
-                              ? null
-                              : (selected) {
-                                  setDialogState(() {
-                                    distanciaTiro = selected ? dist : null;
-                                  });
-                                  atualizarPresets(setDialogState);
-                                  atualizarDescricaoAutomatica(setDialogState);
-                                },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // C) Diâmetro do orifício
-                    TextField(
-                      controller: diametroCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Diâmetro do orifício (mm)',
-                        border: OutlineInputBorder(),
-                        hintText: 'Ex: 9',
-                      ),
-                      onChanged: (_) =>
-                          atualizarDescricaoAutomatica(setDialogState),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // D) Características (checkboxes)
-                    Text(
-                      'Características',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...SinaisPaf.todos.map((sinal) {
-                      return CheckboxListTile(
-                        title: Text(
-                          sinal,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        value: sinaisSelecionados.contains(sinal),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            if (value == true) {
-                              sinaisSelecionados.add(sinal);
-                            } else {
-                              sinaisSelecionados.remove(sinal);
-                            }
-                          });
-                          atualizarDescricaoAutomatica(setDialogState);
-                        },
-                      );
-                    }),
-                    const Divider(),
-                  ],
-
-                  const SizedBox(height: 12),
-
-                  // Fotos da lesão
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  _buildSecaoFotos(
-                    titulo: 'Fotos da lesão',
-                    paths: fotosLesao,
-                    onChanged: (v) {
-                      fotosLesao.clear();
-                      fotosLesao.addAll(v);
-                      setDialogState(() {});
-                    },
-                    subpasta: subpasta,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Campo Descrição
-                  TextField(
-                    controller: descricaoCtrl,
-                    decoration: InputDecoration(
-                      labelText: isPaf
-                          ? 'Descrição (gerada automaticamente)'
-                          : 'Descrição',
-                      border: const OutlineInputBorder(),
-                    ),
-                    maxLines: 5,
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (regiaoCtrl.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Informe a região da lesão'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-
-                  // Montar dados PAF se aplicável
-                  PafData? pafData;
-                  if (isPaf) {
-                    pafData = PafData(
-                      tipo: tipoLesaoPaf,
-                      distancia: tipoLesaoPaf != TipoLesaoPaf.saida
-                          ? distanciaTiro
-                          : null,
-                      diametro: double.tryParse(diametroCtrl.text),
-                      sinais: Set<String>.from(sinaisSelecionados),
-                    );
-                  }
-
-                  final novaLesao = LesaoCadaverModel(
-                    id: lesaoExistente?.id ??
-                        DateTime.now().microsecondsSinceEpoch.toString(),
-                    regiao: regiaoCtrl.text.trim(),
-                    tipo: isPaf
-                        ? 'PAF'
-                        : (tipoCtrl.text.trim().isEmpty
-                              ? null
-                              : tipoCtrl.text.trim()),
-                    descricao: descricaoCtrl.text.trim().isEmpty
-                        ? null
-                        : descricaoCtrl.text.trim(),
-                    isPaf: isPaf,
-                    paf: pafData,
-                    fotosPaths: List<String>.from(fotosLesao),
-                  );
-
-                  setState(() {
-                    if (index != null) {
-                      _lesoes[index] = novaLesao;
-                    } else {
-                      _lesoes.add(novaLesao);
-                    }
-                  });
-                  Navigator.pop(dialogContext);
-                },
-                child: Text(index == null ? 'Adicionar' : 'Salvar'),
-              ),
-            ],
-          );
-        },
+  Future<void> _adicionarLesao() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (ctx) => LesaoCadaverFormScreen(
+          fichaId: widget.ficha.id,
+          cadaverNumero: widget.cadaver.numero,
+          lesaoExistente: null,
+          manterNaTelaAposSalvarNovo: true,
+          onSalvo: (LesaoCadaverModel l) {
+            if (!mounted) return;
+            setState(() => _lesoes.add(l));
+          },
+          onAjudaRegiao: _mostrarNumeracaoCorpoCvli,
+        ),
       ),
     );
+  }
+
+  Future<void> _editarLesao(int index) async {
+    final existente = _lesoes[index];
+    final resultado = await Navigator.of(context).push<LesaoCadaverModel>(
+      MaterialPageRoute(
+        builder: (ctx) => LesaoCadaverFormScreen(
+          fichaId: widget.ficha.id,
+          cadaverNumero: widget.cadaver.numero,
+          lesaoExistente: existente,
+          onAjudaRegiao: _mostrarNumeracaoCorpoCvli,
+        ),
+      ),
+    );
+    if (!mounted || resultado == null) return;
+    setState(() => _lesoes[index] = resultado);
   }
 
   void _adicionarVeste() {

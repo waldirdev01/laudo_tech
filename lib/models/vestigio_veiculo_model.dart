@@ -21,6 +21,10 @@ enum TipoDestinoVestigioVeiculo {
 /// Representa um vestígio associado a um veículo
 class VestigioVeiculoModel {
   final String id;
+
+  /// Nome ou título curto (opcional), para identificação no laudo e legendas.
+  final String? nome;
+
   final String? descricao;
   
   // Localização no veículo (texto livre, sem coordenadas)
@@ -49,6 +53,7 @@ class VestigioVeiculoModel {
 
   VestigioVeiculoModel({
     required this.id,
+    this.nome,
     this.descricao,
     this.localizacao,
     this.tipoAcao,
@@ -62,8 +67,38 @@ class VestigioVeiculoModel {
     this.numerosFotografias,
   });
 
+  /// Nome + descrição (traço longo), para tabelas e resumos.
+  String get rotuloNomeDescricao {
+    final n = nome?.trim() ?? '';
+    final d = (descricao ?? '').trim();
+    if (n.isEmpty) return d;
+    if (d.isEmpty) return n;
+    return '$n — $d';
+  }
+
+  /// Texto corrido para legenda de foto: descrição/nome + local no veículo.
+  String get textoLegendaFoto {
+    final r = rotuloNomeDescricao;
+    final l = (localizacao ?? '').trim();
+    if (r.isEmpty && l.isEmpty) return 'vestígio';
+    if (l.isEmpty) return r;
+    if (r.isEmpty) return l;
+    return '$r, no veículo em $l';
+  }
+
+  /// Descrição + localização para células Word (uma frase).
+  String get textoDescricaoLocalWord {
+    final r = rotuloNomeDescricao;
+    final l = (localizacao ?? '').trim();
+    if (r.isEmpty && l.isEmpty) return '';
+    if (l.isEmpty) return r;
+    if (r.isEmpty) return 'Localização: $l';
+    return '$r. Localização no veículo: $l';
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
+        'nome': nome,
         'descricao': descricao,
         'localizacao': localizacao,
         'tipoAcao': tipoAcao?.name,
@@ -95,6 +130,7 @@ class VestigioVeiculoModel {
 
     return VestigioVeiculoModel(
       id: json['id'] as String? ?? '',
+      nome: json['nome'] as String?,
       descricao: json['descricao'] as String?,
       localizacao: json['localizacao'] as String?,
       tipoAcao: tipoAcao,
@@ -113,6 +149,7 @@ class VestigioVeiculoModel {
 
   VestigioVeiculoModel copyWith({
     String? id,
+    String? nome,
     String? descricao,
     String? localizacao,
     TipoAcaoVestigioVeiculo? tipoAcao,
@@ -127,6 +164,7 @@ class VestigioVeiculoModel {
   }) {
     return VestigioVeiculoModel(
       id: id ?? this.id,
+      nome: nome ?? this.nome,
       descricao: descricao ?? this.descricao,
       localizacao: localizacao ?? this.localizacao,
       tipoAcao: tipoAcao ?? this.tipoAcao,

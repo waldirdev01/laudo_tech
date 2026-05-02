@@ -218,7 +218,9 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                     )
                   : const Text('Salvar e Continuar'),
             ),
-            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+            const SizedBox(
+              height: 80,
+            ), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),

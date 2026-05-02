@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../models/causas_determinantes_transito.dart';
 import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
@@ -30,62 +31,26 @@ class _CrimeTransitoLevantamentoScreenState
   // --- Dinâmica (derivada das formas de interação) ---
   final _dinamicaOutroCtrl = TextEditingController();
   final _qtdVeiculosCtrl = TextEditingController(text: '1');
-
-  // --- Natureza da ocorrência (incorporada ao levantamento) ---
-  CrimeTransitoNaturezaTipo? _tipoOcorrencia;
-  final _quantidadeUnidadesCtrl = TextEditingController();
   final Set<CrimeTransitoFormaInteracao> _formasInteracao = {};
 
   /// Formas de dinâmica principal (UI)
   static const _formasDinamicaPrincipal = [
+    CrimeTransitoFormaInteracao.atropelamento,
     CrimeTransitoFormaInteracao.colisaoFrontal,
     CrimeTransitoFormaInteracao.colisaoTraseira,
     CrimeTransitoFormaInteracao.colisaoTransversal,
     CrimeTransitoFormaInteracao.colisaoLateral,
     CrimeTransitoFormaInteracao.abalroamento,
     CrimeTransitoFormaInteracao.choque,
-    CrimeTransitoFormaInteracao.atropelamento,
     CrimeTransitoFormaInteracao.saidaPista,
+    CrimeTransitoFormaInteracao.capotamento,
+    CrimeTransitoFormaInteracao.tombamento,
     CrimeTransitoFormaInteracao.outro,
   ];
 
   /// Deriva DinamicaAcidente a partir das formas selecionadas (para grupos de fotos)
-  DinamicaAcidente? get _dinamicaDerivada {
-    if (_formasInteracao.contains(CrimeTransitoFormaInteracao.atropelamento)) {
-      return DinamicaAcidente.atropelamento;
-    }
-    if (_formasInteracao.contains(CrimeTransitoFormaInteracao.saidaPista)) {
-      return DinamicaAcidente.saidaPista;
-    }
-    if (_formasInteracao.contains(CrimeTransitoFormaInteracao.choque) ||
-        _formasInteracao.contains(CrimeTransitoFormaInteracao.objetoFixo)) {
-      return DinamicaAcidente.choqueObjetoFixo;
-    }
-    if (_formasInteracao.contains(CrimeTransitoFormaInteracao.colisaoFrontal)) {
-      return DinamicaAcidente.colisaoFrontal;
-    }
-    if (_formasInteracao.contains(
-      CrimeTransitoFormaInteracao.colisaoTraseira,
-    )) {
-      return DinamicaAcidente.colisaoTraseira;
-    }
-    if (_formasInteracao.any(
-      (f) => const [
-        CrimeTransitoFormaInteracao.colisaoTransversal,
-        CrimeTransitoFormaInteracao.colisaoLateral,
-        CrimeTransitoFormaInteracao.abalroamento,
-      ].contains(f),
-    )) {
-      return DinamicaAcidente.colisaoTransversalLateral;
-    }
-    if (_formasInteracao.contains(CrimeTransitoFormaInteracao.outro)) {
-      return DinamicaAcidente.outro;
-    }
-    if (_formasInteracao.isNotEmpty) {
-      return DinamicaAcidente.outro;
-    }
-    return null;
-  }
+  DinamicaAcidente? get _dinamicaDerivada =>
+      CausasDeterminantesCatalogo.derivarDinamica(_formasInteracao);
 
   bool? _materialRecolhido;
   final _materialDescricaoCtrl = TextEditingController();
@@ -120,6 +85,37 @@ class _CrimeTransitoLevantamentoScreenState
 
   int get _qtdVeiculos => int.tryParse(_qtdVeiculosCtrl.text) ?? 1;
 
+  // Sugere a quantidade de veículos com base na dinâmica selecionada
+  int get _qtdVeiculosSugerido {
+    const umaUnidade = {
+      CrimeTransitoFormaInteracao.atropelamento,
+      CrimeTransitoFormaInteracao.saidaPista,
+      CrimeTransitoFormaInteracao.choque,
+      CrimeTransitoFormaInteracao.capotamento,
+      CrimeTransitoFormaInteracao.tombamento,
+    };
+    const duasUnidades = {
+      CrimeTransitoFormaInteracao.colisaoFrontal,
+      CrimeTransitoFormaInteracao.colisaoTraseira,
+      CrimeTransitoFormaInteracao.colisaoTransversal,
+      CrimeTransitoFormaInteracao.colisaoLateral,
+      CrimeTransitoFormaInteracao.abalroamento,
+    };
+    if (_formasInteracao.any(duasUnidades.contains)) return 2;
+    if (_formasInteracao.any(umaUnidade.contains)) return 1;
+    return 1;
+  }
+
+  // Atropelamento sempre composta (veículo + pedestre); demais: depende da qtd
+  CrimeTransitoNaturezaTipo get _tipoOcorrenciaDerivado {
+    if (_formasInteracao.contains(CrimeTransitoFormaInteracao.atropelamento)) {
+      return CrimeTransitoNaturezaTipo.composta;
+    }
+    return _qtdVeiculos >= 2
+        ? CrimeTransitoNaturezaTipo.composta
+        : CrimeTransitoNaturezaTipo.simples;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -133,10 +129,6 @@ class _CrimeTransitoLevantamentoScreenState
     if (dados != null) {
       _dinamicaOutroCtrl.text = dados.dinamicaOutroDescricao ?? '';
       _qtdVeiculosCtrl.text = (dados.quantidadeVeiculos ?? 1).toString();
-      _tipoOcorrencia = dados.tipoOcorrencia;
-      _quantidadeUnidadesCtrl.text =
-          (dados.quantidadeUnidades ?? dados.quantidadeVeiculos ?? '')
-              .toString();
       _formasInteracao.addAll(dados.formasInteracao ?? []);
       _materialRecolhido = dados.materialRecolhido;
       _materialDescricaoCtrl.text = dados.materialDescricao ?? '';
@@ -146,11 +138,6 @@ class _CrimeTransitoLevantamentoScreenState
     }
     // Migração: se levantamento não tinha natureza, preencher a partir da tela antiga
     if (natureza != null && (dados == null || dados.tipoOcorrencia == null)) {
-      _tipoOcorrencia ??= natureza.tipo;
-      if (_quantidadeUnidadesCtrl.text.trim().isEmpty) {
-        _quantidadeUnidadesCtrl.text = (natureza.quantidadeUnidades ?? '')
-            .toString();
-      }
       _formasInteracao.addAll(natureza.formasInteracao ?? []);
       _materialRecolhido ??= natureza.materialRecolhido;
       if (_materialDescricaoCtrl.text.trim().isEmpty) {
@@ -212,7 +199,6 @@ class _CrimeTransitoLevantamentoScreenState
   void dispose() {
     _dinamicaOutroCtrl.dispose();
     _qtdVeiculosCtrl.dispose();
-    _quantidadeUnidadesCtrl.dispose();
     _materialDescricaoCtrl.dispose();
     _laboratorioCtrl.dispose();
     _examesDinamicaCtrl.dispose();
@@ -276,6 +262,7 @@ class _CrimeTransitoLevantamentoScreenState
       } else {
         _formasInteracao.add(forma);
       }
+      _qtdVeiculosCtrl.text = _qtdVeiculosSugerido.toString();
     });
   }
 
@@ -288,15 +275,22 @@ class _CrimeTransitoLevantamentoScreenState
   }
 
   Future<String?> _persistirFoto(XFile foto, String subpasta) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final pasta = Directory(
-      '${dir.path}/levantamento_transito/${widget.ficha.id}/$subpasta',
-    );
-    if (!await pasta.exists()) await pasta.create(recursive: true);
-    final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.jpg';
-    final destino = File('${pasta.path}/$nome');
-    await File(foto.path).copy(destino.path);
-    return destino.path;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_transito/${widget.ficha.id}/$subpasta',
+      );
+      if (!await pasta.exists()) await pasta.create(recursive: true);
+      final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      final destino = File('${pasta.path}/$nome');
+      // readAsBytes() funciona com caminhos de arquivo e com content URIs
+      // (galeria no Android moderno), ao contrário de File.copy().
+      final bytes = await foto.readAsBytes();
+      await destino.writeAsBytes(bytes);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _obterGPS() async {
@@ -360,8 +354,8 @@ class _CrimeTransitoLevantamentoScreenState
           ? null
           : _dinamicaOutroCtrl.text.trim(),
       quantidadeVeiculos: _qtdVeiculos,
-      tipoOcorrencia: _tipoOcorrencia,
-      quantidadeUnidades: int.tryParse(_quantidadeUnidadesCtrl.text.trim()),
+      tipoOcorrencia: _tipoOcorrenciaDerivado,
+      quantidadeUnidades: null,
       formasInteracao: _formasInteracao.isEmpty
           ? null
           : _formasInteracao.toList(),
@@ -420,12 +414,14 @@ class _CrimeTransitoLevantamentoScreenState
     );
 
     // Manter crimeTransitoNatureza em sincronia para laudo/Word
+    final exNat = widget.ficha.crimeTransitoNatureza;
     final natureza = CrimeTransitoNaturezaModel(
-      tipo: _tipoOcorrencia,
-      quantidadeUnidades: int.tryParse(_quantidadeUnidadesCtrl.text.trim()),
+      tipo: _tipoOcorrenciaDerivado,
+      quantidadeUnidades: exNat?.quantidadeUnidades,
       formasInteracao: _formasInteracao.isEmpty
           ? null
           : _formasInteracao.toList(),
+      observacoesComplementares: exNat?.observacoesComplementares,
       materialRecolhido: _materialRecolhido,
       materialDescricao: _materialDescricaoCtrl.text.trim().isEmpty
           ? null
@@ -437,7 +433,10 @@ class _CrimeTransitoLevantamentoScreenState
       examesDinamica: _examesDinamicaCtrl.text.trim().isEmpty
           ? null
           : _examesDinamicaCtrl.text.trim(),
-      croquiObservacoes: null,
+      croquiObservacoes: exNat?.croquiObservacoes,
+      observacoes: exNat?.observacoes,
+      complementoDinamicaFato: exNat?.complementoDinamicaFato,
+      causasDeterminantesIds: exNat?.causasDeterminantesIds,
     );
 
     final fichaAtualizada = widget.ficha.copyWith(
@@ -687,8 +686,12 @@ class _CrimeTransitoLevantamentoScreenState
     TipoVestigioVia.marcaFrenagem => 'Marca de frenagem',
     TipoVestigioVia.marcaDerrapagem => 'Marca de derrapagem',
     TipoVestigioVia.sulcagem => 'Sulcagem',
-    TipoVestigioVia.raspagem => 'Raspagem',
+    TipoVestigioVia.friccao => 'Fricção',
     TipoVestigioVia.arraste => 'Arraste',
+    TipoVestigioVia.arrastamentoCorpoFlacido => 'Arrastamento de corpo flácido',
+    TipoVestigioVia.marcaGuinada => 'Marca de guinada',
+    TipoVestigioVia.materialBiologico => 'Material biológico',
+    TipoVestigioVia.substanciaHematica => 'Substância com aspecto hemático',
     TipoVestigioVia.liquidos => 'Líquidos',
     TipoVestigioVia.fragmentos => 'Fragmentos',
     TipoVestigioVia.outro => 'Outro',
@@ -758,58 +761,11 @@ class _CrimeTransitoLevantamentoScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: _qtdVeiculosCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        labelText: 'Quantidade de veículos',
-                        hintText: 'Ex: 2',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<CrimeTransitoNaturezaTipo>(
-                      initialValue: _tipoOcorrencia,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Natureza da ocorrência',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: CrimeTransitoNaturezaTipo.values
-                          .map(
-                            (tipo) => DropdownMenuItem(
-                              value: tipo,
-                              child: Text(
-                                tipo == CrimeTransitoNaturezaTipo.simples
-                                    ? 'Simples (1 unidade)'
-                                    : 'Composta (2 ou mais unidades)',
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) => setState(() => _tipoOcorrencia = v),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _quantidadeUnidadesCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantidade de unidades envolvidas',
-                        hintText:
-                            'Inclua pedestre, animal ou objeto, se houver',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 16),
                     Text(
                       'Dinâmica principal',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
                       runSpacing: 4,
@@ -833,6 +789,60 @@ class _CrimeTransitoLevantamentoScreenState
                         ),
                       ),
                     ],
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _qtdVeiculosCtrl,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: const InputDecoration(
+                              labelText: 'Quantidade de veículos',
+                              hintText: 'Ex: 2',
+                              border: OutlineInputBorder(),
+                              helperText: 'Auto-preenchido pela dinâmica',
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _tipoOcorrenciaDerivado ==
+                                    CrimeTransitoNaturezaTipo.composta
+                                ? Colors.orange.shade100
+                                : Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _tipoOcorrenciaDerivado ==
+                                      CrimeTransitoNaturezaTipo.composta
+                                  ? Colors.orange.shade400
+                                  : Colors.green.shade400,
+                            ),
+                          ),
+                          child: Text(
+                            _tipoOcorrenciaDerivado ==
+                                    CrimeTransitoNaturezaTipo.composta
+                                ? 'Composta'
+                                : 'Simples',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _tipoOcorrenciaDerivado ==
+                                      CrimeTransitoNaturezaTipo.composta
+                                  ? Colors.orange.shade800
+                                  : Colors.green.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1239,15 +1249,20 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
   }
 
   Future<String?> _persistirFoto(XFile foto) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final pasta = Directory(
-      '${dir.path}/levantamento_transito/${widget.fichaId}/vestigios',
-    );
-    if (!await pasta.exists()) await pasta.create(recursive: true);
-    final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.jpg';
-    final destino = File('${pasta.path}/$nome');
-    await File(foto.path).copy(destino.path);
-    return destino.path;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_transito/${widget.fichaId}/vestigios',
+      );
+      if (!await pasta.exists()) await pasta.create(recursive: true);
+      final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      final destino = File('${pasta.path}/$nome');
+      final bytes = await foto.readAsBytes();
+      await destino.writeAsBytes(bytes);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
   }
 
   void _salvar() {
@@ -1276,8 +1291,12 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
     TipoVestigioVia.marcaFrenagem => 'Marca de frenagem',
     TipoVestigioVia.marcaDerrapagem => 'Marca de derrapagem',
     TipoVestigioVia.sulcagem => 'Sulcagem',
-    TipoVestigioVia.raspagem => 'Raspagem',
+    TipoVestigioVia.friccao => 'Fricção',
     TipoVestigioVia.arraste => 'Arraste',
+    TipoVestigioVia.arrastamentoCorpoFlacido => 'Arrastamento de corpo flácido',
+    TipoVestigioVia.marcaGuinada => 'Marca de guinada',
+    TipoVestigioVia.materialBiologico => 'Material biológico',
+    TipoVestigioVia.substanciaHematica => 'Substância com aspecto hemático',
     TipoVestigioVia.liquidos => 'Líquidos',
     TipoVestigioVia.fragmentos => 'Fragmentos',
     TipoVestigioVia.outro => 'Outro',

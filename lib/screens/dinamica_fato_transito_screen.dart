@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../main.dart';
+import '../models/causas_determinantes_transito.dart';
+import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
@@ -26,14 +28,30 @@ class DinamicaFatoTransitoScreen extends StatefulWidget {
 class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen> {
   final _fichaService = FichaService();
   final _complementoCtrl = TextEditingController();
+  final Set<String> _causasSelecionadas = {};
   bool _salvando = false;
+
+  DinamicaAcidente? get _dinamicaPrincipal {
+    final lev = widget.ficha.crimeTransitoLevantamento;
+    if (lev?.dinamica != null) return lev!.dinamica;
+    return CausasDeterminantesCatalogo.derivarDinamica(
+      widget.ficha.crimeTransitoNatureza?.formasInteracao,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    final complemento =
-        widget.ficha.crimeTransitoNatureza?.complementoDinamicaFato ?? '';
+    final nat = widget.ficha.crimeTransitoNatureza;
+    final complemento = nat?.complementoDinamicaFato ?? '';
     _complementoCtrl.text = complemento;
+    final d = _dinamicaPrincipal;
+    final validIds = d == null
+        ? <String>{}
+        : CausasDeterminantesCatalogo.opcoesPara(d).map((e) => e.id).toSet();
+    for (final id in nat?.causasDeterminantesIds ?? const <String>[]) {
+      if (validIds.contains(id)) _causasSelecionadas.add(id);
+    }
   }
 
   @override
@@ -73,15 +91,20 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
     setState(() => _salvando = true);
     try {
       final natureza = widget.ficha.crimeTransitoNatureza;
+      final causasIds = _causasSelecionadas.isEmpty
+          ? null
+          : _causasSelecionadas.toList();
       final naturezaAtualizada = natureza?.copyWith(
             complementoDinamicaFato: _complementoCtrl.text.trim().isEmpty
                 ? null
                 : _complementoCtrl.text.trim(),
+            causasDeterminantesIds: causasIds,
           ) ??
           CrimeTransitoNaturezaModel(
             complementoDinamicaFato: _complementoCtrl.text.trim().isEmpty
                 ? null
                 : _complementoCtrl.text.trim(),
+            causasDeterminantesIds: causasIds,
           );
 
       String? dataHoraTermino = widget.ficha.dataHoraTermino;
@@ -172,6 +195,16 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
                       const SizedBox(height: 12),
                     ],
                     _rowLabel(context, 'Formas de interação', formasLabel),
+                    if (_dinamicaPrincipal != null) ...[
+                      const SizedBox(height: 12),
+                      _rowLabel(
+                        context,
+                        'Dinâmica principal (levantamento)',
+                        CausasDeterminantesCatalogo.labelDinamica(
+                          _dinamicaPrincipal!,
+                        ),
+                      ),
+                    ],
                     if (natureza?.observacoes != null &&
                         natureza!.observacoes!.trim().isNotEmpty) ...[
                       const SizedBox(height: 12),
@@ -186,6 +219,58 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
               ),
             ),
             const SizedBox(height: 20),
+            if (_dinamicaPrincipal != null) ...[
+              Text(
+                'Modelos de causa (SDT / IC-PCDF)',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Conforme a dinâmica principal indicada no levantamento, '
+                'marque as linhas do documento de referência que melhor descrevem o caso. '
+                'Você pode marcar mais de uma.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              ...CausasDeterminantesCatalogo.opcoesPara(_dinamicaPrincipal!).map(
+                (c) => CheckboxListTile(
+                  value: _causasSelecionadas.contains(c.id),
+                  onChanged: (v) {
+                    setState(() {
+                      if (v == true) {
+                        _causasSelecionadas.add(c.id);
+                      } else {
+                        _causasSelecionadas.remove(c.id);
+                      }
+                    });
+                  },
+                  title: Text('${c.referencia} — ${c.titulo}'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                ),
+              ),
+              const SizedBox(height: 20),
+            ] else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Não foi possível determinar a dinâmica principal a partir do levantamento. '
+                  'Conclua o levantamento fotográfico marcando uma forma de interação principal, '
+                  'ou use o complemento abaixo para descrever a dinâmica.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
             TextField(
               controller: _complementoCtrl,
               decoration: const InputDecoration(

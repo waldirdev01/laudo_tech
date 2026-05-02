@@ -2,7 +2,8 @@
 enum TipoOcorrencia {
   furtoDanoExameLocal('FURTO / DANO / EXAME DE LOCAL'),
   cvli('CVLI - CRIMES VIOLENTOS LETAIS INTENCIONAIS'),
-  crimeTransito('CRIME DE TRÂNSITO'),
+  morteEsclarecer('MORTE A ESCLARECER'),
+  crimeTransito('CRIME DE TRÂNSITO')
   // vistoriaVeiculo('VISTORIA EM VEÍCULO'),
   ;
 
@@ -10,8 +11,9 @@ enum TipoOcorrencia {
   const TipoOcorrencia(this.label);
 
   static List<TipoOcorrencia> get tiposDisponiveis => [
-        furtoDanoExameLocal,
-        cvli,
-        crimeTransito,
-      ];
+    furtoDanoExameLocal,
+    cvli,
+    morteEsclarecer,
+    crimeTransito,
+  ];
 }

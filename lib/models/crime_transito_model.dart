@@ -30,27 +30,57 @@ enum SentidoPista { unico, duplo }
 /// Perfil da via (relevo)
 enum PerfilPista { plano, suave, declive, moderado, aclive, acentuado }
 
-/// Condições do revestimento da via
+/// Tipo de pavimento da via (seleção única)
+enum TipoPavimento {
+  asfalto,
+  concreto,
+  paralelepipedo,
+  cascalho,
+  terraBatida,
+  terraSolta,
+}
+
+/// Condições do estado de conservação da via (multi-select)
 enum CondicaoViaOpcao {
   seca,
+  umida,
   molhada,
   semDefeito,
+  comBuracos,
+  comOndulacoes,
   emObras,
-  cascalho,
-  terra,
-  asfaltoRugoso,
-  buracos,
-  ondulacoes,
-  contaminantes,
-  asfaltoLiso,
+  escorregadia,
+  comContaminantes,
   outro,
 }
 
-/// Tipos de sinalização existentes
-enum SinalizacaoTipo { vertical, horizontal, semaforica }
+/// Tipo de contaminante na via (multi-select)
+enum ContaminanteTipo {
+  oleo,
+  areia,
+  combustivel,
+  outro,
+}
 
-/// Situação operacional da sinalização
-enum SinalizacaoSituacao { normal, desligado, defeituoso }
+/// Condições específicas de via não pavimentada (multi-select)
+enum CondicaoViaNaoPavimentada {
+  comErosao,
+  comValetas,
+  poeiraSuspensao,
+  alagada,
+  vegetacaoNaPista,
+  acostamentoIndefinido,
+}
+
+/// Placas de sinalização vertical encontradas
+enum PlacaVertical {
+  paradaObrigatoria,
+  deAPreferencia,
+  advertencia,
+}
+
+/// Estado de conservação da sinalização
+enum ConservacaoSinalizacao { boa, regular, ruim }
 
 /// Intensidade do tráfego
 enum RegimeTrafego { intenso, moderado, leve, outro }
@@ -90,6 +120,27 @@ enum ElementoLateral {
 
 /// Estado de conservação do acostamento/lateral
 enum ConservacaoEstado { boa, ruim }
+
+/// Orientação cardinal da via (eixo da rodovia)
+enum OrientacaoVia {
+  norteSul,
+  lesteOeste,
+  nordesteSudoeste,
+  noroesteSudeste,
+}
+
+/// Classificação da via conforme CTB (Arts. 60–61)
+enum ClassificacaoVia {
+  urbanaTransitoRapido,
+  urbanaArterial,
+  urbanaColetora,
+  urbanaLocal,
+  ruralRodovia,
+  ruralEstrada,
+}
+
+/// Destino dado aos pertences encontrados com o envolvido
+enum DestinoPertences { recolhido, entregueAPessoa }
 
 /// Equipamentos de segurança utilizados pelos envolvidos
 enum CrimeTransitoEquipamentoSeguranca {
@@ -154,44 +205,61 @@ T? _enumFromJson<T extends Enum>(List<T> values, dynamic value) {
   return _firstWhereOrNull(values, (v) => v.name == value);
 }
 
-/// Informações sobre a sinalização da via
+/// Informações sobre a sinalização da via (vertical e horizontal)
 class CrimeTransitoSinalizacaoInfo {
-  final List<SinalizacaoTipo>? tipos;
-  final List<SinalizacaoSituacao>? situacoes;
-  final String? observacoes;
+  // Vertical
+  final List<PlacaVertical>? placasVerticais;
+  final String? placaAdvertenciaDescricao;
+  final ConservacaoSinalizacao? conservacaoVertical;
+  // Horizontal
+  final List<SeparacaoFaixasOpcao>? separacoesFaixas;
+  final List<CorFaixa>? corFaixas;
 
   const CrimeTransitoSinalizacaoInfo({
-    this.tipos,
-    this.situacoes,
-    this.observacoes,
+    this.placasVerticais,
+    this.placaAdvertenciaDescricao,
+    this.conservacaoVertical,
+    this.separacoesFaixas,
+    this.corFaixas,
   });
 
   Map<String, dynamic> toJson() => {
-        'tipos': tipos?.map((e) => e.name).toList(),
-        'situacoes': situacoes?.map((e) => e.name).toList(),
-        'observacoes': observacoes,
+        'placasVerticais': placasVerticais?.map((e) => e.name).toList(),
+        'placaAdvertenciaDescricao': placaAdvertenciaDescricao,
+        'conservacaoVertical': conservacaoVertical?.name,
+        'separacoesFaixas': separacoesFaixas?.map((e) => e.name).toList(),
+        'corFaixas': corFaixas?.map((e) => e.name).toList(),
       };
 
   factory CrimeTransitoSinalizacaoInfo.fromJson(Map<String, dynamic> json) =>
       CrimeTransitoSinalizacaoInfo(
-        tipos: _mapListFromJson(
-            json['tipos'] as List<dynamic>?, SinalizacaoTipo.values),
-        situacoes: _mapListFromJson(
-          json['situacoes'] as List<dynamic>?,
-          SinalizacaoSituacao.values,
-        ),
-        observacoes: json['observacoes'] as String?,
+        placasVerticais: _mapListFromJson(
+            json['placasVerticais'] as List<dynamic>?, PlacaVertical.values),
+        placaAdvertenciaDescricao:
+            json['placaAdvertenciaDescricao'] as String?,
+        conservacaoVertical: _enumFromJson(
+            ConservacaoSinalizacao.values, json['conservacaoVertical']),
+        separacoesFaixas: _mapListFromJson(
+            json['separacoesFaixas'] as List<dynamic>?,
+            SeparacaoFaixasOpcao.values),
+        corFaixas: _mapListFromJson(
+            json['corFaixas'] as List<dynamic>?, CorFaixa.values),
       );
 
   CrimeTransitoSinalizacaoInfo copyWith({
-    List<SinalizacaoTipo>? tipos,
-    List<SinalizacaoSituacao>? situacoes,
-    String? observacoes,
+    List<PlacaVertical>? placasVerticais,
+    String? placaAdvertenciaDescricao,
+    ConservacaoSinalizacao? conservacaoVertical,
+    List<SeparacaoFaixasOpcao>? separacoesFaixas,
+    List<CorFaixa>? corFaixas,
   }) {
     return CrimeTransitoSinalizacaoInfo(
-      tipos: tipos ?? this.tipos,
-      situacoes: situacoes ?? this.situacoes,
-      observacoes: observacoes ?? this.observacoes,
+      placasVerticais: placasVerticais ?? this.placasVerticais,
+      placaAdvertenciaDescricao:
+          placaAdvertenciaDescricao ?? this.placaAdvertenciaDescricao,
+      conservacaoVertical: conservacaoVertical ?? this.conservacaoVertical,
+      separacoesFaixas: separacoesFaixas ?? this.separacoesFaixas,
+      corFaixas: corFaixas ?? this.corFaixas,
     );
   }
 }
@@ -246,6 +314,7 @@ class CrimeTransitoLateralInfo {
 
 /// Descreve as condições da via/pista para crime de trânsito
 class CrimeTransitoCondicoesViaModel {
+  final ClassificacaoVia? classificacaoVia;
   final List<CondicaoSoloLocal>? condicoesSolo;
   final List<IluminacaoLocal>? iluminacao;
   final List<TracadoPista>? tracados;
@@ -254,7 +323,14 @@ class CrimeTransitoCondicoesViaModel {
   final List<PerfilPista>? perfis;
   final String? larguraPista;
   final String? intensidadePerfil;
+  final OrientacaoVia? orientacaoVia;
+  /// Lados onde há acostamento (ex: "Leste", "Oeste"), derivado da orientação da via
+  final List<String>? ladosAcostamento;
+  final int? faixasAcostamento;
+  final TipoPavimento? tipoPavimento;
   final List<CondicaoViaOpcao>? condicoesVia;
+  final List<ContaminanteTipo>? contaminantes;
+  final List<CondicaoViaNaoPavimentada>? condicoesNaoPavimentada;
   final String? condicaoViaOutroDescricao;
   final CrimeTransitoSinalizacaoInfo? sinalizacao;
   final RegimeTrafego? regimeTrafego;
@@ -266,14 +342,13 @@ class CrimeTransitoCondicoesViaModel {
   final List<String>? largurasFaixas;
   final VisibilidadeTipo? visibilidade;
   final String? visibilidadeReducaoDescricao;
-  final List<SeparacaoFaixasOpcao>? separacoesFaixas;
-  final List<CorFaixa>? corFaixas;
   final List<SeparacaoPistasOpcao>? separacoesPistas;
   final CrimeTransitoLateralInfo? lateralDireita;
   final CrimeTransitoLateralInfo? lateralEsquerda;
   final String? observacoes;
 
   const CrimeTransitoCondicoesViaModel({
+    this.classificacaoVia,
     this.condicoesSolo,
     this.iluminacao,
     this.tracados,
@@ -282,7 +357,13 @@ class CrimeTransitoCondicoesViaModel {
     this.perfis,
     this.larguraPista,
     this.intensidadePerfil,
+    this.orientacaoVia,
+    this.ladosAcostamento,
+    this.faixasAcostamento,
+    this.tipoPavimento,
     this.condicoesVia,
+    this.contaminantes,
+    this.condicoesNaoPavimentada,
     this.condicaoViaOutroDescricao,
     this.sinalizacao,
     this.regimeTrafego,
@@ -294,8 +375,6 @@ class CrimeTransitoCondicoesViaModel {
     this.largurasFaixas,
     this.visibilidade,
     this.visibilidadeReducaoDescricao,
-    this.separacoesFaixas,
-    this.corFaixas,
     this.separacoesPistas,
     this.lateralDireita,
     this.lateralEsquerda,
@@ -303,6 +382,7 @@ class CrimeTransitoCondicoesViaModel {
   });
 
   Map<String, dynamic> toJson() => {
+        'classificacaoVia': classificacaoVia?.name,
         'condicoesSolo': condicoesSolo?.map((e) => e.name).toList(),
         'iluminacao': iluminacao?.map((e) => e.name).toList(),
         'tracados': tracados?.map((e) => e.name).toList(),
@@ -311,7 +391,13 @@ class CrimeTransitoCondicoesViaModel {
         'perfis': perfis?.map((e) => e.name).toList(),
         'larguraPista': larguraPista,
         'intensidadePerfil': intensidadePerfil,
+        'orientacaoVia': orientacaoVia?.name,
+        'ladosAcostamento': ladosAcostamento,
+        'faixasAcostamento': faixasAcostamento,
+        'tipoPavimento': tipoPavimento?.name,
         'condicoesVia': condicoesVia?.map((e) => e.name).toList(),
+        'contaminantes': contaminantes?.map((e) => e.name).toList(),
+        'condicoesNaoPavimentada': condicoesNaoPavimentada?.map((e) => e.name).toList(),
         'condicaoViaOutroDescricao': condicaoViaOutroDescricao,
         'sinalizacao': sinalizacao?.toJson(),
         'regimeTrafego': regimeTrafego?.name,
@@ -323,8 +409,6 @@ class CrimeTransitoCondicoesViaModel {
         'largurasFaixas': largurasFaixas,
         'visibilidade': visibilidade?.name,
         'visibilidadeReducaoDescricao': visibilidadeReducaoDescricao,
-        'separacoesFaixas': separacoesFaixas?.map((e) => e.name).toList(),
-        'corFaixas': corFaixas?.map((e) => e.name).toList(),
         'separacoesPistas': separacoesPistas?.map((e) => e.name).toList(),
         'lateralDireita': lateralDireita?.toJson(),
         'lateralEsquerda': lateralEsquerda?.toJson(),
@@ -333,6 +417,7 @@ class CrimeTransitoCondicoesViaModel {
 
   factory CrimeTransitoCondicoesViaModel.fromJson(Map<String, dynamic> json) =>
       CrimeTransitoCondicoesViaModel(
+        classificacaoVia: _enumFromJson(ClassificacaoVia.values, json['classificacaoVia']),
         condicoesSolo: _mapListFromJson(
           json['condicoesSolo'] as List<dynamic>?,
           CondicaoSoloLocal.values,
@@ -349,8 +434,19 @@ class CrimeTransitoCondicoesViaModel {
             json['perfis'] as List<dynamic>?, PerfilPista.values),
         larguraPista: json['larguraPista'] as String?,
         intensidadePerfil: json['intensidadePerfil'] as String?,
+        orientacaoVia: _enumFromJson(OrientacaoVia.values, json['orientacaoVia']),
+        ladosAcostamento: (json['ladosAcostamento'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList(),
+        faixasAcostamento: json['faixasAcostamento'] as int?,
+        tipoPavimento: _enumFromJson(TipoPavimento.values, json['tipoPavimento']),
         condicoesVia: _mapListFromJson(
             json['condicoesVia'] as List<dynamic>?, CondicaoViaOpcao.values),
+        contaminantes: _mapListFromJson(
+            json['contaminantes'] as List<dynamic>?, ContaminanteTipo.values),
+        condicoesNaoPavimentada: _mapListFromJson(
+            json['condicoesNaoPavimentada'] as List<dynamic>?,
+            CondicaoViaNaoPavimentada.values),
         condicaoViaOutroDescricao: json['condicaoViaOutroDescricao'] as String?,
         sinalizacao: json['sinalizacao'] != null
             ? CrimeTransitoSinalizacaoInfo.fromJson(
@@ -371,12 +467,6 @@ class CrimeTransitoCondicoesViaModel {
             _enumFromJson(VisibilidadeTipo.values, json['visibilidade']),
         visibilidadeReducaoDescricao:
             json['visibilidadeReducaoDescricao'] as String?,
-        separacoesFaixas: _mapListFromJson(
-          json['separacoesFaixas'] as List<dynamic>?,
-          SeparacaoFaixasOpcao.values,
-        ),
-        corFaixas: _mapListFromJson(
-            json['corFaixas'] as List<dynamic>?, CorFaixa.values),
         separacoesPistas: _mapListFromJson(
           json['separacoesPistas'] as List<dynamic>?,
           SeparacaoPistasOpcao.values,
@@ -395,6 +485,7 @@ class CrimeTransitoCondicoesViaModel {
       );
 
   CrimeTransitoCondicoesViaModel copyWith({
+    ClassificacaoVia? classificacaoVia,
     List<CondicaoSoloLocal>? condicoesSolo,
     List<IluminacaoLocal>? iluminacao,
     List<TracadoPista>? tracados,
@@ -403,7 +494,13 @@ class CrimeTransitoCondicoesViaModel {
     List<PerfilPista>? perfis,
     String? larguraPista,
     String? intensidadePerfil,
+    OrientacaoVia? orientacaoVia,
+    List<String>? ladosAcostamento,
+    int? faixasAcostamento,
+    TipoPavimento? tipoPavimento,
     List<CondicaoViaOpcao>? condicoesVia,
+    List<ContaminanteTipo>? contaminantes,
+    List<CondicaoViaNaoPavimentada>? condicoesNaoPavimentada,
     String? condicaoViaOutroDescricao,
     CrimeTransitoSinalizacaoInfo? sinalizacao,
     RegimeTrafego? regimeTrafego,
@@ -415,14 +512,13 @@ class CrimeTransitoCondicoesViaModel {
     List<String>? largurasFaixas,
     VisibilidadeTipo? visibilidade,
     String? visibilidadeReducaoDescricao,
-    List<SeparacaoFaixasOpcao>? separacoesFaixas,
-    List<CorFaixa>? corFaixas,
     List<SeparacaoPistasOpcao>? separacoesPistas,
     CrimeTransitoLateralInfo? lateralDireita,
     CrimeTransitoLateralInfo? lateralEsquerda,
     String? observacoes,
   }) {
     return CrimeTransitoCondicoesViaModel(
+      classificacaoVia: classificacaoVia ?? this.classificacaoVia,
       condicoesSolo: condicoesSolo ?? this.condicoesSolo,
       iluminacao: iluminacao ?? this.iluminacao,
       tracados: tracados ?? this.tracados,
@@ -431,7 +527,13 @@ class CrimeTransitoCondicoesViaModel {
       perfis: perfis ?? this.perfis,
       larguraPista: larguraPista ?? this.larguraPista,
       intensidadePerfil: intensidadePerfil ?? this.intensidadePerfil,
+      orientacaoVia: orientacaoVia ?? this.orientacaoVia,
+      ladosAcostamento: ladosAcostamento ?? this.ladosAcostamento,
+      faixasAcostamento: faixasAcostamento ?? this.faixasAcostamento,
+      tipoPavimento: tipoPavimento ?? this.tipoPavimento,
       condicoesVia: condicoesVia ?? this.condicoesVia,
+      contaminantes: contaminantes ?? this.contaminantes,
+      condicoesNaoPavimentada: condicoesNaoPavimentada ?? this.condicoesNaoPavimentada,
       condicaoViaOutroDescricao:
           condicaoViaOutroDescricao ?? this.condicaoViaOutroDescricao,
       sinalizacao: sinalizacao ?? this.sinalizacao,
@@ -446,8 +548,6 @@ class CrimeTransitoCondicoesViaModel {
       visibilidade: visibilidade ?? this.visibilidade,
       visibilidadeReducaoDescricao:
           visibilidadeReducaoDescricao ?? this.visibilidadeReducaoDescricao,
-      separacoesFaixas: separacoesFaixas ?? this.separacoesFaixas,
-      corFaixas: corFaixas ?? this.corFaixas,
       separacoesPistas: separacoesPistas ?? this.separacoesPistas,
       lateralDireita: lateralDireita ?? this.lateralDireita,
       lateralEsquerda: lateralEsquerda ?? this.lateralEsquerda,
@@ -501,7 +601,10 @@ class CrimeTransitoEnvolvidoModel {
   final String? posicaoDetalhe;
   final IntegridadeItemModel? vestes;
   final IntegridadeItemModel? calcados;
-  final IntegridadeItemModel? pertences;
+  final bool? pertencesEncontrados;
+  final String? pertencesDescricao;
+  final DestinoPertences? destinoPertences;
+  final String? pertencesEntregueIdentificacao;
   final String? observacoes;
   final List<String>? fotosVistaAmplaPosicaoEncontrado;
   final List<String>? fotosVistaAmplaCenario;
@@ -522,7 +625,10 @@ class CrimeTransitoEnvolvidoModel {
     this.posicaoDetalhe,
     this.vestes,
     this.calcados,
-    this.pertences,
+    this.pertencesEncontrados,
+    this.pertencesDescricao,
+    this.destinoPertences,
+    this.pertencesEntregueIdentificacao,
     this.observacoes,
     this.fotosVistaAmplaPosicaoEncontrado,
     this.fotosVistaAmplaCenario,
@@ -545,8 +651,14 @@ class CrimeTransitoEnvolvidoModel {
         'posicaoDetalhe': posicaoDetalhe,
         'vestes': vestes?.toJson(),
         'calcados': calcados?.toJson(),
-        'pertences': pertences?.toJson(),
+        'pertencesEncontrados': pertencesEncontrados,
+        'pertencesDescricao': pertencesDescricao,
+        'destinoPertences': destinoPertences?.name,
+        'pertencesEntregueIdentificacao': pertencesEntregueIdentificacao,
         'observacoes': observacoes,
+        'fotosVistaAmplaPosicaoEncontrado': fotosVistaAmplaPosicaoEncontrado,
+        'fotosVistaAmplaCenario': fotosVistaAmplaCenario,
+        'fotosLesoesPertences': fotosLesoesPertences,
       };
 
   factory CrimeTransitoEnvolvidoModel.fromJson(Map<String, dynamic> json) =>
@@ -585,11 +697,12 @@ class CrimeTransitoEnvolvidoModel {
                 json['calcados'] as Map<String, dynamic>,
               )
             : null,
-        pertences: json['pertences'] != null
-            ? IntegridadeItemModel.fromJson(
-                json['pertences'] as Map<String, dynamic>,
-              )
-            : null,
+        pertencesEncontrados: json['pertencesEncontrados'] as bool?,
+        pertencesDescricao: json['pertencesDescricao'] as String?,
+        destinoPertences: _enumFromJson(
+            DestinoPertences.values, json['destinoPertences']),
+        pertencesEntregueIdentificacao:
+            json['pertencesEntregueIdentificacao'] as String?,
         observacoes: json['observacoes'] as String?,
         fotosVistaAmplaPosicaoEncontrado:
             (json['fotosVistaAmplaPosicaoEncontrado'] as List<dynamic>?)
@@ -620,7 +733,10 @@ class CrimeTransitoEnvolvidoModel {
     String? posicaoDetalhe,
     IntegridadeItemModel? vestes,
     IntegridadeItemModel? calcados,
-    IntegridadeItemModel? pertences,
+    bool? pertencesEncontrados,
+    String? pertencesDescricao,
+    DestinoPertences? destinoPertences,
+    String? pertencesEntregueIdentificacao,
     String? observacoes,
     List<String>? fotosVistaAmplaPosicaoEncontrado,
     List<String>? fotosVistaAmplaCenario,
@@ -642,7 +758,11 @@ class CrimeTransitoEnvolvidoModel {
       posicaoDetalhe: posicaoDetalhe ?? this.posicaoDetalhe,
       vestes: vestes ?? this.vestes,
       calcados: calcados ?? this.calcados,
-      pertences: pertences ?? this.pertences,
+      pertencesEncontrados: pertencesEncontrados ?? this.pertencesEncontrados,
+      pertencesDescricao: pertencesDescricao ?? this.pertencesDescricao,
+      destinoPertences: destinoPertences ?? this.destinoPertences,
+      pertencesEntregueIdentificacao:
+          pertencesEntregueIdentificacao ?? this.pertencesEntregueIdentificacao,
       observacoes: observacoes ?? this.observacoes,
       fotosVistaAmplaPosicaoEncontrado:
           fotosVistaAmplaPosicaoEncontrado ?? this.fotosVistaAmplaPosicaoEncontrado,
@@ -668,6 +788,8 @@ class CrimeTransitoNaturezaModel {
   final String? croquiObservacoes;
   final String? observacoes;
   final String? complementoDinamicaFato;
+  /// IDs do catálogo [CausasDeterminantesCatalogo] (modelos SDT) escolhidos na Dinâmica do Fato.
+  final List<String>? causasDeterminantesIds;
 
   const CrimeTransitoNaturezaModel({
     this.tipo,
@@ -682,6 +804,7 @@ class CrimeTransitoNaturezaModel {
     this.croquiObservacoes,
     this.observacoes,
     this.complementoDinamicaFato,
+    this.causasDeterminantesIds,
   });
 
   Map<String, dynamic> toJson() => {
@@ -698,6 +821,7 @@ class CrimeTransitoNaturezaModel {
         'croquiObservacoes': croquiObservacoes,
         'observacoes': observacoes,
         'complementoDinamicaFato': complementoDinamicaFato,
+        'causasDeterminantesIds': causasDeterminantesIds,
       };
 
   factory CrimeTransitoNaturezaModel.fromJson(Map<String, dynamic> json) =>
@@ -722,6 +846,10 @@ class CrimeTransitoNaturezaModel {
         observacoes: json['observacoes'] as String?,
         complementoDinamicaFato:
             json['complementoDinamicaFato'] as String?,
+        causasDeterminantesIds:
+            (json['causasDeterminantesIds'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList(),
       );
 
   CrimeTransitoNaturezaModel copyWith({
@@ -737,6 +865,7 @@ class CrimeTransitoNaturezaModel {
     String? croquiObservacoes,
     String? observacoes,
     String? complementoDinamicaFato,
+    List<String>? causasDeterminantesIds,
   }) {
     return CrimeTransitoNaturezaModel(
       tipo: tipo ?? this.tipo,
@@ -754,6 +883,8 @@ class CrimeTransitoNaturezaModel {
       observacoes: observacoes ?? this.observacoes,
       complementoDinamicaFato:
           complementoDinamicaFato ?? this.complementoDinamicaFato,
+      causasDeterminantesIds:
+          causasDeterminantesIds ?? this.causasDeterminantesIds,
     );
   }
 }
