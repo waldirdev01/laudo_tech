@@ -128,7 +128,7 @@ class _DinamicaScreenState extends State<DinamicaScreen> {
                 ),
               ),
               child: const Text(
-                'DINÂMICA',
+                'DESCRIÇÃO DO FATO',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

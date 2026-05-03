@@ -5,6 +5,7 @@ import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
 import 'cadastro_cadaver_screen.dart';
 import 'dinamica_screen.dart';
+import 'exames_complementares_screen.dart';
 
 class ListaCadaveresScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -39,10 +40,8 @@ class _ListaCadaveresScreenState extends State<ListaCadaveresScreen> {
 
     final resultado = await Navigator.of(context).push<CadaverModel>(
       MaterialPageRoute(
-        builder: (context) => CadastroCadaverScreen(
-          cadaver: novoCadaver,
-          ficha: _ficha,
-        ),
+        builder: (context) =>
+            CadastroCadaverScreen(cadaver: novoCadaver, ficha: _ficha),
       ),
     );
 
@@ -57,10 +56,8 @@ class _ListaCadaveresScreenState extends State<ListaCadaveresScreen> {
   Future<void> _editarCadaver(CadaverModel cadaver) async {
     final resultado = await Navigator.of(context).push<CadaverModel>(
       MaterialPageRoute(
-        builder: (context) => CadastroCadaverScreen(
-          cadaver: cadaver,
-          ficha: _ficha,
-        ),
+        builder: (context) =>
+            CadastroCadaverScreen(cadaver: cadaver, ficha: _ficha),
       ),
     );
 
@@ -137,13 +134,22 @@ class _ListaCadaveresScreenState extends State<ListaCadaveresScreen> {
 
     // Garantir que cadáveres estão salvos antes de seguir
     await _salvarCadaveres();
+    if (!mounted) return;
+
+    final fichaComExames =
+        await Navigator.of(context).push<FichaCompletaModel>(
+          MaterialPageRoute(
+            builder: (context) => ExamesComplementaresScreen(ficha: _ficha),
+          ),
+        ) ??
+        _ficha;
+
+    _ficha = fichaComExames;
 
     // Navegar para tela de dinâmica (ela própria limpa a pilha e vai para HomeScreen)
     if (mounted) {
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => DinamicaScreen(ficha: _ficha),
-        ),
+        MaterialPageRoute(builder: (context) => DinamicaScreen(ficha: _ficha)),
       );
     }
   }
@@ -151,10 +157,7 @@ class _ListaCadaveresScreenState extends State<ListaCadaveresScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cadáveres'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Cadáveres'), centerTitle: true),
       body: SafeArea(
         child: Column(
           children: [
@@ -215,62 +218,70 @@ class _ListaCadaveresScreenState extends State<ListaCadaveresScreen> {
                       padding: const EdgeInsets.all(16),
                       itemCount: _cadaveres.length,
                       itemBuilder: (context, index) {
-                      final cadaver = _cadaveres[index];
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: cadaver.sexo == SexoCadaver.feminino
-                                ? Colors.pink.shade100
-                                : Colors.blue.shade100,
-                            child: Icon(
-                              cadaver.sexo == SexoCadaver.feminino
-                                  ? Icons.female
-                                  : Icons.male,
-                              color: cadaver.sexo == SexoCadaver.feminino
-                                  ? Colors.pink.shade700
-                                  : Colors.blue.shade700,
+                        final cadaver = _cadaveres[index];
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  cadaver.sexo == SexoCadaver.feminino
+                                  ? Colors.pink.shade100
+                                  : Colors.blue.shade100,
+                              child: Icon(
+                                cadaver.sexo == SexoCadaver.feminino
+                                    ? Icons.female
+                                    : Icons.male,
+                                color: cadaver.sexo == SexoCadaver.feminino
+                                    ? Colors.pink.shade700
+                                    : Colors.blue.shade700,
+                              ),
                             ),
-                          ),
-                          title: Text(
-                            cadaver.nomeDaVitima ?? 'Cadáver ${cadaver.numero}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (cadaver.sexo != null)
-                                Text('Sexo: ${cadaver.sexo!.label}'),
-                              if (cadaver.faixaEtaria != null)
-                                Text('Faixa etária: ${cadaver.faixaEtaria!.label}'),
-                              if (cadaver.numeroLaudoCadaverico != null)
-                                Text('Laudo: ${cadaver.numeroLaudoCadaverico}'),
-                            ],
-                          ),
-                          isThreeLine: true,
-                          trailing: PopupMenuButton(
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'editar',
-                                child: Text('Editar'),
+                            title: Text(
+                              cadaver.nomeDaVitima ??
+                                  'Cadáver ${cadaver.numero}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
                               ),
-                              const PopupMenuItem(
-                                value: 'excluir',
-                                child: Text('Excluir'),
-                              ),
-                            ],
-                            onSelected: (value) {
-                              if (value == 'editar') {
-                                _editarCadaver(cadaver);
-                              } else if (value == 'excluir') {
-                                _excluirCadaver(cadaver);
-                              }
-                            },
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (cadaver.sexo != null)
+                                  Text('Sexo: ${cadaver.sexo!.label}'),
+                                if (cadaver.faixaEtaria != null)
+                                  Text(
+                                    'Faixa etária: ${cadaver.faixaEtaria!.label}',
+                                  ),
+                                if (cadaver.numeroLaudoCadaverico != null)
+                                  Text(
+                                    'Laudo: ${cadaver.numeroLaudoCadaverico}',
+                                  ),
+                              ],
+                            ),
+                            isThreeLine: true,
+                            trailing: PopupMenuButton(
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'editar',
+                                  child: Text('Editar'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'excluir',
+                                  child: Text('Excluir'),
+                                ),
+                              ],
+                              onSelected: (value) {
+                                if (value == 'editar') {
+                                  _editarCadaver(cadaver);
+                                } else if (value == 'excluir') {
+                                  _excluirCadaver(cadaver);
+                                }
+                              },
+                            ),
+                            onTap: () => _editarCadaver(cadaver),
                           ),
-                          onTap: () => _editarCadaver(cadaver),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
             ),
 
             // Botão de salvar e continuar

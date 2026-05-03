@@ -16,14 +16,15 @@ import '../models/vestigio_local_model.dart';
 import '../services/ficha_service.dart';
 import '../services/laudo_generator_service.dart';
 import '../services/perito_service.dart';
+import '../services/photo_backup_service.dart';
 import '../services/word_generator_service.dart';
 import 'atropelamento_calculo_screen.dart';
-import 'dinamica_fato_transito_screen.dart';
 import 'condicoes_observacoes_screen.dart';
 import 'crime_transito_condicoes_screen.dart';
 import 'crime_transito_levantamento_screen.dart';
 import 'dano_screen.dart';
 import 'detalhes_local_screen.dart';
+import 'dinamica_fato_transito_screen.dart';
 import 'equipes_policiais_screen.dart';
 import 'evidencias_furto_screen.dart';
 import 'historico_screen.dart';
@@ -372,11 +373,10 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
     final isTransito =
         fichaAtual.tipoOcorrencia == TipoOcorrencia.crimeTransito;
     final useLevantamentoVestigios =
-        (fichaAtual.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
-            fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
-            fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
-            isTransito) &&
-        (fichaAtual.localFurto != null || isTransito);
+        fichaAtual.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
+        fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+        fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
+        isTransito;
 
     if (useLevantamentoVestigios) {
       final lf = fichaAtual.localFurto;
@@ -393,12 +393,23 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       final pathToLegenda =
           <String, String>{}; // path (resolved) → legenda para anexo
 
-      for (final p in lf?.fotosVistaAmplaPaths ?? []) {
+      final fotosVistaAmpla = <String>[
+        ...?lf?.fotosVistaAmplaMediatoPaths,
+        ...?lf?.fotosVistaAmplaImediatoPaths,
+      ];
+      if (fotosVistaAmpla.isEmpty) {
+        fotosVistaAmpla.addAll(lf?.fotosVistaAmplaPaths ?? const []);
+      }
+
+      for (final p in fotosVistaAmpla) {
         final resolved = await _resolverPath(p, basePath);
         if (resolved != null) {
           orderedPaths.add(resolved);
           pathMap[p] = resolved;
-          pathToLegenda[resolved] = 'Vista ampla do local (fachada).';
+          final isImediato = (lf?.fotosVistaAmplaImediatoPaths ?? []).contains(p);
+          pathToLegenda[resolved] = isImediato
+              ? 'Vista ampla do local imediato.'
+              : 'Vista ampla do local mediato.';
           vistaAmplaOk++;
         }
       }
@@ -558,8 +569,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           }
           for (final lesao in c.lesoes ?? []) {
             final descResumo = lesao.textoLegendaFoto;
-            final comContexto =
-                'Lesão no cadáver ${c.numero}: $descResumo';
+            final comContexto = 'Lesão no cadáver ${c.numero}: $descResumo';
             final legendaTexto = comContexto.length > 60
                 ? '${comContexto.substring(0, 60)}...'
                 : comContexto;
@@ -575,14 +585,25 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
             }
           }
           // Fotos de ausência de lesões de defesa (sempre por último nas lesões)
-          if (c.ausenciaLesoesDefesa) {
-            for (final p in c.fotosLesoesDefesa) {
+          for (final p in c.fotosLesoesDefesa) {
+            final resolved = await _resolverPath(p, basePath);
+            if (resolved != null) {
+              orderedPaths.add(resolved);
+              pathMap[p] = resolved;
+              pathToLegenda[resolved] = c.ausenciaLesoesDefesa
+                  ? 'Ausência de lesões de defesa (cadáver ${c.numero}).'
+                  : 'Lesões de defesa (cadáver ${c.numero}).';
+            }
+          }
+
+          for (final veste in c.vestes ?? []) {
+            for (final p in veste.fotosPaths) {
               final resolved = await _resolverPath(p, basePath);
               if (resolved != null) {
                 orderedPaths.add(resolved);
                 pathMap[p] = resolved;
                 pathToLegenda[resolved] =
-                    'Ausência de lesões de defesa (cadáver ${c.numero}).';
+                    'Veste ${veste.numero} do cadáver ${c.numero}.';
               }
             }
           }
@@ -671,6 +692,25 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }
       }
 
+      // Fallback de recuperação: inclui imagens órfãs encontradas no diretório físico
+      // da ficha (quando os metadados de caminhos foram perdidos/parciais).
+      int fotosRecuperadasFisicas = 0;
+      final setOrdered = orderedPaths.toSet();
+      final fotosFisicas = await _listarFotosFisicasDaFicha(
+        fichaAtual.id,
+        dataReferencia: fichaAtual.dataCriacao,
+        incluirTemporarias:
+            fichaAtual.dadosSolicitacao.raiNumero?.trim().isEmpty ?? true,
+      );
+      for (final p in fotosFisicas) {
+        final resolved = await _resolverPath(p, basePath);
+        if (resolved == null || setOrdered.contains(resolved)) continue;
+        orderedPaths.add(resolved);
+        setOrdered.add(resolved);
+        pathToLegenda[resolved] = 'Foto recuperada do armazenamento local.';
+        fotosRecuperadasFisicas++;
+      }
+
       if (orderedPaths.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -691,6 +731,11 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       detalhes.writeln('Vestígios: $totalVestigios (fotos: $vestigioFotosOk)');
       if (vestigiosSemFoto > 0) {
         detalhes.writeln('(!) $vestigiosSemFoto vestígio(s) sem foto');
+      }
+      if (fotosRecuperadasFisicas > 0) {
+        detalhes.writeln(
+          'Recuperadas do armazenamento: $fotosRecuperadasFisicas foto(s)',
+        );
       }
       if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
               fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) &&
@@ -1035,6 +1080,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.$ext';
       final destino = File('${pasta.path}/$nome');
       await foto.copy(destino.path);
+      await PhotoBackupService.saveToGallery(destino.path);
       paths.add(destino.path);
     }
     return paths;
@@ -1042,17 +1088,65 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
 
   /// Tenta resolver um caminho de foto salvo. Se o caminho original existe, retorna-o.
   /// Caso contrário (ex.: UUID do container iOS mudou), tenta reconstruir usando
-  /// o diretório de documentos atual + parte relativa 'levantamento_fotografico/...'.
+  /// o diretório de documentos atual + parte relativa do levantamento.
   Future<String?> _resolverPath(String path, String currentBasePath) async {
     if (await File(path).exists()) return path;
-    final marker = 'levantamento_fotografico/';
-    final idx = path.indexOf(marker);
-    if (idx >= 0) {
-      final relative = path.substring(idx);
-      final resolved = '$currentBasePath/$relative';
-      if (await File(resolved).exists()) return resolved;
+    const markers = ['levantamento_fotografico/', 'levantamento_transito/'];
+    for (final marker in markers) {
+      final idx = path.indexOf(marker);
+      if (idx >= 0) {
+        final relative = path.substring(idx);
+        final resolved = '$currentBasePath/$relative';
+        if (await File(resolved).exists()) return resolved;
+      }
     }
     return null;
+  }
+
+  Future<List<String>> _listarFotosFisicasDaFicha(
+    String fichaId, {
+    DateTime? dataReferencia,
+    bool incluirTemporarias = false,
+  }) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final pastas = [
+      Directory('${docs.path}/levantamento_fotografico/$fichaId'),
+      Directory('${docs.path}/levantamento_transito/$fichaId'),
+    ];
+    final extensoes = {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'};
+    final paths = <String>[];
+    for (final pasta in pastas) {
+      if (!await pasta.exists()) continue;
+      await for (final e in pasta.list(recursive: true, followLinks: false)) {
+        if (e is! File) continue;
+        final p = e.path.toLowerCase();
+        if (extensoes.any(p.endsWith)) {
+          paths.add(e.path);
+        }
+      }
+    }
+    if (incluirTemporarias && dataReferencia != null) {
+      final temporarias = Directory('${docs.path}/picked_images');
+      if (await temporarias.exists()) {
+        final inicio = dataReferencia.subtract(const Duration(hours: 6));
+        final fim = dataReferencia.add(const Duration(hours: 18));
+        await for (final e in temporarias.list(
+          recursive: false,
+          followLinks: false,
+        )) {
+          if (e is! File) continue;
+          final p = e.path.toLowerCase();
+          if (!extensoes.any(p.endsWith)) continue;
+          final stat = await e.stat();
+          if (stat.modified.isBefore(inicio) || stat.modified.isAfter(fim)) {
+            continue;
+          }
+          paths.add(e.path);
+        }
+      }
+    }
+    paths.sort();
+    return paths;
   }
 
   Future<List<String>?> _gerenciarFotosLevantamento(

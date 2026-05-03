@@ -14,6 +14,7 @@ import '../models/unidade_model.dart';
 import '../models/vestigio_local_model.dart';
 import '../services/ficha_service.dart';
 import '../services/laboratorio_service.dart';
+import '../services/photo_backup_service.dart';
 import '../services/unidade_service.dart';
 import 'evidencias_furto_screen.dart';
 import 'lista_veiculos_screen.dart';
@@ -33,7 +34,6 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   final _unidadeService = UnidadeService();
   final _laboratorioService = LaboratorioService();
   final _imagePicker = ImagePicker();
-  final _viasAcessoController = TextEditingController();
   final _sinaisArrombamentoController = TextEditingController();
   final _descricaoLocalController = TextEditingController();
   final _descricaoMediatoController = TextEditingController();
@@ -41,6 +41,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   final _descricaoRelacionadoController = TextEditingController();
   final _demaisObservacoesController = TextEditingController();
   bool _salvando = false;
+  int _etapaLocalAtual = 0; // 0=mediato, 1=imediato, 2=relacionado
+  bool? _temVestigiosMediato;
 
   // Marco Zero por local
   final _marcoZeroDescricaoMediatoController = TextEditingController();
@@ -90,16 +92,18 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   String? _tipoRegiaoMediato;
   String? _tipoImovelMediato;
   int? _qtdPavimentosMediato;
+  int? _quantidadeAcessosMediato;
   final Set<String> _infraestruturaMediato = {};
   final Set<String> _delimitacaoMediato = {};
-  final Set<String> _acessosMediato = {};
+  final Set<String> _tiposAcessoMediato = {};
+  final Set<String> _posicoesAcessoMediato = {};
 
   // Descrição assistida – Imediato
   String? _abrangenciaImediato;
   final Set<String> _ambientesImediato = {};
-  final Set<String> _estruturasImediato = {};
   final Set<String> _acessosImediato = {};
   String? _estadoConservacaoImediato;
+  final _observacaoImediatoController = TextEditingController();
 
   static const _opcoesAbrangenciaImediato = [
     'único ambiente',
@@ -123,19 +127,6 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     'área comum',
     'outro',
   ];
-  static const _opcoesEstruturas = [
-    'fechadura',
-    'cadeado',
-    'tranca',
-    'janela de vidro',
-    'janela basculante',
-    'grade na janela',
-    'porta de madeira',
-    'porta de vidro',
-    'porta metálica',
-    'câmera de segurança',
-    'alarme',
-  ];
   static const _opcoesEstadoConservacao = [
     'bom estado de conservação',
     'estado regular de conservação',
@@ -156,12 +147,11 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     'calçadas',
     'iluminação pública',
     'rede de esgoto',
-    'transporte público',
   ];
   static const _opcoesTipoImovel = [
     'casa',
     'apartamento',
-    'kitnet',
+    'conjunto de kitnets',
     'loja',
     'galpão',
     'prédio comercial',
@@ -178,14 +168,19 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     'cerca viva',
     'sem delimitação',
   ];
-  static const _opcoesAcessos = [
+  static const _opcoesTiposAcessoMediato = [
     'portão metálico',
-    'porta de madeira',
-    'porta de vidro',
-    'porta metálica de enrolar',
-    'porta de alumínio',
-    'janela',
+    'portão social embutido no portão maior',
+    'portão basculante',
+    'portão deslizante sob trilho',
+    'porta social',
     'garagem',
+  ];
+  static const _opcoesPosicoesAcessoMediato = [
+    'frontal',
+    'posterior',
+    'lateral direita',
+    'lateral esquerda',
   ];
   static const _opcoesAcessosInternos = [
     'porta interna de madeira',
@@ -206,6 +201,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   bool _semVestigiosImediato = false;
   bool _semVestigiosRelacionado = false;
   final List<String> _fotosVistaAmplaPaths = [];
+  final List<String> _fotosVistaAmplaImediatoPaths = [];
 
   /// true = via pública / área aberta; false = imóvel; null = não definido
   bool? _localEmViaPublica;
@@ -243,7 +239,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _sinaisArrombamentoSim = dados.sinaisArrombamentoSim;
       _sinaisArrombamentoNao = dados.sinaisArrombamentoNao;
       _sinaisArrombamentoNaoSeAplica = dados.sinaisArrombamentoNaoSeAplica;
-      _viasAcessoController.text = dados.descricaoViasAcesso ?? '';
+      _quantidadeAcessosMediato = dados.quantidadeAcessosMediato;
+      _tiposAcessoMediato
+        ..clear()
+        ..addAll(dados.tiposAcessoMediato ?? const []);
+      _posicoesAcessoMediato
+        ..clear()
+        ..addAll(dados.posicoesAcessoMediato ?? const []);
       _sinaisArrombamentoController.text =
           dados.sinaisArrombamentoDescricao ?? '';
       _descricaoLocalController.text = dados.descricaoLocal ?? '';
@@ -251,6 +253,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _descricaoImediatoController.text = dados.descricaoLocalImediato ?? '';
       _descricaoRelacionadoController.text =
           dados.descricaoLocalRelacionado ?? '';
+      _observacaoImediatoController.text = '';
       _marcoZeroDescricaoMediatoController.text =
           dados.marcoZeroMediato?.descricao ?? '';
       _marcoZeroXMediatoController.text =
@@ -281,11 +284,80 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _semVestigiosMediato = dados.semVestigiosMediato ?? false;
       _semVestigiosImediato = dados.semVestigiosImediato ?? false;
       _semVestigiosRelacionado = dados.semVestigiosRelacionado ?? false;
+      _temVestigiosMediato = !(dados.semVestigiosMediato ?? false);
+      _fotosVistaAmplaPaths.clear();
+      _fotosVistaAmplaPaths.addAll(
+        dados.fotosVistaAmplaMediatoPaths ??
+            dados.fotosVistaAmplaPaths ??
+            const [],
+      );
+      _fotosVistaAmplaImediatoPaths.clear();
+      _fotosVistaAmplaImediatoPaths.addAll(
+        dados.fotosVistaAmplaImediatoPaths ?? const [],
+      );
     } else if (widget.ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) {
       // Pré-popular vestígios padrão para Morte a Esclarecer (apenas na primeira abertura)
       _classificacaoImediato = true;
       _vestigiosImediato = _vestigiosPadraoMorteEsclarecer();
     }
+  }
+
+  String get _tituloEtapaLocal {
+    switch (_etapaLocalAtual) {
+      case 0:
+        return 'Local Mediato';
+      case 1:
+        return 'Local Imediato';
+      default:
+        return 'Local Relacionado';
+    }
+  }
+
+  Future<void> _avancarEtapaLocal() async {
+    if (_etapaLocalAtual == 0) {
+      setState(() {
+        _classificacaoMediato = true;
+        _classificacaoImediato = true;
+        _etapaLocalAtual = 1;
+      });
+      return;
+    }
+
+    if (_etapaLocalAtual == 1) {
+      final incluirRelacionado = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Local Relacionado'),
+          content: const Text('Há local relacionado para preencher?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Não'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Sim'),
+            ),
+          ],
+        ),
+      );
+
+      if (incluirRelacionado == true) {
+        setState(() {
+          _classificacaoRelacionado = true;
+          _etapaLocalAtual = 2;
+        });
+        return;
+      }
+
+      setState(() {
+        _classificacaoRelacionado = false;
+      });
+      await _salvarLocalFurto();
+      return;
+    }
+
+    await _salvarLocalFurto();
   }
 
   List<VestigioLocalModel> _vestigiosPadraoMorteEsclarecer() {
@@ -323,12 +395,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
 
   @override
   void dispose() {
-    _viasAcessoController.dispose();
     _sinaisArrombamentoController.dispose();
     _descricaoLocalController.dispose();
     _descricaoMediatoController.dispose();
     _descricaoImediatoController.dispose();
     _descricaoRelacionadoController.dispose();
+    _observacaoImediatoController.dispose();
     _demaisObservacoesController.dispose();
     _marcoZeroDescricaoMediatoController.dispose();
     _marcoZeroXMediatoController.dispose();
@@ -340,22 +412,6 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     _marcoZeroXRelacionadoController.dispose();
     _marcoZeroYRelacionadoController.dispose();
     super.dispose();
-  }
-
-  void _onClassificacaoChanged(bool? value, String tipo) {
-    setState(() {
-      switch (tipo) {
-        case 'mediato':
-          _classificacaoMediato = value ?? false;
-          break;
-        case 'imediato':
-          _classificacaoImediato = value ?? false;
-          break;
-        case 'relacionado':
-          _classificacaoRelacionado = value ?? false;
-          break;
-      }
-    });
   }
 
   void _onPisoChanged(bool? value, String tipo, String local) {
@@ -537,6 +593,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           if (value == true) {
             _sinaisArrombamentoSim = false;
             _sinaisArrombamentoNaoSeAplica = false;
+            _sinaisArrombamentoController.clear();
           }
           break;
         case 'naoSeAplica':
@@ -544,6 +601,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           if (value == true) {
             _sinaisArrombamentoSim = false;
             _sinaisArrombamentoNao = false;
+            _sinaisArrombamentoController.clear();
           }
           break;
       }
@@ -567,6 +625,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -703,13 +762,20 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         iluminacaoArtificialRelacionado: _iluminacaoArtificialRelacionado,
         iluminacaoNaturalRelacionado: _iluminacaoNaturalRelacionado,
         iluminacaoAusenteRelacionado: _iluminacaoAusenteRelacionado,
-        descricaoViasAcesso: _viasAcessoController.text.trim().isEmpty
+        descricaoViasAcesso: _gerarDescricaoViasAcessoMediato().isEmpty
             ? null
-            : _viasAcessoController.text.trim(),
-        sinaisArrombamentoDescricao:
-            _sinaisArrombamentoController.text.trim().isEmpty
+            : _gerarDescricaoViasAcessoMediato(),
+        quantidadeAcessosMediato: _quantidadeAcessosMediato,
+        tiposAcessoMediato: _tiposAcessoMediato.isEmpty
             ? null
-            : _sinaisArrombamentoController.text.trim(),
+            : _tiposAcessoMediato.toList(),
+        posicoesAcessoMediato: _posicoesAcessoMediato.isEmpty
+            ? null
+            : _posicoesAcessoMediato.toList(),
+        sinaisArrombamentoDescricao: (_sinaisArrombamentoSim == true &&
+                _sinaisArrombamentoController.text.trim().isNotEmpty)
+            ? _sinaisArrombamentoController.text.trim()
+            : null,
         descricaoLocal: descricaoLocalAgrupada,
         demaisObservacoes: _demaisObservacoesController.text.trim().isEmpty
             ? null
@@ -724,7 +790,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             _descricaoRelacionadoController.text.trim().isEmpty
             ? null
             : _descricaoRelacionadoController.text.trim(),
-        marcoZeroMediato: (_classificacaoMediato == true)
+        marcoZeroMediato: (_classificacaoMediato == true &&
+                _temVestigiosMediato == true)
             ? MarcoZeroLocalModel(
                 descricao:
                     _marcoZeroDescricaoMediatoController.text.trim().isEmpty
@@ -768,12 +835,14 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     : _marcoZeroYRelacionadoController.text.trim(),
               )
             : null,
-        vestigiosMediato: _semVestigiosMediato ? [] : _vestigiosMediato,
+        vestigiosMediato: (_temVestigiosMediato == true)
+            ? _vestigiosMediato
+            : [],
         vestigiosImediato: _semVestigiosImediato ? [] : _vestigiosImediato,
         vestigiosRelacionado: _semVestigiosRelacionado
             ? []
             : _vestigiosRelacionado,
-        semVestigiosMediato: _semVestigiosMediato,
+        semVestigiosMediato: !(_temVestigiosMediato ?? false),
         semVestigiosImediato: _semVestigiosImediato,
         semVestigiosRelacionado: _semVestigiosRelacionado,
         sinaisArrombamentoSim: _sinaisArrombamentoSim,
@@ -782,6 +851,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         fotosVistaAmplaPaths: _fotosVistaAmplaPaths.isEmpty
             ? null
             : _fotosVistaAmplaPaths,
+        fotosVistaAmplaMediatoPaths: _fotosVistaAmplaPaths.isEmpty
+            ? null
+            : _fotosVistaAmplaPaths,
+        fotosVistaAmplaImediatoPaths: _fotosVistaAmplaImediatoPaths.isEmpty
+            ? null
+            : _fotosVistaAmplaImediatoPaths,
         localEmViaPublica: _localEmViaPublica,
       );
 
@@ -930,12 +1005,23 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     final partes = <String>[];
 
     if (_tipoImovelMediato != null) {
-      String frase = 'Tratava-se de $_tipoImovelMediato';
-      if (_qtdPavimentosMediato != null && _qtdPavimentosMediato! > 0) {
-        final n = _qtdPavimentosMediato.toString().padLeft(2, '0');
-        frase += ' de $n pavimento${_qtdPavimentosMediato == 1 ? '' : 's'}';
+      String frase;
+      if (_tipoImovelMediato == 'conjunto de kitnets') {
+        frase =
+            'Tratava-se de um conjunto de kitnets implantado em um mesmo lote, com unidades dispostas umas em frente às outras e área de quintal/pátio central entre elas';
+        if (_qtdPavimentosMediato != null && _qtdPavimentosMediato! > 0) {
+          final n = _qtdPavimentosMediato.toString().padLeft(2, '0');
+          frase += ', com $n pavimento${_qtdPavimentosMediato == 1 ? '' : 's'}';
+        }
+        frase += '.';
+      } else {
+        frase = 'Tratava-se de $_tipoImovelMediato';
+        if (_qtdPavimentosMediato != null && _qtdPavimentosMediato! > 0) {
+          final n = _qtdPavimentosMediato.toString().padLeft(2, '0');
+          frase += ' de $n pavimento${_qtdPavimentosMediato == 1 ? '' : 's'}';
+        }
+        frase += '.';
       }
-      frase += '.';
       partes.add(frase);
     }
 
@@ -962,10 +1048,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       }
     }
 
-    if (_acessosMediato.isNotEmpty) {
-      partes.add(
-        'O acesso se dava por ${_listarItens(_acessosMediato.toList())}.',
-      );
+    final descricaoAcessos = _gerarDescricaoViasAcessoMediato();
+    if (descricaoAcessos.isNotEmpty) {
+      partes.add('O acesso ao imóvel se dava por $descricaoAcessos.');
     }
 
     return partes.join(' ');
@@ -977,20 +1062,21 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     if (_ambientesImediato.isNotEmpty) {
       final ambientes = _listarItens(_ambientesImediato.toList());
       final plural = _ambientesImediato.length > 1;
-      String frase = plural
-          ? 'O local imediato abrangeu múltiplos ambientes no interior do imóvel, compreendendo $ambientes'
-          : 'O local imediato correspondeu ao ambiente: $ambientes';
+      String frase;
+      if (_tipoImovelMediato == 'conjunto de kitnets') {
+        frase = plural
+            ? 'No conjunto de kitnets, o local imediato abrangeu mais de um ponto de interesse, compreendendo $ambientes'
+            : 'No conjunto de kitnets, o local imediato correspondeu especificamente a $ambientes';
+      } else {
+        frase = plural
+            ? 'O local imediato abrangeu múltiplos ambientes no interior do imóvel, compreendendo $ambientes'
+            : 'O local imediato correspondeu ao ambiente: $ambientes';
+      }
       if (_estadoConservacaoImediato != null) {
         frase += ', em $_estadoConservacaoImediato';
       }
       frase += '.';
       partes.add(frase);
-    }
-
-    if (_estruturasImediato.isNotEmpty) {
-      partes.add(
-        'O ambiente possuía ${_listarItens(_estruturasImediato.toList())}.',
-      );
     }
 
     if (_acessosImediato.isNotEmpty) {
@@ -999,6 +1085,33 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       );
     }
 
+    final obsImediato = _observacaoImediatoController.text.trim();
+    if (obsImediato.isNotEmpty) {
+      partes.add('Observação do local imediato: $obsImediato.');
+    }
+
+    return partes.join(' ');
+  }
+
+  String _gerarDescricaoViasAcessoMediato() {
+    if (_localEmViaPublica == true) return '';
+    final qtd = _quantidadeAcessosMediato;
+    final tipos = _tiposAcessoMediato.toList();
+    final posicoes = _posicoesAcessoMediato.toList();
+    if (qtd == null && tipos.isEmpty && posicoes.isEmpty) return '';
+
+    final partes = <String>[];
+    if (qtd != null) {
+      partes.add('$qtd acesso${qtd == 1 ? '' : 's'}');
+    } else {
+      partes.add('acesso(s)');
+    }
+    if (tipos.isNotEmpty) {
+      partes.add('por ${_listarItens(tipos)}');
+    }
+    if (posicoes.isNotEmpty) {
+      partes.add('nas posições ${_listarItens(posicoes)}');
+    }
     return partes.join(' ');
   }
 
@@ -1035,6 +1148,16 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         Text(
           'Selecione as opções para gerar o texto automaticamente.',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          initialValue: 'Local mediato',
+          readOnly: true,
+          decoration: const InputDecoration(
+            labelText: 'Tipo de local',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
@@ -1141,23 +1264,90 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         const SizedBox(height: 12),
         const Text('Acessos'),
         const SizedBox(height: 4),
+        DropdownButtonFormField<int>(
+          isExpanded: true,
+          initialValue: _quantidadeAcessosMediato,
+          decoration: const InputDecoration(
+            labelText: 'Quantidade de acessos',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: const [1, 2, 3, 4]
+              .map((n) => DropdownMenuItem(value: n, child: Text('$n')))
+              .toList(),
+          onChanged: (v) => setState(() {
+            _quantidadeAcessosMediato = v;
+            if (v != null && _posicoesAcessoMediato.length > v) {
+              final manter = _posicoesAcessoMediato.take(v).toSet();
+              _posicoesAcessoMediato
+                ..clear()
+                ..addAll(manter);
+            }
+            _atualizarTextoMediato();
+          }),
+        ),
+        const SizedBox(height: 12),
+        const Text('Tipo de acesso'),
+        const SizedBox(height: 4),
         Wrap(
           spacing: 6,
           runSpacing: 0,
-          children: _opcoesAcessos
+          children: _opcoesTiposAcessoMediato
               .map(
                 (op) => FilterChip(
                   label: Text(_capitalize(op)),
-                  selected: _acessosMediato.contains(op),
+                  selected: _tiposAcessoMediato.contains(op),
                   onSelected: (_) => setState(() {
-                    _acessosMediato.contains(op)
-                        ? _acessosMediato.remove(op)
-                        : _acessosMediato.add(op);
+                    _tiposAcessoMediato.contains(op)
+                        ? _tiposAcessoMediato.remove(op)
+                        : _tiposAcessoMediato.add(op);
                     _atualizarTextoMediato();
                   }),
                 ),
               )
               .toList(),
+        ),
+        const SizedBox(height: 12),
+        const Text('Posição do(s) acesso(s)'),
+        const SizedBox(height: 4),
+        if (_quantidadeAcessosMediato != null)
+          Text(
+            'Selecionadas ${_posicoesAcessoMediato.length} de $_quantidadeAcessosMediato posição(ões).',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+        if (_quantidadeAcessosMediato != null) const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 0,
+          children: _opcoesPosicoesAcessoMediato
+              .map(
+                (op) => FilterChip(
+                  label: Text(_capitalize(op)),
+                  selected: _posicoesAcessoMediato.contains(op),
+                  onSelected:
+                      (_quantidadeAcessosMediato != null &&
+                          _posicoesAcessoMediato.length >=
+                              _quantidadeAcessosMediato! &&
+                          !_posicoesAcessoMediato.contains(op))
+                      ? null
+                      : (selected) => setState(() {
+                          if (selected) {
+                            final limite = _quantidadeAcessosMediato ?? 4;
+                            if (_posicoesAcessoMediato.length >= limite) return;
+                            _posicoesAcessoMediato.add(op);
+                          } else {
+                            _posicoesAcessoMediato.remove(op);
+                          }
+                          _atualizarTextoMediato();
+                        }),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Exemplo comum: portão metálico com portão social, basculante ou deslizante sob trilho.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 16),
         const Divider(),
@@ -1251,27 +1441,6 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           }),
         ),
         const SizedBox(height: 12),
-        const Text('Estruturas pertinentes ao exame'),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 6,
-          runSpacing: 0,
-          children: _opcoesEstruturas
-              .map(
-                (op) => FilterChip(
-                  label: Text(_capitalize(op)),
-                  selected: _estruturasImediato.contains(op),
-                  onSelected: (_) => setState(() {
-                    _estruturasImediato.contains(op)
-                        ? _estruturasImediato.remove(op)
-                        : _estruturasImediato.add(op);
-                    _atualizarTextoImediato();
-                  }),
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 12),
         const Text('Acessos internos ao(s) ambiente(s)'),
         const SizedBox(height: 4),
         Wrap(
@@ -1291,6 +1460,18 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                 ),
               )
               .toList(),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _observacaoImediatoController,
+          decoration: const InputDecoration(
+            labelText: 'Observação (opcional)',
+            hintText: 'Descreva algum ponto relevante do local imediato...',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          maxLines: 3,
+          onChanged: (_) => _atualizarTextoImediato(),
         ),
         const SizedBox(height: 16),
         const Divider(),
@@ -1326,6 +1507,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     required void Function(bool?, String) onPisoChanged,
     required void Function(bool?, String) onIluminacaoChanged,
     bool showMarcoZero = true,
+    bool usarFluxoVestigioMediato = false,
+    bool exibirSinaisArrombamento = false,
   }) {
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -1383,7 +1566,56 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                   minLines: 4,
                   textInputAction: TextInputAction.newline,
                 ),
-                if (showMarcoZero) ...[
+                if (exibirSinaisArrombamento) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  if (_localEmViaPublica == true) ...[
+                    Text(
+                      'Sinais de arrombamento não se aplicam para via pública/área aberta.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ] else ...[
+                    _buildCheckboxRow('Sinais de Arrombamento', [
+                      {
+                        'label': 'Sim',
+                        'value': _sinaisArrombamentoSim ?? false,
+                        'onChanged': (value) =>
+                            _onSinaisArrombamentoChanged(value, 'sim'),
+                      },
+                      {
+                        'label': 'Não',
+                        'value': _sinaisArrombamentoNao ?? false,
+                        'onChanged': (value) =>
+                            _onSinaisArrombamentoChanged(value, 'nao'),
+                      },
+                      {
+                        'label': 'Não Se Aplica',
+                        'value': _sinaisArrombamentoNaoSeAplica ?? false,
+                        'onChanged': (value) =>
+                            _onSinaisArrombamentoChanged(value, 'naoSeAplica'),
+                      },
+                    ]),
+                    if (_sinaisArrombamentoSim == true) ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _sinaisArrombamentoController,
+                        decoration: const InputDecoration(
+                          labelText: 'Descrição dos Sinais de Arrombamento',
+                          hintText: 'Descreva os sinais de arrombamento...',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        maxLines: 3,
+                      ),
+                    ],
+                  ],
+                ],
+                if (!usarFluxoVestigioMediato && showMarcoZero) ...[
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 12),
@@ -1531,18 +1763,115 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Sem vestígios neste local'),
-                  value: semVestigios,
-                  onChanged: (value) {
-                    onSemVestigiosChanged(value);
-                  },
-                ),
-                if (!semVestigios) ...[
+                if (usarFluxoVestigioMediato) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Há vestígios neste local?',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  RadioGroup<bool>(
+                    groupValue: _temVestigiosMediato,
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _temVestigiosMediato = value;
+                        _semVestigiosMediato = !value;
+                        if (!value) {
+                          _vestigiosMediato.clear();
+                          marcoZeroDescricaoController.clear();
+                          marcoZeroXController.text = '0';
+                          marcoZeroYController.text = '0';
+                        }
+                      });
+                    },
+                    child: Row(
+                      children: const [
+                        Row(children: [Radio<bool>(value: true), Text('Sim')]),
+                        SizedBox(width: 16),
+                        Row(children: [Radio<bool>(value: false), Text('Não')]),
+                      ],
+                    ),
+                  ),
+                  if (_temVestigiosMediato == true && showMarcoZero) ...[
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Marco Zero',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Defina o marco zero: ponto de referência utilizado para amarração e posicionamento dos vestígios.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: marcoZeroDescricaoController,
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição do Marco Zero',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      maxLines: null,
+                      minLines: 2,
+                      textInputAction: TextInputAction.newline,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: marcoZeroXController,
+                            decoration: const InputDecoration(
+                              labelText: 'Coordenada X',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              hintText: 'Ex: -23,5',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: marcoZeroYController,
+                            decoration: const InputDecoration(
+                              labelText: 'Coordenada Y',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              hintText: 'Ex: -46,6',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ] else ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Sem vestígios neste local'),
+                    value: semVestigios,
+                    onChanged: (value) {
+                      onSemVestigiosChanged(value);
+                    },
+                  ),
+                ],
+                if ((usarFluxoVestigioMediato && _temVestigiosMediato == true) ||
+                    (!usarFluxoVestigioMediato && !semVestigios)) ...[
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -1829,8 +2158,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
-            // Tipo de local (imóvel vs via pública)
-            Container(
+            // Tipo de local (apenas no mediato)
+            if (_etapaLocalAtual == 0)
+              Container(
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1890,8 +2220,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                 ],
               ),
             ),
-            // Foto(s) vista ampla do local
-            Container(
+            // Foto(s) vista ampla por etapa (mediato/imediato)
+            if (_etapaLocalAtual == 0 || _etapaLocalAtual == 1)
+              Container(
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1907,9 +2238,11 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _localEmViaPublica == true
-                        ? 'Vista geral do local (ex.: trecho da via, ponto do fato). Será a Fotografia 01 no laudo.'
-                        : 'Ex.: fachada ou porção anterior do imóvel (será a Fotografia 01 no laudo).',
+                    _etapaLocalAtual == 0
+                        ? (_localEmViaPublica == true
+                              ? 'Vista geral do local mediato (ex.: trecho da via, ponto do fato).'
+                              : 'Ex.: fachada ou porção anterior do imóvel (local mediato).')
+                        : 'Registre a vista ampla específica do local imediato.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 12),
@@ -1924,7 +2257,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           if (foto != null && mounted) {
                             final path = await _persistirFotoVestigio(foto);
                             if (path != null) {
-                              setState(() => _fotosVistaAmplaPaths.add(path));
+                              setState(() {
+                                if (_etapaLocalAtual == 0) {
+                                  _fotosVistaAmplaPaths.add(path);
+                                } else {
+                                  _fotosVistaAmplaImediatoPaths.add(path);
+                                }
+                              });
                             }
                           }
                         },
@@ -1947,7 +2286,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                 XFile(f.path!),
                               );
                               if (path != null) {
-                                setState(() => _fotosVistaAmplaPaths.add(path));
+                                setState(() {
+                                  if (_etapaLocalAtual == 0) {
+                                    _fotosVistaAmplaPaths.add(path);
+                                  } else {
+                                    _fotosVistaAmplaImediatoPaths.add(path);
+                                  }
+                                });
                               }
                             }
                           }
@@ -1957,12 +2302,20 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                       ),
                     ],
                   ),
-                  if (_fotosVistaAmplaPaths.isNotEmpty) ...[
+                  if ((_etapaLocalAtual == 0
+                          ? _fotosVistaAmplaPaths
+                          : _fotosVistaAmplaImediatoPaths)
+                      .isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: _fotosVistaAmplaPaths.asMap().entries.map((e) {
+                      children: (_etapaLocalAtual == 0
+                              ? _fotosVistaAmplaPaths
+                              : _fotosVistaAmplaImediatoPaths)
+                          .asMap()
+                          .entries
+                          .map((e) {
                         return Stack(
                           children: [
                             ClipRRect(
@@ -1998,7 +2351,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                 ),
                                 onPressed: () {
                                   setState(
-                                    () => _fotosVistaAmplaPaths.removeAt(e.key),
+                                    () => (_etapaLocalAtual == 0
+                                            ? _fotosVistaAmplaPaths
+                                            : _fotosVistaAmplaImediatoPaths)
+                                        .removeAt(e.key),
                                   );
                                 },
                               ),
@@ -2022,112 +2378,6 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
               ),
               child: Column(
                 children: [
-                  // Classificação
-                  _buildCheckboxRow('Classificação', [
-                    {
-                      'label': 'Mediato',
-                      'value': _classificacaoMediato ?? false,
-                      'onChanged': (value) =>
-                          _onClassificacaoChanged(value, 'mediato'),
-                    },
-                    {
-                      'label': 'Imediato',
-                      'value': _classificacaoImediato ?? false,
-                      'onChanged': (value) =>
-                          _onClassificacaoChanged(value, 'imediato'),
-                    },
-                    {
-                      'label': 'Relacionado',
-                      'value': _classificacaoRelacionado ?? false,
-                      'onChanged': (value) =>
-                          _onClassificacaoChanged(value, 'relacionado'),
-                    },
-                  ]),
-                  const Divider(height: 1),
-                  // Descrição das Vias de Acesso
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Descrição das Vias de Acesso:',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _viasAcessoController,
-                          decoration: const InputDecoration(
-                            hintText: 'Descreva as vias de acesso...',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          maxLines: 3,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  // Sinais de Arrombamento (oculto em via pública)
-                  if (_localEmViaPublica == true) ...[
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        'Em via pública estes itens não se aplicam.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                    const Divider(height: 1),
-                  ] else ...[
-                    _buildCheckboxRow('Sinais de Arrombamento', [
-                      {
-                        'label': 'Sim',
-                        'value': _sinaisArrombamentoSim ?? false,
-                        'onChanged': (value) =>
-                            _onSinaisArrombamentoChanged(value, 'sim'),
-                      },
-                      {
-                        'label': 'Não',
-                        'value': _sinaisArrombamentoNao ?? false,
-                        'onChanged': (value) =>
-                            _onSinaisArrombamentoChanged(value, 'nao'),
-                      },
-                      {
-                        'label': 'Não Se Aplica',
-                        'value': _sinaisArrombamentoNaoSeAplica ?? false,
-                        'onChanged': (value) =>
-                            _onSinaisArrombamentoChanged(value, 'naoSeAplica'),
-                      },
-                    ]),
-                    const Divider(height: 1),
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Descrição dos Sinais de Arrombamento:',
-                            style: TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _sinaisArrombamentoController,
-                            decoration: const InputDecoration(
-                              hintText: 'Descreva os sinais de arrombamento...',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            maxLines: 3,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                  ],
                   // Descrição dos Locais (Mediato, Imediato, Relacionado) + Vestígios
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -2148,13 +2398,18 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             ).colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        if ((_classificacaoMediato ?? false)) ...[
+                        Text(
+                          _tituloEtapaLocal,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        if (_etapaLocalAtual == 0)
                           _buildSecaoLocalDetalhado(
                             titulo: 'Local Mediato',
                             local: 'mediato',
                             showMarcoZero:
                                 widget.ficha.tipoOcorrencia !=
                                 TipoOcorrencia.morteEsclarecer,
+                            usarFluxoVestigioMediato: true,
                             descricaoController: _descricaoMediatoController,
                             marcoZeroDescricaoController:
                                 _marcoZeroDescricaoMediatoController,
@@ -2162,12 +2417,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             marcoZeroYController: _marcoZeroYMediatoController,
                             vestigios: _vestigiosMediato,
                             semVestigios: _semVestigiosMediato,
-                            onSemVestigiosChanged: (value) {
-                              setState(() {
-                                _semVestigiosMediato = value;
-                                if (value) _vestigiosMediato.clear();
-                              });
-                            },
+                            onSemVestigiosChanged: (value) {},
                             onAdicionarVestigio: () =>
                                 _adicionarOuEditarVestigio('mediato'),
                             onRemoverVestigio: (id) =>
@@ -2187,11 +2437,11 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             onIluminacaoChanged: (value, tipo) =>
                                 _onIluminacaoChanged(value, tipo, 'mediato'),
                           ),
-                        ],
-                        if ((_classificacaoImediato ?? false)) ...[
+                        if (_etapaLocalAtual == 1)
                           _buildSecaoLocalDetalhado(
                             titulo: 'Local Imediato',
                             local: 'imediato',
+                            exibirSinaisArrombamento: true,
                             showMarcoZero:
                                 widget.ficha.tipoOcorrencia !=
                                 TipoOcorrencia.morteEsclarecer,
@@ -2227,8 +2477,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             onIluminacaoChanged: (value, tipo) =>
                                 _onIluminacaoChanged(value, tipo, 'imediato'),
                           ),
-                        ],
-                        if ((_classificacaoRelacionado ?? false)) ...[
+                        if (_etapaLocalAtual == 2)
                           _buildSecaoLocalDetalhado(
                             titulo: 'Local Relacionado',
                             local: 'relacionado',
@@ -2275,7 +2524,6 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                   'relacionado',
                                 ),
                           ),
-                        ],
                       ],
                     ),
                   ),
@@ -2311,7 +2559,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             ),
             const SizedBox(height: 32),
             FilledButton(
-              onPressed: _salvando ? null : _salvarLocalFurto,
+              onPressed: _salvando ? null : _avancarEtapaLocal,
               style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
               child: _salvando
                   ? const SizedBox(
@@ -2322,7 +2570,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : const Text('Salvar e Continuar'),
+                  : Text(
+                      _etapaLocalAtual == 0
+                          ? 'Salvar e Ir para Local Imediato'
+                          : _etapaLocalAtual == 1
+                          ? 'Salvar e Continuar'
+                          : 'Salvar',
+                    ),
             ),
             const SizedBox(
               height: 80,

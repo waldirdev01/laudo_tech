@@ -40,6 +40,9 @@ class LocalFurtoModel {
 
   // Descrições
   final String? descricaoViasAcesso;
+  final int? quantidadeAcessosMediato;
+  final List<String>? tiposAcessoMediato;
+  final List<String>? posicoesAcessoMediato;
   final String? sinaisArrombamentoDescricao;
   final String? descricaoLocal;
   final String? demaisObservacoes;
@@ -71,6 +74,8 @@ class LocalFurtoModel {
 
   // Foto(s) vista ampla do local (ex.: fachada) – primeira(s) do levantamento (Fotografia 01)
   final List<String>? fotosVistaAmplaPaths;
+  final List<String>? fotosVistaAmplaMediatoPaths;
+  final List<String>? fotosVistaAmplaImediatoPaths;
 
   /// true = via pública / área aberta; false = imóvel (fechado); null = não definido
   final bool? localEmViaPublica;
@@ -98,6 +103,9 @@ class LocalFurtoModel {
     this.iluminacaoNaturalRelacionado,
     this.iluminacaoAusenteRelacionado,
     this.descricaoViasAcesso,
+    this.quantidadeAcessosMediato,
+    this.tiposAcessoMediato,
+    this.posicoesAcessoMediato,
     this.sinaisArrombamentoDescricao,
     this.descricaoLocal,
     this.demaisObservacoes,
@@ -117,6 +125,8 @@ class LocalFurtoModel {
     this.sinaisArrombamentoNao,
     this.sinaisArrombamentoNaoSeAplica,
     this.fotosVistaAmplaPaths,
+    this.fotosVistaAmplaMediatoPaths,
+    this.fotosVistaAmplaImediatoPaths,
     this.localEmViaPublica,
   });
 
@@ -143,6 +153,9 @@ class LocalFurtoModel {
         'iluminacaoNaturalRelacionado': iluminacaoNaturalRelacionado,
         'iluminacaoAusenteRelacionado': iluminacaoAusenteRelacionado,
         'descricaoViasAcesso': descricaoViasAcesso,
+        'quantidadeAcessosMediato': quantidadeAcessosMediato,
+        'tiposAcessoMediato': tiposAcessoMediato,
+        'posicoesAcessoMediato': posicoesAcessoMediato,
         'sinaisArrombamentoDescricao': sinaisArrombamentoDescricao,
         'descricaoLocal': descricaoLocal,
         'demaisObservacoes': demaisObservacoes,
@@ -162,6 +175,8 @@ class LocalFurtoModel {
         'sinaisArrombamentoNao': sinaisArrombamentoNao,
         'sinaisArrombamentoNaoSeAplica': sinaisArrombamentoNaoSeAplica,
         'fotosVistaAmplaPaths': fotosVistaAmplaPaths,
+        'fotosVistaAmplaMediatoPaths': fotosVistaAmplaMediatoPaths,
+        'fotosVistaAmplaImediatoPaths': fotosVistaAmplaImediatoPaths,
         'localEmViaPublica': localEmViaPublica,
       };
 
@@ -189,6 +204,15 @@ class LocalFurtoModel {
         iluminacaoNaturalRelacionado: json['iluminacaoNaturalRelacionado'] as bool?,
         iluminacaoAusenteRelacionado: json['iluminacaoAusenteRelacionado'] as bool?,
         descricaoViasAcesso: json['descricaoViasAcesso'] as String?,
+        quantidadeAcessosMediato:
+            (json['quantidadeAcessosMediato'] as num?)?.toInt(),
+        tiposAcessoMediato: (json['tiposAcessoMediato'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+        posicoesAcessoMediato:
+            (json['posicoesAcessoMediato'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList(),
         sinaisArrombamentoDescricao: json['sinaisArrombamentoDescricao'] as String?,
         descricaoLocal: json['descricaoLocal'] as String?,
         demaisObservacoes: json['demaisObservacoes'] as String?,
@@ -222,6 +246,12 @@ class LocalFurtoModel {
         fotosVistaAmplaPaths: (json['fotosVistaAmplaPaths'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList(),
+        fotosVistaAmplaMediatoPaths: (json['fotosVistaAmplaMediatoPaths'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+        fotosVistaAmplaImediatoPaths: (json['fotosVistaAmplaImediatoPaths'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
         localEmViaPublica: json['localEmViaPublica'] as bool?,
       );
 
@@ -248,6 +278,9 @@ class LocalFurtoModel {
     bool? iluminacaoNaturalRelacionado,
     bool? iluminacaoAusenteRelacionado,
     String? descricaoViasAcesso,
+    int? quantidadeAcessosMediato,
+    List<String>? tiposAcessoMediato,
+    List<String>? posicoesAcessoMediato,
     String? sinaisArrombamentoDescricao,
     String? descricaoLocal,
     String? demaisObservacoes,
@@ -267,6 +300,8 @@ class LocalFurtoModel {
     bool? sinaisArrombamentoNao,
     bool? sinaisArrombamentoNaoSeAplica,
     List<String>? fotosVistaAmplaPaths,
+    List<String>? fotosVistaAmplaMediatoPaths,
+    List<String>? fotosVistaAmplaImediatoPaths,
     bool? localEmViaPublica,
   }) {
     return LocalFurtoModel(
@@ -292,6 +327,9 @@ class LocalFurtoModel {
       iluminacaoNaturalRelacionado: iluminacaoNaturalRelacionado ?? this.iluminacaoNaturalRelacionado,
       iluminacaoAusenteRelacionado: iluminacaoAusenteRelacionado ?? this.iluminacaoAusenteRelacionado,
       descricaoViasAcesso: descricaoViasAcesso ?? this.descricaoViasAcesso,
+      quantidadeAcessosMediato: quantidadeAcessosMediato ?? this.quantidadeAcessosMediato,
+      tiposAcessoMediato: tiposAcessoMediato ?? this.tiposAcessoMediato,
+      posicoesAcessoMediato: posicoesAcessoMediato ?? this.posicoesAcessoMediato,
       sinaisArrombamentoDescricao: sinaisArrombamentoDescricao ?? this.sinaisArrombamentoDescricao,
       descricaoLocal: descricaoLocal ?? this.descricaoLocal,
       demaisObservacoes: demaisObservacoes ?? this.demaisObservacoes,
@@ -311,8 +349,9 @@ class LocalFurtoModel {
       sinaisArrombamentoNao: sinaisArrombamentoNao ?? this.sinaisArrombamentoNao,
       sinaisArrombamentoNaoSeAplica: sinaisArrombamentoNaoSeAplica ?? this.sinaisArrombamentoNaoSeAplica,
       fotosVistaAmplaPaths: fotosVistaAmplaPaths ?? this.fotosVistaAmplaPaths,
+      fotosVistaAmplaMediatoPaths: fotosVistaAmplaMediatoPaths ?? this.fotosVistaAmplaMediatoPaths,
+      fotosVistaAmplaImediatoPaths: fotosVistaAmplaImediatoPaths ?? this.fotosVistaAmplaImediatoPaths,
       localEmViaPublica: localEmViaPublica ?? this.localEmViaPublica,
     );
   }
 }
-

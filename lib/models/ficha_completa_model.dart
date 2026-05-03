@@ -8,6 +8,7 @@ import 'equipe_ficha_model.dart';
 import 'equipe_policial_ficha_model.dart';
 import 'equipe_resgate_model.dart';
 import 'evidencia_model.dart';
+import 'exame_complementar_model.dart';
 import 'ficha_base_model.dart';
 import 'local_ficha_model.dart';
 import 'solicitacao_model.dart';
@@ -63,6 +64,7 @@ class FichaCompletaModel {
 
   // Dados específicos para CVLI - Veículos
   final List<VeiculoModel>? veiculos;
+  final List<ExameComplementarModel>? examesComplementares;
   // Dados específicos para Crime de Trânsito
   final CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes;
   final CrimeTransitoLevantamentoModel? crimeTransitoLevantamento;
@@ -97,6 +99,7 @@ class FichaCompletaModel {
     this.dano,
     this.cadaveres,
     this.veiculos,
+    this.examesComplementares,
     this.crimeTransitoCondicoes,
     this.crimeTransitoLevantamento,
     this.envolvidosTransito,
@@ -128,6 +131,9 @@ class FichaCompletaModel {
     'dano': dano?.toJson(),
     'cadaveres': cadaveres?.map((c) => c.toJson()).toList(),
     'veiculos': veiculos?.map((v) => v.toJson()).toList(),
+    'examesComplementares': examesComplementares
+        ?.map((e) => e.toJson())
+        .toList(),
     'crimeTransitoCondicoes': crimeTransitoCondicoes?.toJson(),
     'crimeTransitoLevantamento': crimeTransitoLevantamento?.toJson(),
     'envolvidosTransito': envolvidosTransito?.map((e) => e.toJson()).toList(),
@@ -138,12 +144,18 @@ class FichaCompletaModel {
   };
 
   factory FichaCompletaModel.fromJson(Map<String, dynamic> json) {
+    final tipoOcorrenciaSalvo = json['tipoOcorrencia'] as String?;
+    final tipoOcorrenciaNormalizado =
+        tipoOcorrenciaSalvo == TipoOcorrencia.morteEsclarecer.name
+        ? TipoOcorrencia.cvli
+        : TipoOcorrencia.values.firstWhere(
+            (e) => e.name == tipoOcorrenciaSalvo,
+            orElse: () => TipoOcorrencia.furtoDanoExameLocal,
+          );
+
     return FichaCompletaModel(
       id: json['id'] as String,
-      tipoOcorrencia: TipoOcorrencia.values.firstWhere(
-        (e) => e.name == json['tipoOcorrencia'],
-        orElse: () => TipoOcorrencia.furtoDanoExameLocal,
-      ),
+      tipoOcorrencia: tipoOcorrenciaNormalizado,
       dadosSolicitacao: SolicitacaoModel.fromJson(
         json['dadosSolicitacao'] as Map<String, dynamic>,
       ),
@@ -207,6 +219,15 @@ class FichaCompletaModel {
                 .map((v) => VeiculoModel.fromJson(v as Map<String, dynamic>))
                 .toList()
           : null,
+      examesComplementares: json['examesComplementares'] != null
+          ? (json['examesComplementares'] as List<dynamic>)
+                .map(
+                  (e) => ExameComplementarModel.fromJson(
+                    e as Map<String, dynamic>,
+                  ),
+                )
+                .toList()
+          : null,
       crimeTransitoCondicoes: json['crimeTransitoCondicoes'] != null
           ? CrimeTransitoCondicoesViaModel.fromJson(
               json['crimeTransitoCondicoes'] as Map<String, dynamic>,
@@ -265,6 +286,7 @@ class FichaCompletaModel {
     DanoModel? dano,
     List<CadaverModel>? cadaveres,
     List<VeiculoModel>? veiculos,
+    List<ExameComplementarModel>? examesComplementares,
     CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes,
     CrimeTransitoLevantamentoModel? crimeTransitoLevantamento,
     List<CrimeTransitoEnvolvidoModel>? envolvidosTransito,
@@ -301,6 +323,7 @@ class FichaCompletaModel {
       dano: dano ?? this.dano,
       cadaveres: cadaveres ?? this.cadaveres,
       veiculos: veiculos ?? this.veiculos,
+      examesComplementares: examesComplementares ?? this.examesComplementares,
       crimeTransitoCondicoes:
           crimeTransitoCondicoes ?? this.crimeTransitoCondicoes,
       crimeTransitoLevantamento:

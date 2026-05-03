@@ -5,9 +5,42 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/cadaver_model.dart';
+import '../services/photo_backup_service.dart';
 
 typedef AjudaRegiaoLesaoCallback =
     void Function(BuildContext context, TextEditingController regiaoCtrl);
+
+enum TipoLesaoArmaBranca {
+  perfurante('Perfurante'),
+  cortante('Cortante'),
+  perfurocortante('Perfurocortante');
+
+  final String label;
+  const TipoLesaoArmaBranca(this.label);
+}
+
+enum ClassificacaoLamina {
+  facaUmGume('Faca de um gume'),
+  facaDoisGumes('Faca de dois gumes'),
+  punhal('Punhal');
+
+  final String label;
+  const ClassificacaoLamina(this.label);
+}
+
+class SinaisPab {
+  static const bordasRegulares = 'Bordas regulares/nítidas';
+  static const caudaEscoriacao = 'Cauda de escoriação (sugere direção)';
+  static const maiorProfundidade = 'Predomínio de profundidade';
+  static const maiorExtensao = 'Predomínio de extensão superficial';
+
+  static List<String> get todos => [
+    bordasRegulares,
+    caudaEscoriacao,
+    maiorProfundidade,
+    maiorExtensao,
+  ];
+}
 
 /// Tela cheia para cadastrar ou editar uma lesão/evidência no exame do cadáver.
 class LesaoCadaverFormScreen extends StatefulWidget {
@@ -56,9 +89,13 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
   final List<String> _fotosLesao = [];
 
   bool _isPaf = false;
+  bool _isPab = false;
   TipoLesaoPaf _tipoLesaoPaf = TipoLesaoPaf.entrada;
   DistanciaTiro? _distanciaTiro;
   Set<String> _sinaisSelecionados = {};
+  TipoLesaoArmaBranca _tipoLesaoPab = TipoLesaoArmaBranca.perfurocortante;
+  ClassificacaoLamina _classificacaoLamina = ClassificacaoLamina.facaUmGume;
+  Set<String> _sinaisPabSelecionados = {};
 
   String? _erroMensagem;
   bool _salvando = false;
@@ -75,6 +112,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
       text: e?.paf?.diametro?.toString() ?? '',
     );
     _isPaf = e?.isPaf ?? false;
+    _isPab = !_isPaf && (e?.tipo?.toUpperCase() == 'PAB');
     _tipoLesaoPaf = e?.paf?.tipo ?? TipoLesaoPaf.entrada;
     _distanciaTiro = e?.paf?.distancia;
     _sinaisSelecionados = Set<String>.from(e?.paf?.sinais ?? []);
@@ -105,9 +143,13 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
     _fotosLesao.clear();
     setState(() {
       _isPaf = false;
+      _isPab = false;
       _tipoLesaoPaf = TipoLesaoPaf.entrada;
       _distanciaTiro = null;
       _sinaisSelecionados = {};
+      _tipoLesaoPab = TipoLesaoArmaBranca.perfurocortante;
+      _classificacaoLamina = ClassificacaoLamina.facaUmGume;
+      _sinaisPabSelecionados = {};
       _erroMensagem = null;
       _subpastaFotos = 'lesao_novo_${DateTime.now().microsecondsSinceEpoch}';
     });
@@ -136,6 +178,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -149,17 +192,38 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
   }
 
   void _atualizarDescricaoAutomatica() {
-    if (!_isPaf || _regiaoCtrl.text.trim().isEmpty) return;
-    final descricao = gerarDescricaoPAF(
-      regiao: _regiaoCtrl.text.trim(),
-      tipo: _tipoLesaoPaf,
-      distancia: _tipoLesaoPaf != TipoLesaoPaf.saida ? _distanciaTiro : null,
-      diametro: double.tryParse(_diametroCtrl.text),
-      sinais: _sinaisSelecionados,
-    );
-    setState(() {
-      _descricaoCtrl.text = descricao;
-    });
+    if (_regiaoCtrl.text.trim().isEmpty) return;
+
+    if (_isPaf) {
+      final descricao = gerarDescricaoPAF(
+        regiao: _regiaoCtrl.text.trim(),
+        tipo: _tipoLesaoPaf,
+        distancia: _tipoLesaoPaf != TipoLesaoPaf.saida ? _distanciaTiro : null,
+        diametro: double.tryParse(_diametroCtrl.text),
+        sinais: _sinaisSelecionados,
+      );
+      setState(() {
+        _descricaoCtrl.text = descricao;
+      });
+      return;
+    }
+
+    if (_isPab) {
+      final partes = <String>[
+        'Lesão compatível com instrumento ${_tipoLesaoPab.label.toLowerCase()} (${_classificacaoLamina.label.toLowerCase()})',
+        'em ${_regiaoCtrl.text.trim()}',
+      ];
+      if (_sinaisPabSelecionados.isNotEmpty) {
+        final sinais = _sinaisPabSelecionados.toList();
+        final textoSinais = sinais.length == 1
+            ? sinais.first.toLowerCase()
+            : '${sinais.sublist(0, sinais.length - 1).join(', ').toLowerCase()} e ${sinais.last.toLowerCase()}';
+        partes.add('apresentando $textoSinais');
+      }
+      setState(() {
+        _descricaoCtrl.text = '${partes.join(', ')}.';
+      });
+    }
   }
 
   Future<void> _salvar() async {
@@ -190,6 +254,8 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
         regiao: _regiaoCtrl.text.trim(),
         tipo: _isPaf
             ? 'PAF'
+            : _isPab
+            ? 'PAB'
             : (_tipoCtrl.text.trim().isEmpty ? null : _tipoCtrl.text.trim()),
         descricao: _descricaoCtrl.text.trim().isEmpty
             ? null
@@ -384,13 +450,15 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _tipoCtrl,
-            enabled: !_isPaf,
+            enabled: !_isPaf && !_isPab,
             decoration: InputDecoration(
               labelText: 'Tipo',
               border: const OutlineInputBorder(),
-              hintText: _isPaf ? 'PAF' : 'Ex: PAB, contusão, etc.',
-              filled: _isPaf,
-              fillColor: _isPaf ? Colors.grey.shade800 : null,
+              hintText: (_isPaf || _isPab)
+                  ? 'Preenchido automaticamente'
+                  : 'Ex: PAB, contusão, etc.',
+              filled: _isPaf || _isPab,
+              fillColor: (_isPaf || _isPab) ? Colors.grey.shade800 : null,
             ),
           ),
           const SizedBox(height: 12),
@@ -403,6 +471,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
               setState(() {
                 _isPaf = value ?? false;
                 if (_isPaf) {
+                  _isPab = false;
                   _tipoCtrl.text = 'PAF';
                   _atualizarPresets();
                   _atualizarDescricaoAutomatica();
@@ -411,6 +480,29 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
                   _descricaoCtrl.clear();
                   _sinaisSelecionados.clear();
                   _distanciaTiro = null;
+                }
+              });
+            },
+          ),
+          CheckboxListTile(
+            title: const Text('Lesão por faca/punhal (PAB)'),
+            value: _isPab,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            onChanged: (value) {
+              setState(() {
+                _isPab = value ?? false;
+                if (_isPab) {
+                  _isPaf = false;
+                  _tipoCtrl.text = 'PAB';
+                  if (_sinaisPabSelecionados.isEmpty) {
+                    _sinaisPabSelecionados = {SinaisPab.bordasRegulares};
+                  }
+                  _atualizarDescricaoAutomatica();
+                } else {
+                  _tipoCtrl.clear();
+                  _descricaoCtrl.clear();
+                  _sinaisPabSelecionados.clear();
                 }
               });
             },
@@ -529,6 +621,86 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
             ),
             const Divider(),
           ],
+          if (_isPab) ...[
+            const Divider(),
+            const SizedBox(height: 8),
+            Text(
+              'Tipo de lesão por arma branca',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: TipoLesaoArmaBranca.values.map((tipo) {
+                final isSelected = _tipoLesaoPab == tipo;
+                return ChoiceChip(
+                  label: Text(tipo.label),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (!selected) return;
+                    setState(() => _tipoLesaoPab = tipo);
+                    _atualizarDescricaoAutomatica();
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Classificação da lâmina',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: ClassificacaoLamina.values.map((lamina) {
+                final isSelected = _classificacaoLamina == lamina;
+                return ChoiceChip(
+                  label: Text(lamina.label),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (!selected) return;
+                    setState(() => _classificacaoLamina = lamina);
+                    _atualizarDescricaoAutomatica();
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Características principais',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...SinaisPab.todos.map(
+              (sinal) => CheckboxListTile(
+                title: Text(sinal, style: const TextStyle(fontSize: 13)),
+                value: _sinaisPabSelecionados.contains(sinal),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                onChanged: (value) {
+                  setState(() {
+                    if (value == true) {
+                      _sinaisPabSelecionados.add(sinal);
+                    } else {
+                      _sinaisPabSelecionados.remove(sinal);
+                    }
+                  });
+                  _atualizarDescricaoAutomatica();
+                },
+              ),
+            ),
+            const Divider(),
+          ],
           const SizedBox(height: 12),
           const Divider(),
           const SizedBox(height: 8),
@@ -538,6 +710,8 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
             controller: _descricaoCtrl,
             decoration: InputDecoration(
               labelText: _isPaf
+                  ? 'Descrição (gerada automaticamente)'
+                  : _isPab
                   ? 'Descrição (gerada automaticamente)'
                   : 'Descrição',
               border: const OutlineInputBorder(),

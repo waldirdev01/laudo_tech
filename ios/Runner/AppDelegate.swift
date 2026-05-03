@@ -1,10 +1,12 @@
 import Flutter
 import UIKit
 import PDFKit
+import Photos
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private let CHANNEL = "laudo_tech/pdf"
+  private let PDF_CHANNEL = "laudo_tech/pdf"
+  private let PHOTO_BACKUP_CHANNEL = "laudo_tech/photo_backup"
   
   override func application(
     _ application: UIApplication,
@@ -18,7 +20,7 @@ import PDFKit
     }
     
     let channel = FlutterMethodChannel(
-      name: CHANNEL,
+      name: PDF_CHANNEL,
       binaryMessenger: controller.binaryMessenger
     )
     
@@ -49,6 +51,30 @@ import PDFKit
           details: nil
         ))
       }
+    }
+
+    let photoBackupChannel = FlutterMethodChannel(
+      name: PHOTO_BACKUP_CHANNEL,
+      binaryMessenger: controller.binaryMessenger
+    )
+
+    photoBackupChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard call.method == "saveToGallery" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+
+      guard let args = call.arguments as? [String: Any],
+            let path = args["path"] as? String else {
+        result(FlutterError(
+          code: "ARG_ERROR",
+          message: "path is required",
+          details: nil
+        ))
+        return
+      }
+
+      self?.saveImageToGallery(path: path, result: result)
     }
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -115,5 +141,53 @@ import PDFKit
     }
     
     result(fullText)
+  }
+
+  private func saveImageToGallery(path: String, result: @escaping FlutterResult) {
+    let fileURL = URL(fileURLWithPath: path)
+    guard FileManager.default.fileExists(atPath: path) else {
+      result(FlutterError(
+        code: "NOT_FOUND",
+        message: "File not found: \(path)",
+        details: nil
+      ))
+      return
+    }
+
+    let save: () -> Void = {
+      PHPhotoLibrary.shared().performChanges({
+        PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+      }) { success, error in
+        DispatchQueue.main.async {
+          if let error = error {
+            result(FlutterError(
+              code: "SAVE_ERROR",
+              message: error.localizedDescription,
+              details: nil
+            ))
+          } else {
+            result(success)
+          }
+        }
+      }
+    }
+
+    if #available(iOS 14, *) {
+      PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+        guard status == .authorized || status == .limited else {
+          DispatchQueue.main.async { result(false) }
+          return
+        }
+        save()
+      }
+    } else {
+      PHPhotoLibrary.requestAuthorization { status in
+        guard status == .authorized else {
+          DispatchQueue.main.async { result(false) }
+          return
+        }
+        save()
+      }
+    }
   }
 }

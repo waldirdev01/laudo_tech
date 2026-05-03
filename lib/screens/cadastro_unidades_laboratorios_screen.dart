@@ -260,10 +260,7 @@ class _CadastroUnidadesLaboratoriosScreenState
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabController,
-              children: [
-                _buildListaUnidades(),
-                _buildListaLaboratorios(),
-              ],
+              children: [_buildListaUnidades(), _buildListaLaboratorios()],
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -360,7 +357,9 @@ class _CadastroUnidadesLaboratoriosScreenState
           child: ListTile(
             leading: const CircleAvatar(child: Icon(Icons.science)),
             title: Text(laboratorio.nome),
-            subtitle: laboratorio.sigla != null ? Text(laboratorio.sigla!) : null,
+            subtitle: laboratorio.sigla != null
+                ? Text(laboratorio.sigla!)
+                : null,
             trailing: PopupMenuButton(
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'editar', child: Text('Editar')),

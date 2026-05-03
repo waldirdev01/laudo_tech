@@ -9,8 +9,11 @@ import '../models/laboratorio_model.dart';
 import '../models/unidade_model.dart';
 import '../models/vestigio_local_model.dart';
 import '../services/laboratorio_service.dart';
+import '../services/ficha_service.dart';
 import '../services/perito_service.dart';
+import '../services/photo_backup_service.dart';
 import '../services/unidade_service.dart';
+import 'exames_complementares_screen.dart';
 
 /// Tela cheia para cadastrar ou editar um vestígio de local (mediato / imediato / relacionado).
 class VestigioLocalFormScreen extends StatefulWidget {
@@ -48,6 +51,7 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
   final _peritoService = PeritoService();
   final _unidadeService = UnidadeService();
   final _laboratorioService = LaboratorioService();
+  final _fichaService = FichaService();
   final _imagePicker = ImagePicker();
   final _scrollController = ScrollController();
 
@@ -139,6 +143,7 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -216,7 +221,9 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       }
 
       final novo = VestigioLocalModel(
-        id: widget.vestigioExistente?.id ?? VestigioLocalFormScreen.gerarIdVestigio(),
+        id:
+            widget.vestigioExistente?.id ??
+            VestigioLocalFormScreen.gerarIdVestigio(),
         nome: _nomeCtrl.text.trim().isEmpty ? null : _nomeCtrl.text.trim(),
         descricao: _descricaoCtrl.text.trim(),
         coordenadaX: _coordenadaXCtrl.text.trim(),
@@ -238,7 +245,8 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
 
       if (!mounted) return;
 
-      final continuar = widget.manterNaTelaAposSalvarNovo &&
+      final continuar =
+          widget.manterNaTelaAposSalvarNovo &&
           widget.vestigioExistente == null &&
           widget.onSalvo != null;
 
@@ -258,6 +266,27 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     } finally {
       if (mounted) setState(() => _salvando = false);
     }
+  }
+
+  Future<void> _abrirExamesComplementares() async {
+    final ficha = await _fichaService.obterFicha(widget.fichaId);
+    if (!mounted) return;
+    if (ficha == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível abrir os exames complementares para esta ficha.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ExamesComplementaresScreen(ficha: ficha),
+      ),
+    );
   }
 
   @override
@@ -624,6 +653,15 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Número do lacre (opcional)',
                   border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _abrirExamesComplementares,
+                  icon: const Icon(Icons.science_outlined),
+                  label: const Text('Ir para exames complementares'),
                 ),
               ),
             ],

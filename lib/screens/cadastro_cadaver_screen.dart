@@ -8,6 +8,7 @@ import '../constants/evidencias_cadaver_regioes.dart';
 import '../constants/tipos_barba_referencia.dart';
 import '../models/cadaver_model.dart';
 import '../models/ficha_completa_model.dart';
+import '../services/photo_backup_service.dart';
 import 'lesao_cadaver_form_screen.dart';
 
 class CadastroCadaverScreen extends StatefulWidget {
@@ -84,6 +85,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   EstadoRigidez? _rigidezMemInferior;
   EstadoHipostase? _hipostaseEstado;
   bool? _hipostaseCompativeis;
+  bool? _hipostasePresente;
 
   // Posição do corpo
   String? _posicaoCorpoPreset;
@@ -92,6 +94,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   bool? _secrecaoOral;
   bool? _secrecaoAnal;
   bool? _secrecaoPenianaVaginal;
+  bool? _secrecoesPresentes;
 
   List<LesaoCadaverModel> _lesoes = [];
 
@@ -102,6 +105,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   List<String> _fotosLesoesDefesa = [];
 
   List<VesteCadaverModel> _vestes = [];
+  List<TatuagemMarcaCorporalModel> _tatuagensMarcasLista = [];
 
   // Fotos dos exames (paths locais)
   List<String> _fotosVistaCadaversAmbiente = [];
@@ -161,6 +165,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _hipostasePosicaoCtrl.text = c.hipostasePosicao ?? '';
     _hipostaseEstado = c.hipostaseEstado;
     _hipostaseCompativeis = c.hipostaseCompativeis;
+    _hipostasePresente =
+        (c.hipostasePosicao?.trim().isNotEmpty == true) ||
+        c.hipostaseEstado != null ||
+        c.hipostaseCompativeis != null;
 
     _secrecaoNasal = c.secrecaoNasal;
     _secrecaoNasalTipoCtrl.text = c.secrecaoNasalTipo ?? '';
@@ -170,8 +178,15 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _secrecaoAnalTipoCtrl.text = c.secrecaoAnalTipo ?? '';
     _secrecaoPenianaVaginal = c.secrecaoPenianaVaginal;
     _secrecaoPenianaVaginalTipoCtrl.text = c.secrecaoPenianaVaginalTipo ?? '';
+    _secrecoesPresentes = c.secrecaoNasal == true ||
+        c.secrecaoOral == true ||
+        c.secrecaoAnal == true ||
+        c.secrecaoPenianaVaginal == true;
     _outrasObservacoesCtrl.text = c.outrasObservacoes ?? '';
     _tatuagensMarcasCtrl.text = c.tatuagensMarcas ?? '';
+    _tatuagensMarcasLista = List<TatuagemMarcaCorporalModel>.from(
+      c.tatuagensMarcasLista ?? const [],
+    );
     _pertencesCtrl.text = c.pertences ?? '';
 
     _lesoes = List<LesaoCadaverModel>.from(c.lesoes ?? []);
@@ -183,8 +198,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _fotosLesoesDefesa = List<String>.from(c.fotosLesoesDefesa);
     _vestes = List<VesteCadaverModel>.from(c.vestes ?? []);
 
-    _fotosVistaCadaversAmbiente =
-        List<String>.from(c.fotosVistaCadaversAmbiente);
+    _fotosVistaCadaversAmbiente = List<String>.from(
+      c.fotosVistaCadaversAmbiente,
+    );
     _fotosPosicaoEncontrada = List<String>.from(c.fotosPosicaoEncontrada);
     _fotosHipostaseSecrecoes = List<String>.from(c.fotosHipostaseSecrecoes);
     _fotosTatuagens = List<String>.from(c.fotosTatuagens);
@@ -310,28 +326,38 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       rigidezMandibula: _rigidezMandibula,
       rigidezMemSuperior: _rigidezMemSuperior,
       rigidezMemInferior: _rigidezMemInferior,
-      hipostasePosicao: _hipostasePosicaoCtrl.text.trim().isEmpty
-          ? null
-          : _hipostasePosicaoCtrl.text.trim(),
-      hipostaseEstado: _hipostaseEstado,
-      hipostaseCompativeis: _hipostaseCompativeis,
-      secrecaoNasal: _secrecaoNasal,
-      secrecaoNasalTipo: _secrecaoNasalTipoCtrl.text.trim().isEmpty
-          ? null
-          : _secrecaoNasalTipoCtrl.text.trim(),
-      secrecaoOral: _secrecaoOral,
-      secrecaoOralTipo: _secrecaoOralTipoCtrl.text.trim().isEmpty
-          ? null
-          : _secrecaoOralTipoCtrl.text.trim(),
-      secrecaoAnal: _secrecaoAnal,
-      secrecaoAnalTipo: _secrecaoAnalTipoCtrl.text.trim().isEmpty
-          ? null
-          : _secrecaoAnalTipoCtrl.text.trim(),
-      secrecaoPenianaVaginal: _secrecaoPenianaVaginal,
-      secrecaoPenianaVaginalTipo:
-          _secrecaoPenianaVaginalTipoCtrl.text.trim().isEmpty
-          ? null
-          : _secrecaoPenianaVaginalTipoCtrl.text.trim(),
+      hipostasePosicao: _hipostasePresente == true &&
+              _hipostasePosicaoCtrl.text.trim().isNotEmpty
+          ? _hipostasePosicaoCtrl.text.trim()
+          : null,
+      hipostaseEstado: _hipostasePresente == true ? _hipostaseEstado : null,
+      hipostaseCompativeis:
+          _hipostasePresente == true ? _hipostaseCompativeis : null,
+      secrecaoNasal: _secrecoesPresentes == true ? _secrecaoNasal : null,
+      secrecaoNasalTipo: (_secrecoesPresentes == true &&
+              _secrecaoNasal == true &&
+              _secrecaoNasalTipoCtrl.text.trim().isNotEmpty)
+          ? _secrecaoNasalTipoCtrl.text.trim()
+          : null,
+      secrecaoOral: _secrecoesPresentes == true ? _secrecaoOral : null,
+      secrecaoOralTipo: (_secrecoesPresentes == true &&
+              _secrecaoOral == true &&
+              _secrecaoOralTipoCtrl.text.trim().isNotEmpty)
+          ? _secrecaoOralTipoCtrl.text.trim()
+          : null,
+      secrecaoAnal: _secrecoesPresentes == true ? _secrecaoAnal : null,
+      secrecaoAnalTipo: (_secrecoesPresentes == true &&
+              _secrecaoAnal == true &&
+              _secrecaoAnalTipoCtrl.text.trim().isNotEmpty)
+          ? _secrecaoAnalTipoCtrl.text.trim()
+          : null,
+      secrecaoPenianaVaginal:
+          _secrecoesPresentes == true ? _secrecaoPenianaVaginal : null,
+      secrecaoPenianaVaginalTipo: (_secrecoesPresentes == true &&
+              _secrecaoPenianaVaginal == true &&
+              _secrecaoPenianaVaginalTipoCtrl.text.trim().isNotEmpty)
+          ? _secrecaoPenianaVaginalTipoCtrl.text.trim()
+          : null,
       outrasObservacoes: _outrasObservacoesCtrl.text.trim().isEmpty
           ? null
           : _outrasObservacoesCtrl.text.trim(),
@@ -345,11 +371,28 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       vestes: _vestes,
       fotosVistaCadaversAmbiente: _fotosVistaCadaversAmbiente,
       fotosPosicaoEncontrada: _fotosPosicaoEncontrada,
-      fotosHipostaseSecrecoes: _fotosHipostaseSecrecoes,
-      fotosTatuagens: _fotosTatuagens,
-      tatuagensMarcas: _tatuagensMarcasCtrl.text.trim().isEmpty
-          ? null
-          : _tatuagensMarcasCtrl.text.trim(),
+      fotosHipostaseSecrecoes:
+          (_hipostasePresente == true || _secrecoesPresentes == true)
+          ? _fotosHipostaseSecrecoes
+          : const [],
+      fotosTatuagens: _tatuagensMarcasLista.isNotEmpty
+          ? _tatuagensMarcasLista
+                .expand((t) => t.fotosPaths)
+                .where((p) => p.trim().isNotEmpty)
+                .toSet()
+                .toList()
+          : _fotosTatuagens,
+      tatuagensMarcas: _tatuagensMarcasLista.isNotEmpty
+          ? _tatuagensMarcasLista
+                .map((t) => t.descricao?.trim())
+                .whereType<String>()
+                .where((d) => d.isNotEmpty)
+                .join('; ')
+          : (_tatuagensMarcasCtrl.text.trim().isEmpty
+                ? null
+                : _tatuagensMarcasCtrl.text.trim()),
+      tatuagensMarcasLista:
+          _tatuagensMarcasLista.isEmpty ? null : _tatuagensMarcasLista,
       pertences: _pertencesCtrl.text.trim().isEmpty
           ? null
           : _pertencesCtrl.text.trim(),
@@ -371,6 +414,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -664,7 +708,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _mostrarSelecaoBarbaReferencia(context),
+                            onPressed: () =>
+                                _mostrarSelecaoBarbaReferencia(context),
                             icon: const Icon(Icons.image_outlined, size: 18),
                             label: const Text('Selecionar da referência'),
                             style: OutlinedButton.styleFrom(
@@ -684,8 +729,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     Text(
                       _textoTipoBarbaSelecionado(),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 12),
 
@@ -756,8 +801,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     String? hint,
     String? subpasta,
   }) {
-    final pasta = subpasta ??
-        titulo.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    final pasta =
+        subpasta ?? titulo.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -834,30 +879,32 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
         const SizedBox(height: 8),
         if (paths.isEmpty)
           Text(
-            obrigatorio ? 'Nenhuma foto. Adicione ao menos uma.' : 'Nenhuma foto.',
+            obrigatorio
+                ? 'Nenhuma foto. Adicione ao menos uma.'
+                : 'Nenhuma foto.',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
           )
         else
           ...paths.asMap().entries.map(
-                (e) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.image_outlined, size: 18),
-                  title: Text(
-                    _nomeArquivoFoto(e.value),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close, size: 18),
-                    tooltip: 'Remover foto',
-                    onPressed: () {
-                      final nova = List<String>.from(paths)..removeAt(e.key);
-                      onChanged(nova);
-                    },
-                  ),
-                ),
+            (e) => ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.image_outlined, size: 18),
+              title: Text(
+                _nomeArquivoFoto(e.value),
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13),
               ),
+              trailing: IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                tooltip: 'Remover foto',
+                onPressed: () {
+                  final nova = List<String>.from(paths)..removeAt(e.key);
+                  onChanged(nova);
+                },
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1249,25 +1296,17 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   ),
                   const Divider(),
                   const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _hipostasePosicaoCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Posição',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDropdown<EstadoHipostase>(
-                    label: 'Estado',
-                    value: _hipostaseEstado,
-                    items: EstadoHipostase.values,
-                    onChanged: (v) => setState(() => _hipostaseEstado = v),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('Compatíveis:'),
+                  const Text('Há manchas de hipóstase?'),
                   RadioGroup<bool>(
-                    groupValue: _hipostaseCompativeis,
-                    onChanged: (v) => setState(() => _hipostaseCompativeis = v),
+                    groupValue: _hipostasePresente,
+                    onChanged: (v) => setState(() {
+                      _hipostasePresente = v;
+                      if (v == false) {
+                        _hipostasePosicaoCtrl.clear();
+                        _hipostaseEstado = null;
+                        _hipostaseCompativeis = null;
+                      }
+                    }),
                     child: Row(
                       children: [
                         Expanded(
@@ -1285,6 +1324,45 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       ],
                     ),
                   ),
+                  if (_hipostasePresente == true) ...[
+                    TextFormField(
+                      controller: _hipostasePosicaoCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Posição',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDropdown<EstadoHipostase>(
+                      label: 'Estado',
+                      value: _hipostaseEstado,
+                      items: EstadoHipostase.values,
+                      onChanged: (v) => setState(() => _hipostaseEstado = v),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Compatíveis:'),
+                    RadioGroup<bool>(
+                      groupValue: _hipostaseCompativeis,
+                      onChanged: (v) =>
+                          setState(() => _hipostaseCompativeis = v),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<bool>(
+                              title: const Text('Sim'),
+                              value: true,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<bool>(
+                              title: const Text('Não'),
+                              value: false,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1308,36 +1386,74 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   ),
                   const Divider(),
                   const SizedBox(height: 8),
-                  _buildSecrecaoRow('Nasal', _secrecaoNasal, (v) {
-                    setState(() => _secrecaoNasal = v);
-                  }, _secrecaoNasalTipoCtrl),
-                  const SizedBox(height: 12),
-                  _buildSecrecaoRow('Oral', _secrecaoOral, (v) {
-                    setState(() => _secrecaoOral = v);
-                  }, _secrecaoOralTipoCtrl),
-                  const SizedBox(height: 12),
-                  _buildSecrecaoRow('Anal', _secrecaoAnal, (v) {
-                    setState(() => _secrecaoAnal = v);
-                  }, _secrecaoAnalTipoCtrl),
-                  const SizedBox(height: 12),
-                  _buildSecrecaoRow(
-                    _sexo == SexoCadaver.feminino ? 'Vaginal' : 'Peniana',
-                    _secrecaoPenianaVaginal,
-                    (v) {
-                      setState(() => _secrecaoPenianaVaginal = v);
-                    },
-                    _secrecaoPenianaVaginalTipoCtrl,
+                  const Text('Há secreções?'),
+                  RadioGroup<bool>(
+                    groupValue: _secrecoesPresentes,
+                    onChanged: (v) => setState(() {
+                      _secrecoesPresentes = v;
+                      if (v == false) {
+                        _secrecaoNasal = null;
+                        _secrecaoOral = null;
+                        _secrecaoAnal = null;
+                        _secrecaoPenianaVaginal = null;
+                        _secrecaoNasalTipoCtrl.clear();
+                        _secrecaoOralTipoCtrl.clear();
+                        _secrecaoAnalTipoCtrl.clear();
+                        _secrecaoPenianaVaginalTipoCtrl.clear();
+                      }
+                    }),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<bool>(
+                            title: const Text('Sim'),
+                            value: true,
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<bool>(
+                            title: const Text('Não'),
+                            value: false,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  _buildSecaoFotos(
-                    titulo: 'Fotos (manchas de hipóstase e secreções)',
-                    paths: _fotosHipostaseSecrecoes,
-                    onChanged: (v) =>
-                        setState(() => _fotosHipostaseSecrecoes = v),
-                    obrigatorio: false,
-                  ),
+                  if (_secrecoesPresentes == true) ...[
+                    _buildSecrecaoRow('Nasal', _secrecaoNasal, (v) {
+                      setState(() => _secrecaoNasal = v);
+                    }, _secrecaoNasalTipoCtrl),
+                    const SizedBox(height: 12),
+                    _buildSecrecaoRow('Oral', _secrecaoOral, (v) {
+                      setState(() => _secrecaoOral = v);
+                    }, _secrecaoOralTipoCtrl),
+                    const SizedBox(height: 12),
+                    _buildSecrecaoRow('Anal', _secrecaoAnal, (v) {
+                      setState(() => _secrecaoAnal = v);
+                    }, _secrecaoAnalTipoCtrl),
+                    const SizedBox(height: 12),
+                    _buildSecrecaoRow(
+                      _sexo == SexoCadaver.feminino ? 'Vaginal' : 'Peniana',
+                      _secrecaoPenianaVaginal,
+                      (v) {
+                        setState(() => _secrecaoPenianaVaginal = v);
+                      },
+                      _secrecaoPenianaVaginalTipoCtrl,
+                    ),
+                  ],
+                  if (_hipostasePresente == true || _secrecoesPresentes == true)
+                    ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      _buildSecaoFotos(
+                        titulo: 'Fotos (manchas de hipóstase e secreções)',
+                        paths: _fotosHipostaseSecrecoes,
+                        onChanged: (v) =>
+                            setState(() => _fotosHipostaseSecrecoes = v),
+                        obrigatorio: false,
+                      ),
+                    ],
                 ],
               ),
             ),
@@ -1361,25 +1477,82 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   ),
                   const Divider(),
                   const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _tatuagensMarcasCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Descreva tatuagens, cicatrizes, marcas, etc.',
-                      border: OutlineInputBorder(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Itens registrados',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        tooltip: 'Adicionar tatuagem/marca',
+                        onPressed: _adicionarTatuagemMarca,
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Cadastre uma por vez. Sugestão: foto de vista ampla (posição no corpo) e foto aproximada.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    maxLines: 5,
                   ),
-                  const SizedBox(height: 16),
-                  const Divider(),
                   const SizedBox(height: 8),
-                  _buildSecaoFotos(
-                    titulo: 'Fotos (tatuagens e marcas corporais)',
-                    paths: _fotosTatuagens,
-                    onChanged: (v) => setState(() => _fotosTatuagens = v),
-                    obrigatorio: false,
-                    hint:
-                        'Sugestão: uma foto de vista ampla (posição no corpo) e uma em detalhe.',
-                  ),
+                  if (_tatuagensMarcasLista.isEmpty &&
+                      _tatuagensMarcasCtrl.text.trim().isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Nenhuma tatuagem/marca registrada.'),
+                    )
+                  else ...[
+                    if (_tatuagensMarcasLista.isNotEmpty)
+                      ...List.generate(_tatuagensMarcasLista.length, (index) {
+                        final item = _tatuagensMarcasLista[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            title: Text(
+                              item.descricao?.trim().isNotEmpty == true
+                                  ? item.descricao!
+                                  : 'Tatuagem/Marca ${index + 1}',
+                            ),
+                            subtitle: item.fotosPaths.isNotEmpty
+                                ? Text('${item.fotosPaths.length} foto(s)')
+                                : null,
+                            onTap: () => _editarTatuagemMarca(index),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit),
+                                  onPressed: () => _editarTatuagemMarca(index),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete),
+                                  onPressed: () {
+                                    setState(
+                                      () => _tatuagensMarcasLista.removeAt(index),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    if (_tatuagensMarcasLista.isEmpty &&
+                        _tatuagensMarcasCtrl.text.trim().isNotEmpty)
+                      TextFormField(
+                        controller: _tatuagensMarcasCtrl,
+                        decoration: const InputDecoration(
+                          labelText:
+                              'Descrição legada de tatuagens/marcas corporais',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 5,
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -1531,7 +1704,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     const SizedBox(height: 8),
                     const Text(
                       'Membros examinados:',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     for (final membro in [
@@ -1644,9 +1820,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                                   '${veste.fotosPaths.length} foto(s)',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                               Wrap(
@@ -1843,9 +2019,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       Expanded(
                         child: Text(
                           'EVIDÊNCIAS NO CADÁVER — Numeração',
-                          style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(sheetContext).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
                       IconButton(
@@ -1862,7 +2037,11 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => _mostrarFiguraCorpo(sheetContext, _assetCorpoMasculino, 'Corpo masculino'),
+                          onPressed: () => _mostrarFiguraCorpo(
+                            sheetContext,
+                            _assetCorpoMasculino,
+                            'Corpo masculino',
+                          ),
                           icon: const Icon(Icons.image_outlined, size: 20),
                           label: const Text('Masculino'),
                         ),
@@ -1870,7 +2049,11 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => _mostrarFiguraCorpo(sheetContext, _assetCorpoFeminino, 'Corpo feminino'),
+                          onPressed: () => _mostrarFiguraCorpo(
+                            sheetContext,
+                            _assetCorpoFeminino,
+                            'Corpo feminino',
+                          ),
                           icon: const Icon(Icons.image_outlined, size: 20),
                           label: const Text('Feminino'),
                         ),
@@ -1888,8 +2071,11 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'Toque em uma região para preencher o campo.',
-                          style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                          style: Theme.of(sheetContext).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  sheetContext,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                         ),
                       ),
@@ -1898,9 +2084,12 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'Vista anterior (frente)',
-                          style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(
+                          style: Theme.of(sheetContext).textTheme.titleSmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(sheetContext).colorScheme.primary,
+                                color: Theme.of(
+                                  sheetContext,
+                                ).colorScheme.primary,
                               ),
                         ),
                       ),
@@ -1924,9 +2113,12 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'Vista posterior (costas)',
-                          style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(
+                          style: Theme.of(sheetContext).textTheme.titleSmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(sheetContext).colorScheme.primary,
+                                color: Theme.of(
+                                  sheetContext,
+                                ).colorScheme.primary,
                               ),
                         ),
                       ),
@@ -1994,9 +2186,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       Expanded(
                         child: Text(
                           'Tipos de barba (referência)',
-                          style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(sheetContext).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
                       IconButton(
@@ -2017,9 +2208,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       child: Image.asset(
                         _assetBarba,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, e, s) => const Center(
-                          child: Text('Imagem não encontrada.'),
-                        ),
+                        errorBuilder: (_, e, s) =>
+                            const Center(child: Text('Imagem não encontrada.')),
                       ),
                     ),
                   ),
@@ -2029,8 +2219,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   child: Text(
                     'Use o gesto de pinça para zoom. Toque no tipo desejado abaixo para preencher.',
                     style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(
+                        sheetContext,
+                      ).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2070,7 +2262,11 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   }
 
   /// Exibe a figura do corpo (masculino/feminino) em um diálogo para consulta.
-  void _mostrarFiguraCorpo(BuildContext context, String assetPath, String titulo) {
+  void _mostrarFiguraCorpo(
+    BuildContext context,
+    String assetPath,
+    String titulo,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -2087,8 +2283,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       child: Text(
                         titulo,
                         style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -2113,8 +2309,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         child: Text(
                           'Imagem não encontrada.',
                           style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(ctx).colorScheme.error,
-                              ),
+                            color: Theme.of(ctx).colorScheme.error,
+                          ),
                         ),
                       ),
                     ),
@@ -2162,240 +2358,623 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     setState(() => _lesoes[index] = resultado);
   }
 
-  void _adicionarVeste() {
-    _mostrarDialogoVeste(null);
-  }
-
-  void _editarVeste(int index) {
-    _mostrarDialogoVeste(index);
-  }
-
-  void _mostrarDialogoVeste(int? index) {
-    final vesteExistente = index != null ? _vestes[index] : null;
-    final proximoNumero =
-        vesteExistente?.numero ??
-        (_vestes.isEmpty
-            ? 1
-            : _vestes.map((v) => v.numero).reduce((a, b) => a > b ? a : b) + 1);
-
-    final tipoMarcaCtrl = TextEditingController(
-      text: vesteExistente?.tipoMarca ?? '',
+  Future<void> _adicionarVeste() async {
+    final proximoNumero = _vestes.isEmpty
+        ? 1
+        : _vestes.map((v) => v.numero).reduce((a, b) => a > b ? a : b) + 1;
+    final novaVeste = await Navigator.of(context).push<VesteCadaverModel>(
+      MaterialPageRoute(
+        builder: (ctx) => CadastroVesteScreen(
+          fichaId: widget.ficha.id,
+          cadaverNumero: widget.cadaver.numero,
+          numeroVeste: proximoNumero,
+        ),
+      ),
     );
-    final corCtrl = TextEditingController(text: vesteExistente?.cor ?? '');
-    final notasCtrl = TextEditingController(text: vesteExistente?.notas ?? '');
+    if (!mounted || novaVeste == null) return;
+    setState(() => _vestes.add(novaVeste));
+  }
 
-    bool? sujidades = vesteExistente?.sujidades;
-    bool? sangue = vesteExistente?.sangue;
-    bool? bolsos = vesteExistente?.bolsos;
-    bool? bolsosVazios = vesteExistente?.bolsosVazios;
-    final fotosVeste = List<String>.from(vesteExistente?.fotosPaths ?? []);
+  Future<void> _editarVeste(int index) async {
+    final resultado = await Navigator.of(context).push<VesteCadaverModel>(
+      MaterialPageRoute(
+        builder: (ctx) => CadastroVesteScreen(
+          fichaId: widget.ficha.id,
+          cadaverNumero: widget.cadaver.numero,
+          numeroVeste: _vestes[index].numero,
+          vesteExistente: _vestes[index],
+        ),
+      ),
+    );
+    if (!mounted || resultado == null) return;
+    setState(() => _vestes[index] = resultado);
+  }
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(index == null ? 'Nova Veste' : 'Editar Veste'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Future<void> _adicionarTatuagemMarca() async {
+    final nova = await Navigator.of(context).push<TatuagemMarcaCorporalModel>(
+      MaterialPageRoute(
+        builder: (ctx) => CadastroTatuagemMarcaScreen(
+          fichaId: widget.ficha.id,
+          cadaverNumero: widget.cadaver.numero,
+        ),
+      ),
+    );
+    if (!mounted || nova == null) return;
+    setState(() => _tatuagensMarcasLista.add(nova));
+  }
+
+  Future<void> _editarTatuagemMarca(int index) async {
+    final resultado =
+        await Navigator.of(context).push<TatuagemMarcaCorporalModel>(
+      MaterialPageRoute(
+        builder: (ctx) => CadastroTatuagemMarcaScreen(
+          fichaId: widget.ficha.id,
+          cadaverNumero: widget.cadaver.numero,
+          existente: _tatuagensMarcasLista[index],
+        ),
+      ),
+    );
+    if (!mounted || resultado == null) return;
+    setState(() => _tatuagensMarcasLista[index] = resultado);
+  }
+}
+
+class CadastroVesteScreen extends StatefulWidget {
+  final String fichaId;
+  final int cadaverNumero;
+  final int numeroVeste;
+  final VesteCadaverModel? vesteExistente;
+
+  const CadastroVesteScreen({
+    super.key,
+    required this.fichaId,
+    required this.cadaverNumero,
+    required this.numeroVeste,
+    this.vesteExistente,
+  });
+
+  @override
+  State<CadastroVesteScreen> createState() => _CadastroVesteScreenState();
+}
+
+class CadastroTatuagemMarcaScreen extends StatefulWidget {
+  final String fichaId;
+  final int cadaverNumero;
+  final TatuagemMarcaCorporalModel? existente;
+
+  const CadastroTatuagemMarcaScreen({
+    super.key,
+    required this.fichaId,
+    required this.cadaverNumero,
+    this.existente,
+  });
+
+  @override
+  State<CadastroTatuagemMarcaScreen> createState() =>
+      _CadastroTatuagemMarcaScreenState();
+}
+
+class _CadastroTatuagemMarcaScreenState extends State<CadastroTatuagemMarcaScreen> {
+  final _descricaoCtrl = TextEditingController();
+  final _imagePicker = ImagePicker();
+  List<String> _fotos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _descricaoCtrl.text = widget.existente?.descricao ?? '';
+    _fotos = List<String>.from(widget.existente?.fotosPaths ?? const []);
+  }
+
+  @override
+  void dispose() {
+    _descricaoCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<String?> _persistirFoto(XFile arquivo) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_fotografico/${widget.fichaId}/cadaver_${widget.cadaverNumero}/tatuagens_marcas',
+      );
+      if (!await pasta.exists()) await pasta.create(recursive: true);
+      final ext = arquivo.path.contains('.')
+          ? arquivo.path.split('.').last.toLowerCase()
+          : 'jpg';
+      final destino = File(
+        '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
+      );
+      final bytes = await arquivo.readAsBytes();
+      await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _nomeArquivoFoto(String path) {
+    final idx = path.lastIndexOf(Platform.pathSeparator);
+    return idx >= 0 ? path.substring(idx + 1) : path;
+  }
+
+  void _salvar() {
+    final item = TatuagemMarcaCorporalModel(
+      id: widget.existente?.id ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
+      descricao: _descricaoCtrl.text.trim().isEmpty
+          ? null
+          : _descricaoCtrl.text.trim(),
+      fotosPaths: List<String>.from(_fotos),
+    );
+    Navigator.of(context).pop(item);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.existente == null
+              ? 'Nova Tatuagem/Marca'
+              : 'Editar Tatuagem/Marca',
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _descricaoCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Descrição',
+                hintText: 'Ex.: tatuagem em antebraço direito...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 4,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Sugestão: inclua uma foto de vista ampla e outra aproximada.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Text('Veste Nº $proximoNumero'),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: tipoMarcaCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo e marca',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: corCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Cor',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text('Sujidades:'),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Sim'),
-                            selected: sujidades == true,
-                            onSelected: (v) =>
-                                setDialogState(() => sujidades = v ? true : null),
-                          ),
-                          ChoiceChip(
-                            label: const Text('Não'),
-                            selected: sujidades == false,
-                            onSelected: (v) =>
-                                setDialogState(() => sujidades = v ? false : null),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Text('Sangue:'),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Sim'),
-                            selected: sangue == true,
-                            onSelected: (v) =>
-                                setDialogState(() => sangue = v ? true : null),
-                          ),
-                          ChoiceChip(
-                            label: const Text('Não'),
-                            selected: sangue == false,
-                            onSelected: (v) =>
-                                setDialogState(() => sangue = v ? false : null),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Text('Bolsos:'),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Sim'),
-                            selected: bolsos == true,
-                            onSelected: (v) =>
-                                setDialogState(() => bolsos = v ? true : null),
-                          ),
-                          ChoiceChip(
-                            label: const Text('Não'),
-                            selected: bolsos == false,
-                            onSelected: (v) =>
-                                setDialogState(() => bolsos = v ? false : null),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (bolsos == true) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Text('Vazios:'),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          alignment: WrapAlignment.end,
-                          children: [
-                            ChoiceChip(
-                              label: const Text('Sim'),
-                              selected: bolsosVazios == true,
-                              onSelected: (v) => setDialogState(
-                                () => bolsosVazios = v ? true : null,
-                              ),
-                            ),
-                            ChoiceChip(
-                              label: const Text('Não'),
-                              selected: bolsosVazios == false,
-                              onSelected: (v) => setDialogState(
-                                () => bolsosVazios = v ? false : null,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notasCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Notas',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                _buildSecaoFotos(
-                  titulo: 'Fotos da veste',
-                  paths: fotosVeste,
-                  onChanged: (v) {
-                    fotosVeste.clear();
-                    fotosVeste.addAll(v);
-                    setDialogState(() {});
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final foto = await _imagePicker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 90,
+                    );
+                    if (foto == null || !mounted) return;
+                    final path = await _persistirFoto(foto);
+                    if (path != null) setState(() => _fotos.add(path));
                   },
-                  subpasta: 'veste_$proximoNumero',
+                  icon: const Icon(Icons.photo_camera, size: 18),
+                  label: const Text('Câmera'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final fotos = await _imagePicker.pickMultiImage(
+                      imageQuality: 90,
+                    );
+                    if (fotos.isEmpty || !mounted) return;
+                    final novas = <String>[];
+                    for (final foto in fotos) {
+                      final path = await _persistirFoto(foto);
+                      if (path != null) novas.add(path);
+                    }
+                    if (novas.isNotEmpty) {
+                      setState(() => _fotos = [..._fotos, ...novas]);
+                    }
+                  },
+                  icon: const Icon(Icons.photo_library, size: 18),
+                  label: const Text('Galeria'),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final novaVeste = VesteCadaverModel(
-                  id:
-                      vesteExistente?.id ??
-                      DateTime.now().microsecondsSinceEpoch.toString(),
-                  numero: proximoNumero,
-                  tipoMarca: tipoMarcaCtrl.text.trim().isEmpty
-                      ? null
-                      : tipoMarcaCtrl.text.trim(),
-                  cor: corCtrl.text.trim().isEmpty ? null : corCtrl.text.trim(),
-                  sujidades: sujidades,
-                  sangue: sangue,
-                  bolsos: bolsos,
-                  bolsosVazios: bolsosVazios,
-                  notas: notasCtrl.text.trim().isEmpty
-                      ? null
-                      : notasCtrl.text.trim(),
-                  fotosPaths: List<String>.from(fotosVeste),
+            const SizedBox(height: 12),
+            if (_fotos.isEmpty)
+              Text(
+                'Nenhuma foto adicionada',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              )
+            else
+              ..._fotos.asMap().entries.map((entry) {
+                final i = entry.key;
+                final p = entry.value;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.file(
+                        File(p),
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.broken_image),
+                      ),
+                    ),
+                    title: Text(
+                      _nomeArquivoFoto(p),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => setState(() => _fotos.removeAt(i)),
+                    ),
+                  ),
                 );
+              }),
+            const SizedBox(height: 80),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            onPressed: _salvar,
+            child: const Text('Salvar'),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                setState(() {
-                  if (index != null) {
-                    _vestes[index] = novaVeste;
-                  } else {
-                    _vestes.add(novaVeste);
-                  }
-                });
-                Navigator.pop(dialogContext);
+class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
+  final _tipoMarcaCtrl = TextEditingController();
+  final _corCtrl = TextEditingController();
+  final _notasCtrl = TextEditingController();
+  final _imagePicker = ImagePicker();
+
+  bool? _sujidades;
+  bool? _sangue;
+  bool? _bolsos;
+  bool? _bolsosVazios;
+  List<String> _fotosVeste = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final v = widget.vesteExistente;
+    _tipoMarcaCtrl.text = v?.tipoMarca ?? '';
+    _corCtrl.text = v?.cor ?? '';
+    _notasCtrl.text = v?.notas ?? '';
+    _sujidades = v?.sujidades;
+    _sangue = v?.sangue;
+    _bolsos = v?.bolsos;
+    _bolsosVazios = v?.bolsosVazios;
+    _fotosVeste = List<String>.from(v?.fotosPaths ?? []);
+  }
+
+  @override
+  void dispose() {
+    _tipoMarcaCtrl.dispose();
+    _corCtrl.dispose();
+    _notasCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<String?> _persistirFotoVeste(XFile arquivo) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final pasta = Directory(
+        '${dir.path}/levantamento_fotografico/${widget.fichaId}/cadaver_${widget.cadaverNumero}/veste_${widget.numeroVeste}',
+      );
+      if (!await pasta.exists()) await pasta.create(recursive: true);
+      final ext = arquivo.path.contains('.')
+          ? arquivo.path.split('.').last.toLowerCase()
+          : 'jpg';
+      final destino = File(
+        '${pasta.path}/foto_${DateTime.now().microsecondsSinceEpoch}.$ext',
+      );
+      final bytes = await arquivo.readAsBytes();
+      await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
+      return destino.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _nomeArquivoFoto(String path) {
+    final idx = path.lastIndexOf(Platform.pathSeparator);
+    return idx >= 0 ? path.substring(idx + 1) : path;
+  }
+
+  Widget _buildSecaoFotos() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Fotos da veste',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                final foto = await _imagePicker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 90,
+                );
+                if (foto == null || !mounted) return;
+                final path = await _persistirFotoVeste(foto);
+                if (path != null) setState(() => _fotosVeste.add(path));
               },
-              child: const Text('Salvar'),
+              icon: const Icon(Icons.photo_camera, size: 18),
+              label: const Text('Câmera'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final fotos = await _imagePicker.pickMultiImage(
+                  imageQuality: 90,
+                );
+                if (fotos.isEmpty || !mounted) return;
+                final novas = <String>[];
+                for (final foto in fotos) {
+                  final path = await _persistirFotoVeste(foto);
+                  if (path != null) novas.add(path);
+                }
+                if (novas.isNotEmpty) {
+                  setState(() => _fotosVeste = [..._fotosVeste, ...novas]);
+                }
+              },
+              icon: const Icon(Icons.photo_library, size: 18),
+              label: const Text('Galeria'),
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        if (_fotosVeste.isEmpty)
+          Text(
+            'Nenhuma foto adicionada',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          ..._fotosVeste.asMap().entries.map((entry) {
+            final i = entry.key;
+            final path = entry.value;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.file(
+                    File(path),
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Icon(Icons.broken_image),
+                  ),
+                ),
+                title: Text(
+                  _nomeArquivoFoto(path),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    setState(() => _fotosVeste.removeAt(i));
+                  },
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  void _salvar() {
+    final veste = VesteCadaverModel(
+      id: widget.vesteExistente?.id ??
+          DateTime.now().microsecondsSinceEpoch.toString(),
+      numero: widget.numeroVeste,
+      tipoMarca: _tipoMarcaCtrl.text.trim().isEmpty
+          ? null
+          : _tipoMarcaCtrl.text.trim(),
+      cor: _corCtrl.text.trim().isEmpty ? null : _corCtrl.text.trim(),
+      sujidades: _sujidades,
+      sangue: _sangue,
+      bolsos: _bolsos,
+      bolsosVazios: _bolsosVazios,
+      notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
+      fotosPaths: List<String>.from(_fotosVeste),
+    );
+    Navigator.of(context).pop(veste);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.vesteExistente == null
+              ? 'Nova Veste Nº ${widget.numeroVeste}'
+              : 'Editar Veste Nº ${widget.numeroVeste}',
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _tipoMarcaCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Tipo e marca',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _corCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Cor',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Text('Sujidades:'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Sim'),
+                        selected: _sujidades == true,
+                        onSelected: (v) =>
+                            setState(() => _sujidades = v ? true : null),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Não'),
+                        selected: _sujidades == false,
+                        onSelected: (v) =>
+                            setState(() => _sujidades = v ? false : null),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('Sangue:'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Sim'),
+                        selected: _sangue == true,
+                        onSelected: (v) =>
+                            setState(() => _sangue = v ? true : null),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Não'),
+                        selected: _sangue == false,
+                        onSelected: (v) =>
+                            setState(() => _sangue = v ? false : null),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('Bolsos:'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Sim'),
+                        selected: _bolsos == true,
+                        onSelected: (v) =>
+                            setState(() => _bolsos = v ? true : null),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Não'),
+                        selected: _bolsos == false,
+                        onSelected: (v) =>
+                            setState(() => _bolsos = v ? false : null),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_bolsos == true) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Text('Vazios:'),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Sim'),
+                          selected: _bolsosVazios == true,
+                          onSelected: (v) =>
+                              setState(() => _bolsosVazios = v ? true : null),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Não'),
+                          selected: _bolsosVazios == false,
+                          onSelected: (v) =>
+                              setState(() => _bolsosVazios = v ? false : null),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notasCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Notas',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            _buildSecaoFotos(),
+            const SizedBox(height: 80),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            onPressed: _salvar,
+            child: const Text('Salvar'),
+          ),
         ),
       ),
     );

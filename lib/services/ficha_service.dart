@@ -26,11 +26,18 @@ class FichaService {
   Future<List<FichaCompletaModel>> listarFichas() async {
     final prefs = await SharedPreferences.getInstance();
     final fichasJson = prefs.getStringList(_fichasKey) ?? [];
-    
-    return fichasJson
-        .map((json) => FichaCompletaModel.fromJson(jsonDecode(json)))
-        .toList()
-      ..sort((a, b) => b.dataCriacao.compareTo(a.dataCriacao)); // Mais recentes primeiro
+
+    final fichas = <FichaCompletaModel>[];
+    for (final item in fichasJson) {
+      try {
+        fichas.add(FichaCompletaModel.fromJson(jsonDecode(item)));
+      } catch (_) {
+        // Ignora registros inválidos/corrompidos para não derrubar o app inteiro.
+      }
+    }
+
+    fichas.sort((a, b) => b.dataCriacao.compareTo(a.dataCriacao));
+    return fichas; // Mais recentes primeiro
   }
 
   /// Obtém uma ficha por ID
@@ -59,4 +66,3 @@ class FichaService {
     await prefs.setStringList(_fichasKey, fichasJson);
   }
 }
-

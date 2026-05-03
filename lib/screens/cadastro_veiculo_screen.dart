@@ -9,10 +9,11 @@ import '../models/laboratorio_model.dart';
 import '../models/unidade_model.dart';
 import '../models/veiculo_model.dart';
 import '../models/vestigio_veiculo_model.dart';
-import 'vestigio_veiculo_form_screen.dart';
 import '../services/laboratorio_service.dart';
+import '../services/photo_backup_service.dart';
 import '../services/unidade_service.dart';
 import '../models/tipo_ocorrencia.dart';
+import 'vestigio_veiculo_form_screen.dart';
 
 class CadastroVeiculoScreen extends StatefulWidget {
   final VeiculoModel veiculo;
@@ -111,7 +112,12 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _placaCtrl.text = v.placa ?? '';
     _chassiCtrl.text = v.chassiAparente ?? '';
 
-    _localizacaoAmbienteCtrl.text = v.localizacaoAmbiente ?? '';
+    final posicaoLegada = (v.posicao == PosicaoVeiculo.outra)
+        ? (v.posicaoLivre ?? '')
+        : (v.posicao?.label ?? '');
+    _localizacaoAmbienteCtrl.text = (v.localizacaoAmbiente ?? '').trim().isNotEmpty
+        ? v.localizacaoAmbiente!
+        : posicaoLegada;
     _coordenadaFrenteXCtrl.text = v.coordenadaFrenteX ?? '';
     _coordenadaFrenteYCtrl.text = v.coordenadaFrenteY ?? '';
     _alturaFrenteCtrl.text = v.alturaFrente ?? '';
@@ -151,8 +157,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
 
     _vestigios = List<VestigioVeiculoModel>.from(v.vestigios ?? []);
 
-    _fotosVistaVeiculoAmbiente =
-        List<String>.from(v.fotosVistaVeiculoAmbiente);
+    _fotosVistaVeiculoAmbiente = List<String>.from(v.fotosVistaVeiculoAmbiente);
 
     _relacao = v.relacao;
     _observacoesCtrl.text = v.observacoes ?? '';
@@ -248,10 +253,12 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           : _condicaoGeralCtrl.text.trim(),
       intensidadeDano: _intensidadeDano,
       setoresImpacto: _setoresImpacto.isEmpty ? null : _setoresImpacto.toList(),
-      tipificacoesDeformacoes:
-          _tipificacoes.isEmpty ? null : _tipificacoes.toList(),
-      orientacoesDeformacoes:
-          _orientacoes.isEmpty ? null : _orientacoes.toList(),
+      tipificacoesDeformacoes: _tipificacoes.isEmpty
+          ? null
+          : _tipificacoes.toList(),
+      orientacoesDeformacoes: _orientacoes.isEmpty
+          ? null
+          : _orientacoes.toList(),
       danosObservacoes: _danosObservacoesCtrl.text.trim().isEmpty
           ? null
           : _danosObservacoesCtrl.text.trim(),
@@ -271,8 +278,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           : _bicicletaModeloCtrl.text.trim(),
       bicicletaElementosSinalizacao:
           _bicicletaSinalizacaoCtrl.text.trim().isEmpty
-              ? null
-              : _bicicletaSinalizacaoCtrl.text.trim(),
+          ? null
+          : _bicicletaSinalizacaoCtrl.text.trim(),
       bicicletaPossuiCampainha: _bicicletaPossuiCampainha,
       fotosVistaVeiculoAmbiente: _fotosVistaVeiculoAmbiente,
       vestigios: _vestigios,
@@ -282,7 +289,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           : _observacoesCtrl.text.trim(),
     );
   }
-
 
   void _alternarEnum<T>(Set<T> conjunto, T valor) {
     setState(() {
@@ -335,10 +341,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 12),
-        Text(
-          titulo,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
@@ -373,21 +376,17 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
         const SizedBox(height: 8),
         DropdownButtonFormField<IntensidadeDano>(
           initialValue: _intensidadeDano,
-          decoration: const InputDecoration(
-            labelText: 'Intensidade dos danos',
-          ),
+          decoration: const InputDecoration(labelText: 'Intensidade dos danos'),
           items: IntensidadeDano.values
               .map(
                 (dano) => DropdownMenuItem(
                   value: dano,
-                  child: Text(
-                    switch (dano) {
-                      IntensidadeDano.leve => 'Leve',
-                      IntensidadeDano.media => 'Média',
-                      IntensidadeDano.grave => 'Grave',
-                      IntensidadeDano.gravissima => 'Gravíssima',
-                    },
-                  ),
+                  child: Text(switch (dano) {
+                    IntensidadeDano.leve => 'Leve',
+                    IntensidadeDano.media => 'Média',
+                    IntensidadeDano.grave => 'Grave',
+                    IntensidadeDano.gravissima => 'Gravíssima',
+                  }),
                 ),
               )
               .toList(),
@@ -467,13 +466,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
               .map(
                 (estado) => DropdownMenuItem(
                   value: estado,
-                  child: Text(
-                    switch (estado) {
-                      EstadoPneumaticos.novos => 'Novos',
-                      EstadoPneumaticos.meiaVida => 'Meia vida',
-                      EstadoPneumaticos.desgastados => 'Desgastados',
-                    },
-                  ),
+                  child: Text(switch (estado) {
+                    EstadoPneumaticos.novos => 'Novos',
+                    EstadoPneumaticos.meiaVida => 'Meia vida',
+                    EstadoPneumaticos.desgastados => 'Desgastados',
+                  }),
                 ),
               )
               .toList(),
@@ -500,13 +497,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
               .map(
                 (status) => DropdownMenuItem(
                   value: status,
-                  child: Text(
-                    switch (status) {
-                      AirbagStatus.acionado => 'Acionado',
-                      AirbagStatus.naoAcionado => 'Não acionado',
-                      AirbagStatus.ausente => 'Ausente',
-                    },
-                  ),
+                  child: Text(switch (status) {
+                    AirbagStatus.acionado => 'Acionado',
+                    AirbagStatus.naoAcionado => 'Não acionado',
+                    AirbagStatus.ausente => 'Ausente',
+                  }),
                 ),
               )
               .toList(),
@@ -543,13 +538,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
               .map(
                 (status) => DropdownMenuItem(
                   value: status,
-                  child: Text(
-                    switch (status) {
-                      TacografoStatus.ausente => 'Ausente',
-                      TacografoStatus.recolhido => 'Recolhido',
-                      TacografoStatus.naoSeAplica => 'Não se aplica',
-                    },
-                  ),
+                  child: Text(switch (status) {
+                    TacografoStatus.ausente => 'Ausente',
+                    TacografoStatus.recolhido => 'Recolhido',
+                    TacografoStatus.naoSeAplica => 'Não se aplica',
+                  }),
                 ),
               )
               .toList(),
@@ -646,6 +639,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -763,9 +757,12 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               'vista_ambiente',
                             );
                             if (path != null) {
-                              setState(() =>
-                                  _fotosVistaVeiculoAmbiente =
-                                      [..._fotosVistaVeiculoAmbiente, path]);
+                              setState(
+                                () => _fotosVistaVeiculoAmbiente = [
+                                  ..._fotosVistaVeiculoAmbiente,
+                                  path,
+                                ],
+                              );
                             }
                           },
                           icon: const Icon(Icons.photo_camera, size: 18),
@@ -786,9 +783,12 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                               if (path != null) novas.add(path);
                             }
                             if (novas.isNotEmpty) {
-                              setState(() =>
-                                  _fotosVistaVeiculoAmbiente =
-                                      [..._fotosVistaVeiculoAmbiente, ...novas]);
+                              setState(
+                                () => _fotosVistaVeiculoAmbiente = [
+                                  ..._fotosVistaVeiculoAmbiente,
+                                  ...novas,
+                                ],
+                              );
                             }
                           },
                           icon: const Icon(Icons.photo_library, size: 18),
@@ -807,29 +807,28 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                       )
                     else
                       ..._fotosVistaVeiculoAmbiente.asMap().entries.map(
-                            (e) => ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.image_outlined, size: 18),
-                              title: Text(
-                                _nomeArquivoFoto(e.value),
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                tooltip: 'Remover foto',
-                                onPressed: () {
-                                  setState(() {
-                                    _fotosVistaVeiculoAmbiente =
-                                        List<String>.from(
-                                            _fotosVistaVeiculoAmbiente)
-                                          ..removeAt(e.key);
-                                  });
-                                },
-                              ),
-                            ),
+                        (e) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.image_outlined, size: 18),
+                          title: Text(
+                            _nomeArquivoFoto(e.value),
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
                           ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            tooltip: 'Remover foto',
+                            onPressed: () {
+                              setState(() {
+                                _fotosVistaVeiculoAmbiente = List<String>.from(
+                                  _fotosVistaVeiculoAmbiente,
+                                )..removeAt(e.key);
+                              });
+                            },
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -946,7 +945,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
 
             const SizedBox(height: 16),
 
-            // Localização no Ambiente
+            // Situação e posicionamento do veículo
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -954,7 +953,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'LOCALIZAÇÃO NO AMBIENTE',
+                      'SITUAÇÃO E POSICIONAMENTO DO VEÍCULO',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).colorScheme.primary,
@@ -965,11 +964,23 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                     TextFormField(
                       controller: _localizacaoAmbienteCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Localização *',
+                        labelText: 'Situação e posicionamento no local *',
                         border: OutlineInputBorder(),
-                        hintText: 'Ex: estacionado na rua, no centro da via',
+                        hintText:
+                            'Ex: estacionado no acostamento, sentido norte-sul, parcialmente sobre a calçada, tombado sobre o lado direito',
                       ),
                       maxLines: 2,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _condicaoGeralCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Condição geral',
+                        border: OutlineInputBorder(),
+                        hintText:
+                            'Ex: avarias na lateral esquerda e para-choque dianteiro deslocado',
+                      ),
+                      maxLines: 3,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -1157,63 +1168,6 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
 
             const SizedBox(height: 16),
 
-            // Estado e Posição
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ESTADO E POSIÇÃO',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    _buildDropdown<PosicaoVeiculo>(
-                      label: 'Posição',
-                      value: _posicao,
-                      items: PosicaoVeiculo.values,
-                      onChanged: (v) {
-                        setState(() {
-                          _posicao = v;
-                          if (v != PosicaoVeiculo.outra) {
-                            _posicaoLivreCtrl.clear();
-                          }
-                        });
-                      },
-                    ),
-                    if (_posicao == PosicaoVeiculo.outra) ...[
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _posicaoLivreCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Descrição livre da posição',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 2,
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _condicaoGeralCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Condição geral',
-                        border: OutlineInputBorder(),
-                        hintText: 'Ex: danos na lateral esquerda',
-                      ),
-                      maxLines: 3,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
             // Vestígios/Evidências
             Card(
               child: Padding(
@@ -1308,7 +1262,9 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                     '${vestigio.fotosPaths.length} foto(s)',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                     ),
                                   ),
                                 if (vestigio.localizacao != null)
@@ -1324,11 +1280,12 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                 if (vestigio.tipoDestino != null &&
                                     vestigio.destinoId != null)
                                   FutureBuilder<dynamic>(
-                                    future: vestigio.tipoDestino ==
+                                    future:
+                                        vestigio.tipoDestino ==
                                             TipoDestinoVestigioVeiculo.unidade
                                         ? _unidadeService.listarUnidades()
                                         : _laboratorioService
-                                            .listarLaboratorios(),
+                                              .listarLaboratorios(),
                                     builder: (context, snapshot) {
                                       if (snapshot.hasData) {
                                         final lista = snapshot.data as List;
@@ -1338,7 +1295,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                         );
                                         if (items.isNotEmpty) {
                                           final item = items.first;
-                                          final nome = vestigio.tipoDestino ==
+                                          final nome =
+                                              vestigio.tipoDestino ==
                                                   TipoDestinoVestigioVeiculo
                                                       .unidade
                                               ? (item as UnidadeModel).nome

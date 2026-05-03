@@ -1,5 +1,7 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/laboratorio_model.dart';
 
 /// Serviço para gerenciar laboratórios que recebem vestígios
@@ -34,7 +36,7 @@ class LaboratorioService {
   Future<List<LaboratorioModel>> listarLaboratorios() async {
     final prefs = await SharedPreferences.getInstance();
     final laboratoriosJson = prefs.getStringList(_laboratoriosKey) ?? [];
-    
+
     return laboratoriosJson
         .map((json) => LaboratorioModel.fromJson(jsonDecode(json)))
         .toList();

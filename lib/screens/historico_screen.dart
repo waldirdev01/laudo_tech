@@ -29,7 +29,60 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
     // Carregar histórico já salvo (se estiver editando)
     if (widget.ficha.dadosFichaBase?.historico != null) {
       _historicoController.text = widget.ficha.dadosFichaBase!.historico!;
+      return;
     }
+    _historicoController.text = _montarHistoricoInicial();
+  }
+
+  String _montarHistoricoInicial() {
+    final origem = widget.ficha.dadosSolicitacao;
+    final localEndereco = widget.ficha.local?.endereco ?? origem.endereco;
+    final localMunicipio = widget.ficha.local?.municipio ?? origem.municipio;
+    final dataHoraFato = origem.dataHoraComunicacao?.trim();
+
+    final temDataHora = dataHoraFato != null && dataHoraFato.isNotEmpty;
+    final temLocal =
+        (localEndereco != null && localEndereco.trim().isNotEmpty) ||
+        (localMunicipio != null && localMunicipio.trim().isNotEmpty);
+
+    String trechoDataHora;
+    if (temDataHora) {
+      final partes = dataHoraFato.split(' ');
+      final data = partes.isNotEmpty ? partes.first.trim() : '';
+      final hora = partes.length > 1 ? partes[1].trim() : '';
+      if (data.isNotEmpty && hora.isNotEmpty) {
+        final horaFormatada = _formatarHora(hora);
+        trechoDataHora = 'no dia $data, por volta de $horaFormatada';
+      } else if (data.isNotEmpty) {
+        trechoDataHora = 'na data de $data';
+      } else {
+        trechoDataHora = 'em data e horário não determinados';
+      }
+    } else {
+      trechoDataHora = 'em data e horário não determinados';
+    }
+
+    String trechoLocal;
+    if (temLocal) {
+      final partesLocal = <String>[];
+      if (localEndereco != null && localEndereco.trim().isNotEmpty) {
+        partesLocal.add(localEndereco.trim());
+      }
+      if (localMunicipio != null && localMunicipio.trim().isNotEmpty) {
+        partesLocal.add(localMunicipio.trim());
+      }
+      trechoLocal = 'no local ${partesLocal.join(', ')}';
+    } else {
+      trechoLocal = 'em local não determinado';
+    }
+
+    return 'Segundo o apurado, o fato teria ocorrido $trechoDataHora, $trechoLocal.';
+  }
+
+  String _formatarHora(String hora) {
+    final partes = hora.split(':');
+    if (partes.length < 2) return hora;
+    return '${partes[0]}h${partes[1]}min';
   }
 
   @override
@@ -118,33 +171,12 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Título da seção
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade700,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  topRight: Radius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'HISTÓRICO',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
             // Área de texto
             Container(
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade300),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(8),
-                  bottomRight: Radius.circular(8),
+                borderRadius: const BorderRadius.all(
+                  Radius.circular(8),
                 ),
               ),
               child: Column(
@@ -163,7 +195,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '(Fazer breve resumo do histórico da ocorrência. Não copiar o RAI).',
+                          '(Redação sugerida: "Segundo o apurado, o fato teria ocorrido...").',
                           style: TextStyle(
                             color: Colors.blue.shade700,
                             decoration: TextDecoration.underline,
@@ -172,7 +204,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '(Constar data/hora na qual o fato teria ocorrido).',
+                          '(Incluir, quando possível, data, hora e local do fato; se desconhecidos, registrar como não determinados).',
                           style: TextStyle(
                             color: Colors.blue.shade700,
                             decoration: TextDecoration.underline,
@@ -188,7 +220,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                     child: TextFormField(
                       controller: _historicoController,
                       decoration: const InputDecoration(
-                        hintText: 'Digite o histórico da ocorrência...',
+                        hintText: 'Descreva o histórico da ocorrência...',
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 8),
                       ),

@@ -9,8 +9,11 @@ import '../models/laboratorio_model.dart';
 import '../models/unidade_model.dart';
 import '../models/vestigio_veiculo_model.dart';
 import '../services/laboratorio_service.dart';
+import '../services/ficha_service.dart';
 import '../services/perito_service.dart';
+import '../services/photo_backup_service.dart';
 import '../services/unidade_service.dart';
+import 'exames_complementares_screen.dart';
 
 /// Tela cheia para cadastrar ou editar vestígio de veículo.
 class VestigioVeiculoFormScreen extends StatefulWidget {
@@ -47,6 +50,7 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
   final _peritoService = PeritoService();
   final _unidadeService = UnidadeService();
   final _laboratorioService = LaboratorioService();
+  final _fichaService = FichaService();
   final _imagePicker = ImagePicker();
   final _scrollController = ScrollController();
 
@@ -143,6 +147,7 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -162,8 +167,7 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
     }
     if (_tipoAcaoSelecionado == null) {
       setState(
-        () => _erroMensagem =
-            'Selecione se será coletado ou apenas registrado',
+        () => _erroMensagem = 'Selecione se será coletado ou apenas registrado',
       );
       return;
     }
@@ -173,7 +177,8 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
         setState(() => _erroMensagem = 'Selecione o destino');
         return;
       }
-      final lista = _tipoDestinoSelecionado == TipoDestinoVestigioVeiculo.unidade
+      final lista =
+          _tipoDestinoSelecionado == TipoDestinoVestigioVeiculo.unidade
           ? await _unidadeService.listarUnidades()
           : await _laboratorioService.listarLaboratorios();
       if (lista.isEmpty) {
@@ -198,12 +203,12 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
       String? dataHoraColeta;
       if (_tipoAcaoSelecionado == TipoAcaoVestigioVeiculo.coletado) {
         coletadoPor = nomePerito;
-        dataHoraColeta =
-            DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+        dataHoraColeta = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
       }
 
       final novo = VestigioVeiculoModel(
-        id: widget.vestigioExistente?.id ??
+        id:
+            widget.vestigioExistente?.id ??
             VestigioVeiculoFormScreen.gerarIdVestigio(),
         nome: _nomeCtrl.text.trim().isEmpty ? null : _nomeCtrl.text.trim(),
         descricao: _descricaoCtrl.text.trim(),
@@ -222,7 +227,8 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
 
       if (!mounted) return;
 
-      final continuar = widget.manterNaTelaAposSalvarNovo &&
+      final continuar =
+          widget.manterNaTelaAposSalvarNovo &&
           widget.vestigioExistente == null &&
           widget.onSalvo != null;
 
@@ -244,6 +250,27 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
     }
   }
 
+  Future<void> _abrirExamesComplementares() async {
+    final ficha = await _fichaService.obterFicha(widget.fichaId);
+    if (!mounted) return;
+    if (ficha == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível abrir os exames complementares para esta ficha.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ExamesComplementaresScreen(ficha: ficha),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final existente = widget.vestigioExistente;
@@ -255,9 +282,7 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
         title: Text(
           fluxoContinuo
               ? 'Registrar vestígios no veículo'
-              : (existente == null
-                  ? 'Adicionar vestígio'
-                  : 'Editar vestígio'),
+              : (existente == null ? 'Adicionar vestígio' : 'Editar vestígio'),
         ),
         centerTitle: true,
         actions: [
@@ -429,8 +454,7 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
                   title: const Text('Apenas Registrado'),
                   onTap: () {
                     setState(() {
-                      _tipoAcaoSelecionado =
-                          TipoAcaoVestigioVeiculo.registrado;
+                      _tipoAcaoSelecionado = TipoAcaoVestigioVeiculo.registrado;
                       _tipoDestinoSelecionado = null;
                       _destinoIdSelecionado = null;
                     });
@@ -501,7 +525,8 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
             if (_tipoDestinoSelecionado != null) ...[
               const SizedBox(height: 16),
               FutureBuilder<List<dynamic>>(
-                future: _tipoDestinoSelecionado ==
+                future:
+                    _tipoDestinoSelecionado ==
                         TipoDestinoVestigioVeiculo.unidade
                     ? _unidadeService.listarUnidades()
                     : _laboratorioService.listarLaboratorios(),
@@ -527,11 +552,13 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: opcoes.map((opcao) {
-                      final id = _tipoDestinoSelecionado ==
+                      final id =
+                          _tipoDestinoSelecionado ==
                               TipoDestinoVestigioVeiculo.unidade
                           ? (opcao as UnidadeModel).id
                           : (opcao as LaboratorioModel).id;
-                      final nome = _tipoDestinoSelecionado ==
+                      final nome =
+                          _tipoDestinoSelecionado ==
                               TipoDestinoVestigioVeiculo.unidade
                           ? (opcao as UnidadeModel).nome
                           : (opcao as LaboratorioModel).nome;
@@ -552,6 +579,15 @@ class _VestigioVeiculoFormScreenState extends State<VestigioVeiculoFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Número do lacre (opcional)',
                   border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _abrirExamesComplementares,
+                  icon: const Icon(Icons.science_outlined),
+                  label: const Text('Ir para exames complementares'),
                 ),
               ),
               const SizedBox(height: 12),

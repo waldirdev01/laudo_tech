@@ -120,8 +120,9 @@ class _CrimeTransitoCondicoesScreenState
   }
 
   String? _calcVelocidadeRodovia() {
-    if (_tipoPistaRodoviaCTB == null || _categoriaVeiculoCTB == null)
+    if (_tipoPistaRodoviaCTB == null || _categoriaVeiculoCTB == null) {
       return null;
+    }
     return switch (_categoriaVeiculoCTB!) {
       _CategoriaVeiculoCTB.automoveisMotos =>
         _tipoPistaRodoviaCTB == TipoPistaRodovia.dupla ? '110' : '100',

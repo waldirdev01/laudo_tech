@@ -10,10 +10,13 @@ import '../models/cadaver_model.dart';
 import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/detatlhes_local.dart';
+import '../models/equipe_policial_ficha_model.dart';
 import '../models/equipe_resgate_model.dart';
 import '../models/evidencia_model.dart';
+import '../models/exame_complementar_model.dart';
 import '../models/ficha_base_model.dart';
 import '../models/ficha_completa_model.dart';
+import '../models/laboratorio_model.dart';
 import '../models/membro_equipe_model.dart';
 import '../models/perito_model.dart';
 import '../models/pessoa_envolvida_model.dart';
@@ -662,7 +665,7 @@ class LaudoGeneratorService {
     final textoPolicial = _textoPresencaPolicial(ficha);
     buffer.writeln(
       _gerarParagrafoHistorico(
-        'Quando da chegada da referida equipe, estavam presentes no local: $textoPolicial.',
+        'Quando da chegada da referida equipe, estavam presentes no local $textoPolicial.',
       ),
     );
 
@@ -675,13 +678,16 @@ class LaudoGeneratorService {
       );
     }
 
-    // ── Parágrafo 3: início, duração, liberação e destino do(s) corpo(s) ─────
+    // ── Parágrafo 3: início, duração e liberação ───────────────────────────────
     final horaInicio = _extrairHoraInicio(ficha.dataHoraInicio);
+    final horaTermino = _extrairHoraInicio(ficha.dataHoraTermino);
     final duracaoMin = _calcularDuracaoMinutos(
       ficha.dataHoraInicio,
       ficha.dataHoraTermino,
     );
     final duracaoTexto = duracaoMin != null ? '$duracaoMin' : 'XX';
+    final qtdVeiculos = ficha.veiculos?.length ?? 0;
+    final textoVeiculos = qtdVeiculos == 1 ? 'o veículo' : 'os veículos';
 
     final temCorpo =
         (ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
@@ -691,17 +697,12 @@ class LaudoGeneratorService {
 
     final cidade = perito.cidade.isNotEmpty ? perito.cidade : 'Cidade';
     final qtdCorpos = ficha.cadaveres?.length ?? 0;
-    final textoCorpo = !temCorpo
-        ? ''
-        : qtdCorpos > 1
-        ? ' Os corpos das vítimas fatais foram encaminhados ao necrotério do Instituto de Medicina Legal (IML) de $cidade.'
-        : ' O corpo da vítima fatal foi encaminhado ao necrotério do Instituto de Medicina Legal (IML) de $cidade.';
 
     buffer.writeln(
       _gerarParagrafoHistorico(
         'O levantamento de local teve início às $horaInicio, com duração aproximada de '
-        '$duracaoTexto min., sendo o local e os veículos, posteriormente, liberados '
-        'aos Policiais presentes.$textoCorpo',
+        '$duracaoTexto minutos, sendo o local e $textoVeiculos posteriormente liberados '
+        'aos policiais militares presentes.',
       ),
     );
 
@@ -720,7 +721,30 @@ class LaudoGeneratorService {
     // ── Parágrafo 4: relatos (histórico) ─────────────────────────────────────
     final historico = ficha.dadosFichaBase?.historico ?? '';
     if (historico.isNotEmpty) {
-      buffer.writeln(_gerarParagrafoHistorico('Segundo consta, $historico'));
+      final historicoTrim = historico.trim();
+      final iniciaComSegundo = RegExp(
+        r'^segundo\b',
+        caseSensitive: false,
+      ).hasMatch(historicoTrim);
+      final textoHistorico = iniciaComSegundo
+          ? historicoTrim
+          : 'Segundo o apurado, $historicoTrim';
+      buffer.writeln(_gerarParagrafoHistorico(textoHistorico));
+    }
+
+    // ── Último parágrafo: recolhimento/encaminhamento de corpo(s) ─────────────
+    if (temCorpo) {
+      final textoCorpos = qtdCorpos > 1
+          ? 'os corpos foram recolhidos e encaminhados'
+          : 'o corpo foi recolhido e encaminhado';
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Ao fim dos trabalhos, por volta de $horaTermino, $textoCorpos, em viatura própria, '
+          'ao necrotério do Instituto de Medicina Legal (IML) de $cidade, onde foi realizado '
+          'o Exame Médico-Legal Cadavérico. Os pertences, se existissem, foram deixados sob a '
+          'guarda da auxiliar de autópsia e o local liberado.',
+        ),
+      );
     }
 
     return buffer.toString();
@@ -788,30 +812,103 @@ class LaudoGeneratorService {
     final partes = <String>[];
     for (final equipe in equipes) {
       final isPM = equipe.tipo == TipoEquipePolicial.policiaMilitar;
-      final prefixoViatura = equipe.viaturaNumero?.trim().isNotEmpty == true
-          ? 'viatura ${equipe.viaturaNumero}'
-          : null;
+      final membrosValidos = equipe.membros
+          .where((m) => m.nome.trim().isNotEmpty)
+          .toList();
+      if (membrosValidos.isEmpty) continue;
 
-      final membrosTexto = equipe.membros.map((m) {
+      final membrosTexto = membrosValidos.map((m) {
         final posto = m.postoGraduacao?.trim().isNotEmpty == true
             ? m.postoGraduacao!.trim()
             : null;
-        final cargo = isPM ? posto : (equipe.outrosTipo ?? equipe.tipo.label);
-        final nomeCompleto = cargo != null ? '$cargo ${m.nome}' : m.nome;
+        final nomeComCargo = isPM && posto != null
+            ? '$posto ${m.nome}'
+            : m.nome;
         return _textoMembroComMatricula(
-          nomeCompleto,
+          nomeComCargo.trim(),
           m.matricula,
           usarRg: isPM,
         );
       }).toList();
 
-      final itens = <String>[];
-      if (prefixoViatura != null) itens.add(prefixoViatura);
-      itens.addAll(membrosTexto);
-      partes.add(itens.join(', '));
+      final sujeito = _sujeitoEquipePolicial(equipe, membrosValidos.length);
+      final viatura = equipe.viaturaNumero?.trim();
+      var textoEquipe = '$sujeito ${_juntarItens(membrosTexto)}';
+      if (viatura != null && viatura.isNotEmpty) {
+        final verboTripular = membrosValidos.length > 1
+            ? 'tripulavam'
+            : 'tripulava';
+        textoEquipe = '$textoEquipe, que $verboTripular a viatura $viatura';
+      }
+
+      partes.add(textoEquipe);
     }
 
-    return _juntarItens(partes);
+    if (partes.isEmpty) return 'XX';
+    if (partes.length == 1) return partes.first;
+    if (partes.length == 2) return '${partes[0]}, bem como ${partes[1]}';
+    return '${partes.sublist(0, partes.length - 1).join(', ')}, bem como ${partes.last}';
+  }
+
+  String _sujeitoEquipePolicial(
+    EquipePolicialFichaModel equipe,
+    int qtdMembros,
+  ) {
+    final plural = qtdMembros > 1;
+    switch (equipe.tipo) {
+      case TipoEquipePolicial.policiaMilitar:
+        return plural ? 'os policiais militares' : 'o policial militar';
+      case TipoEquipePolicial.policiaCivil:
+        return plural ? 'os policiais civis' : 'o policial civil';
+      case TipoEquipePolicial.prf:
+        return plural
+            ? 'os policiais rodoviários federais'
+            : 'o policial rodoviário federal';
+      case TipoEquipePolicial.gcm:
+        return plural
+            ? 'os guardas civis municipais'
+            : 'o guarda civil municipal';
+      case TipoEquipePolicial.outros:
+        final tipoOutros = equipe.outrosTipo?.trim();
+        if (tipoOutros != null && tipoOutros.isNotEmpty) {
+          return plural
+              ? 'os agentes de $tipoOutros'
+              : 'o agente de $tipoOutros';
+        }
+        return plural ? 'os policiais' : 'o policial';
+    }
+  }
+
+  String? _fraseIsolamentoComPoliciaisMilitares(FichaCompletaModel ficha) {
+    final equipesPm = ficha.equipesPoliciais
+        ?.where((e) => e.tipo == TipoEquipePolicial.policiaMilitar)
+        .toList();
+    if (equipesPm == null || equipesPm.isEmpty) return null;
+
+    final policiais = <String>[];
+    for (final equipe in equipesPm) {
+      for (final m in equipe.membros) {
+        final nome = m.nome.trim();
+        if (nome.isEmpty) continue;
+        final posto = m.postoGraduacao?.trim();
+        final nomeComCargo = (posto != null && posto.isNotEmpty)
+            ? '$posto $nome'
+            : nome;
+        policiais.add(
+          _textoMembroComMatricula(nomeComCargo, m.matricula, usarRg: true),
+        );
+      }
+    }
+
+    if (policiais.isEmpty) {
+      return 'O local encontrava-se isolado pelos policiais militares presentes, que mantiveram o isolamento e a segurança da equipe durante os levantamentos e o processamento do local.';
+    }
+
+    if (policiais.length == 1) {
+      return 'O local encontrava-se isolado pelo policial militar ${policiais.first}, que manteve o isolamento e a segurança da equipe durante os levantamentos e o processamento do local.';
+    }
+
+    return 'O local encontrava-se isolado pelos policiais militares ${_juntarItens(policiais)}, que mantiveram o isolamento e a segurança da equipe durante os levantamentos e o processamento do local.';
   }
 
   /// Retorna o complemento de "foi recebida ___" com base nas equipes presentes.
@@ -1070,7 +1167,7 @@ class LaudoGeneratorService {
     buffer.writeln(_gerarTituloSecao('2. OBJETIVOS DA PERÍCIA'));
 
     final texto = ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito
-        ? 'Determinar a materialidade de possível Crime de Trânsito, bem como se possível, definir a dinâmica e as circunstâncias do fato sob Investigação, para, tecnicamente, determinar sua causa geradora; e se possível, responder aos quesitos, se apresentados.'
+        ? 'Determinar a materialidade de possível crime de trânsito, bem como, quando possível, definir a dinâmica e as circunstâncias do fato sob investigação, identificar sua causa geradora e responder aos quesitos apresentados.'
         : 'Estabelecer a materialidade dos fatos, buscando os elementos comprobatórios e os meios e/ou instrumentos utilizados na perpetração do ato delituoso e, se possível, os vestígios materiais que contribuam com a elucidação da autoria.';
 
     buffer.writeln(_gerarParagrafoHistorico(texto));
@@ -1100,8 +1197,11 @@ class LaudoGeneratorService {
       );
     } else if (fb?.isolamentoSim == true) {
       final meios = _formatarMeiosIsolamento(fb!);
+      final frasePm = _fraseIsolamentoComPoliciaisMilitares(ficha);
       buffer.writeln(
-        _gerarParagrafoHistorico('O local encontrava-se isolado por $meios.'),
+        _gerarParagrafoHistorico(
+          frasePm ?? 'O local encontrava-se isolado por $meios.',
+        ),
       );
     }
 
@@ -1109,7 +1209,7 @@ class LaudoGeneratorService {
     if (fb?.preservacaoSim == true) {
       buffer.writeln(
         _gerarParagrafoHistorico(
-          'Quanto à Preservação, não foram relatadas e/ou constatadas alterações aparentes no estado geral das coisas que inviabilizasse o correto processamento do local.',
+          'Quanto à Preservação, não foram relatadas e/ou constatadas alterações aparentes no estado geral das coisas que inviabilizassem o correto processamento do local.',
         ),
       );
     } else if (fb?.preservacaoNao == true) {
@@ -2371,7 +2471,7 @@ class LaudoGeneratorService {
           final laboratorio = laboratorios.firstWhere(
             (l) => l.id == v.destinoId,
           );
-          return laboratorio.nome;
+          return _formatarLaboratorioParaLaudoLocal(laboratorio);
         }
       } catch (_) {}
     }
@@ -2382,6 +2482,13 @@ class LaudoGeneratorService {
       return 'Laboratório (não localizado)';
     }
     return 'a unidade ou laboratório cadastrados para o vestígio';
+  }
+
+  String _formatarLaboratorioParaLaudoLocal(LaboratorioModel lab) {
+    final nome = lab.nome.trim();
+    final sigla = lab.sigla?.trim();
+    if (sigla == null || sigla.isEmpty) return nome;
+    return '$nome (${sigla.toUpperCase()})';
   }
 
   Future<String> _resolverNomeDestinoParaLaudoVeiculo(
@@ -2399,7 +2506,7 @@ class LaudoGeneratorService {
           final laboratorio = laboratorios.firstWhere(
             (l) => l.id == v.destinoId,
           );
-          return laboratorio.nome;
+          return _formatarLaboratorioParaLaudoLocal(laboratorio);
         }
       } catch (_) {}
     }
@@ -2473,10 +2580,7 @@ class LaudoGeneratorService {
   }
 
   /// Gera o texto de um vestígio de local (descrição e coordenadas; encaminhamento em parágrafo à parte).
-  String _gerarTextoVestigioLocal(
-    VestigioLocalModel vestigio,
-    int indice,
-  ) {
+  String _gerarTextoVestigioLocal(VestigioLocalModel vestigio, int indice) {
     final letra = _indicePraLetra(indice);
     final partes = <String>[];
 
@@ -2650,10 +2754,7 @@ class LaudoGeneratorService {
   }
 
   /// Gera o texto de um vestígio de veículo (descrição; encaminhamento em parágrafo à parte).
-  String _gerarTextoVestigioVeiculo(
-    VestigioVeiculoModel vestigio,
-    int indice,
-  ) {
+  String _gerarTextoVestigioVeiculo(VestigioVeiculoModel vestigio, int indice) {
     final letra = _indicePraLetra(indice);
     final partes = <String>[];
 
@@ -2669,7 +2770,8 @@ class LaudoGeneratorService {
     }
     String descricao = nucleo;
     if (vestigio.isSangueHumano) {
-      descricao = '${descricao.isNotEmpty ? '$descricao, ' : ''}com indícios '
+      descricao =
+          '${descricao.isNotEmpty ? '$descricao, ' : ''}com indícios '
           'compatíveis com sangue humano';
     }
     final citacaoFotosVeiculo = _formatarCitacaoFotosVestigio(
@@ -2976,15 +3078,6 @@ class LaudoGeneratorService {
       );
     }
 
-    if (cadaver.tatuagensMarcas != null &&
-        cadaver.tatuagensMarcas!.isNotEmpty) {
-      buffer.writeln(
-        _gerarParagrafoHistorico(
-          'Tatuagens/marcas: ${cadaver.tatuagensMarcas}.',
-        ),
-      );
-    }
-
     return buffer.toString();
   }
 
@@ -3257,9 +3350,7 @@ class LaudoGeneratorService {
       buffer.writeln(_gerarParagrafoHistorico(textoDefesa));
     }
 
-    // Exames complementares do cadáver (rigidez, hipóstase, secreções)
-    buffer.writeln(_gerarParagrafoHistorico(''));
-    buffer.writeln(_gerarParagrafoHistoricoNegrito('Exames no Local:'));
+    // Exames do cadáver integrados aos demais vestígios observados no local
 
     // Rigidez Cadavérica
     final rigidez = <String>[];
@@ -3328,6 +3419,27 @@ class LaudoGeneratorService {
       );
     } else {
       buffer.writeln(_gerarParagrafoHistorico('Secreções: Não observadas'));
+    }
+
+    // Tatuagens e marcas corporais (lista nova + fallback texto legado)
+    if (cadaver.tatuagensMarcasLista != null &&
+        cadaver.tatuagensMarcasLista!.isNotEmpty) {
+      for (var i = 0; i < cadaver.tatuagensMarcasLista!.length; i++) {
+        final item = cadaver.tatuagensMarcasLista![i];
+        final desc = item.descricao?.trim();
+        if (desc != null && desc.isNotEmpty) {
+          buffer.writeln(
+            _gerarParagrafoHistorico('Tatuagem/Marca ${i + 1}: $desc'),
+          );
+        }
+      }
+    } else if (cadaver.tatuagensMarcas != null &&
+        cadaver.tatuagensMarcas!.isNotEmpty) {
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Tatuagens/Marcas Corporais: ${cadaver.tatuagensMarcas}',
+        ),
+      );
     }
 
     // Outras observações
@@ -3477,10 +3589,11 @@ class LaudoGeneratorService {
       final sb2 = StringBuffer('Cada pista apresentava');
       if (largura != null) sb2.write(' calibre total de $largura m');
       if (largura != null && numFaixas != null) sb2.write(' e');
-      if (numFaixas != null)
+      if (numFaixas != null) {
         sb2.write(
           ' era composta por $numFaixas faixa${numFaixas == 1 ? '' : 's'} de rolamento',
         );
+      }
       if (numAcostamento != null) {
         sb2.write(
           ' e $numAcostamento faixa${numAcostamento == 1 ? '' : 's'} destinada${numAcostamento == 1 ? '' : 's'} ao acostamento',
@@ -4080,30 +4193,97 @@ class LaudoGeneratorService {
   /// Gera a seção 7. EXAMES COMPLEMENTARES para CVLI
   String _gerarSecaoExamesComplementaresCVLI(FichaCompletaModel ficha) {
     final buffer = StringBuffer();
+    final examesSolicitados =
+        (ficha.examesComplementares ?? const <ExameComplementarModel>[])
+            .where((e) => e.solicitado)
+            .toList();
 
     buffer.writeln(_gerarTituloSecao('7. EXAMES COMPLEMENTARES'));
 
-    // Texto introdutório
     buffer.writeln(
       _gerarParagrafoHistorico(
-        'Este campo destina-se à apresentação dos resultados de Exames solicitados aos '
-        'Laboratórios de Polícia Científica ou realizados pelo próprio Perito Criminal de '
-        'local, como: Balística Forense, Análise de Imagens de Vídeo, entre outros.',
+        'Esta seção apresenta os exames complementares solicitados no '
+        'levantamento pericial.',
       ),
     );
 
-    // Verificar se há exames complementares registrados
-    // Por enquanto, deixar campos para preenchimento manual
-    buffer.writeln(_gerarParagrafoVazio());
-    buffer.writeln(_gerarTituloSubSecao('7.1 Exame Balístico'));
-    buffer.writeln(
-      _gerarParagrafoHistorico(
-        'Aguardando resultado do Laudo de Exame Balístico nº ______.',
-      ),
+    int proximaSubsecao = 1;
+
+    void adicionarSubsecaoExame({
+      required TipoExameComplementar tipo,
+      required String titulo,
+      required String textoNaoSolicitado,
+      bool exibirQuandoNaoSolicitado = true,
+    }) {
+      final itens = examesSolicitados.where((e) => e.tipo == tipo).toList();
+      if (itens.isEmpty && !exibirQuandoNaoSolicitado) {
+        return;
+      }
+
+      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(_gerarTituloSubSecao('7.$proximaSubsecao $titulo'));
+      proximaSubsecao++;
+
+      if (itens.isEmpty) {
+        buffer.writeln(_gerarParagrafoHistorico(textoNaoSolicitado));
+        return;
+      }
+      for (final exame in itens) {
+        buffer.writeln(
+          _gerarParagrafoHistorico(_textoExameComplementarSolicitado(exame)),
+        );
+      }
+    }
+
+    adicionarSubsecaoExame(
+      tipo: TipoExameComplementar.pesquisaDna,
+      titulo: 'Pesquisa por DNA',
+      textoNaoSolicitado: 'Pesquisa por DNA não solicitada até o momento.',
+    );
+    adicionarSubsecaoExame(
+      tipo: TipoExameComplementar.analiseImpressoesPapilares,
+      titulo: 'Análise de Fragmentos de Impressões Papilares',
+      textoNaoSolicitado:
+          'Análise de fragmentos de impressões papilares não solicitada até o momento.',
+    );
+    adicionarSubsecaoExame(
+      tipo: TipoExameComplementar.caracterizacaoObjetos,
+      titulo: 'Caracterização de Objetos',
+      textoNaoSolicitado:
+          'Caracterização de objetos não solicitada até o momento.',
+    );
+    adicionarSubsecaoExame(
+      tipo: TipoExameComplementar.caracterizacaoElementosMunicao,
+      titulo: 'Caracterização de Elementos de Munição',
+      textoNaoSolicitado:
+          'Caracterização de elementos de munição não solicitada até o momento.',
+    );
+    adicionarSubsecaoExame(
+      tipo: TipoExameComplementar.balistico,
+      titulo: 'Exame Balístico',
+      textoNaoSolicitado: '',
+      exibirQuandoNaoSolicitado: false,
     );
 
+    final outros = examesSolicitados
+        .where((e) => e.tipo == TipoExameComplementar.outro)
+        .toList();
+    if (outros.isNotEmpty) {
+      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(
+        _gerarTituloSubSecao('7.$proximaSubsecao Outros Exames Complementares'),
+      );
+      for (final exame in outros) {
+        buffer.writeln(
+          _gerarParagrafoHistorico(_textoExameComplementarSolicitado(exame)),
+        );
+      }
+    }
+
     buffer.writeln(_gerarParagrafoVazio());
-    buffer.writeln(_gerarTituloSubSecao('7.2 Exame Necroscópico'));
+    buffer.writeln(
+      _gerarTituloSubSecao('7.$proximaSubsecao Exame Necroscópico'),
+    );
 
     // Verificar se há número de laudo cadavérico nos cadáveres
     if (ficha.cadaveres != null && ficha.cadaveres!.isNotEmpty) {
@@ -4134,6 +4314,39 @@ class LaudoGeneratorService {
     return buffer.toString();
   }
 
+  String _textoExameComplementarSolicitado(ExameComplementarModel exame) {
+    final nomeExame = exame.nomeExibicao.trim();
+    final destino = _textoDestinoExameComplementar(exame);
+    final observacao = exame.observacao?.trim();
+
+    var texto = 'Foi solicitado $nomeExame';
+    if (destino.isNotEmpty) {
+      texto += ' $destino';
+    }
+    texto += '.';
+
+    if (observacao != null && observacao.isNotEmpty) {
+      texto += ' Observação: $observacao.';
+    }
+
+    return texto;
+  }
+
+  String _textoDestinoExameComplementar(ExameComplementarModel exame) {
+    if (exame.tipoDestino == null) return '';
+    final destinoNome = exame.destinoNome?.trim();
+    if (exame.tipoDestino == TipoDestinoExameComplementar.unidade) {
+      if (destinoNome != null && destinoNome.isNotEmpty) {
+        return 'para análise na Unidade $destinoNome';
+      }
+      return 'para análise na unidade responsável';
+    }
+    if (destinoNome != null && destinoNome.isNotEmpty) {
+      return 'para análise no Laboratório $destinoNome';
+    }
+    return 'para análise em laboratório especializado';
+  }
+
   /// Gera a seção 8. CONSIDERAÇÕES TÉCNICO-PERICIAIS para CVLI
   String _gerarSecaoConsideracoesTecnicoPericiais(FichaCompletaModel ficha) {
     final buffer = StringBuffer();
@@ -4158,16 +4371,11 @@ class LaudoGeneratorService {
 
     buffer.writeln(_gerarParagrafoVazio());
 
-    // Se houver modus operandi/dinâmica detalhada, usar
-    if (ficha.modusOperandi != null && ficha.modusOperandi!.isNotEmpty) {
-      buffer.writeln(_gerarParagrafoHistorico(ficha.modusOperandi!));
-    } else {
-      buffer.writeln(
-        _gerarParagrafoHistorico(
-          '[Inserir análise e interpretação dos vestígios conforme metodologia sugerida]',
-        ),
-      );
-    }
+    buffer.writeln(
+      _gerarParagrafoHistorico(
+        'A interpretação técnica dos vestígios observados foi realizada de forma integrada, considerando a coerência espacial, temporal e material entre os elementos documentados no exame pericial.',
+      ),
+    );
 
     buffer.writeln(_gerarParagrafoVazio());
 

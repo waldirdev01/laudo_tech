@@ -13,7 +13,6 @@ enum TipoOcorrencia {
   static List<TipoOcorrencia> get tiposDisponiveis => [
     furtoDanoExameLocal,
     cvli,
-    morteEsclarecer,
     crimeTransito,
   ];
 }

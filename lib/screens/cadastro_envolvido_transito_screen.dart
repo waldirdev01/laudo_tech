@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
+import '../services/photo_backup_service.dart';
 
 class CadastroEnvolvidoTransitoScreen extends StatefulWidget {
   final CrimeTransitoEnvolvidoModel envolvido;
@@ -66,7 +67,8 @@ class _CadastroEnvolvidoTransitoScreenState
     _vestesObsCtrl.text = envolvido.vestes?.observacoes ?? '';
     _calcadosObsCtrl.text = envolvido.calcados?.observacoes ?? '';
     _pertencesObsCtrl.text = envolvido.pertencesDescricao ?? '';
-    _pertencesEntregueCtrl.text = envolvido.pertencesEntregueIdentificacao ?? '';
+    _pertencesEntregueCtrl.text =
+        envolvido.pertencesEntregueIdentificacao ?? '';
     _observacoesCtrl.text = envolvido.observacoes ?? '';
     _classificacao = envolvido.classificacao;
     _equipamentos.addAll(envolvido.equipamentosSeguranca ?? const []);
@@ -75,12 +77,15 @@ class _CadastroEnvolvidoTransitoScreenState
     _calcadosIntegro = envolvido.calcados?.integro;
     _pertencesEncontrados = envolvido.pertencesEncontrados ?? false;
     _destinoPertences = envolvido.destinoPertences;
-    _fotosVistaAmplaPosicao =
-        List<String>.from(envolvido.fotosVistaAmplaPosicaoEncontrado ?? []);
-    _fotosVistaAmplaCenario =
-        List<String>.from(envolvido.fotosVistaAmplaCenario ?? []);
-    _fotosLesoesPertences =
-        List<String>.from(envolvido.fotosLesoesPertences ?? []);
+    _fotosVistaAmplaPosicao = List<String>.from(
+      envolvido.fotosVistaAmplaPosicaoEncontrado ?? [],
+    );
+    _fotosVistaAmplaCenario = List<String>.from(
+      envolvido.fotosVistaAmplaCenario ?? [],
+    );
+    _fotosLesoesPertences = List<String>.from(
+      envolvido.fotosLesoesPertences ?? [],
+    );
   }
 
   Future<String?> _persistirFoto(XFile foto, String subpasta) async {
@@ -94,6 +99,7 @@ class _CadastroEnvolvidoTransitoScreenState
       final destino = File('${pasta.path}/$nome');
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -291,19 +297,21 @@ class _CadastroEnvolvidoTransitoScreenState
             ),
       calcados:
           (_calcadosIntegro == null && _calcadosObsCtrl.text.trim().isEmpty)
-              ? null
-              : IntegridadeItemModel(
-                  integro: _calcadosIntegro,
-                  observacoes: _calcadosObsCtrl.text.trim().isEmpty
-                      ? null
-                      : _calcadosObsCtrl.text.trim(),
-                ),
+          ? null
+          : IntegridadeItemModel(
+              integro: _calcadosIntegro,
+              observacoes: _calcadosObsCtrl.text.trim().isEmpty
+                  ? null
+                  : _calcadosObsCtrl.text.trim(),
+            ),
       pertencesEncontrados: _pertencesEncontrados,
-      pertencesDescricao: (_pertencesEncontrados && _pertencesObsCtrl.text.trim().isNotEmpty)
+      pertencesDescricao:
+          (_pertencesEncontrados && _pertencesObsCtrl.text.trim().isNotEmpty)
           ? _pertencesObsCtrl.text.trim()
           : null,
       destinoPertences: _pertencesEncontrados ? _destinoPertences : null,
-      pertencesEntregueIdentificacao: (_pertencesEncontrados &&
+      pertencesEntregueIdentificacao:
+          (_pertencesEncontrados &&
               _destinoPertences == DestinoPertences.entregueAPessoa &&
               _pertencesEntregueCtrl.text.trim().isNotEmpty)
           ? _pertencesEntregueCtrl.text.trim()
@@ -333,15 +341,13 @@ class _CadastroEnvolvidoTransitoScreenState
       children: CrimeTransitoEquipamentoSeguranca.values
           .map(
             (equip) => FilterChip(
-              label: Text(
-                switch (equip) {
-                  CrimeTransitoEquipamentoSeguranca.cinto => 'Cinto',
-                  CrimeTransitoEquipamentoSeguranca.capacete => 'Capacete',
-                  CrimeTransitoEquipamentoSeguranca.nenhum => 'Nenhum',
-                  CrimeTransitoEquipamentoSeguranca.naoSeAplica =>
-                    'Não se aplica',
-                },
-              ),
+              label: Text(switch (equip) {
+                CrimeTransitoEquipamentoSeguranca.cinto => 'Cinto',
+                CrimeTransitoEquipamentoSeguranca.capacete => 'Capacete',
+                CrimeTransitoEquipamentoSeguranca.nenhum => 'Nenhum',
+                CrimeTransitoEquipamentoSeguranca.naoSeAplica =>
+                  'Não se aplica',
+              }),
               selected: _equipamentos.contains(equip),
               onSelected: (_) => _alternarEquipamento(equip),
             ),
@@ -386,12 +392,7 @@ class _CadastroEnvolvidoTransitoScreenState
       appBar: AppBar(
         title: const Text('Envolvido'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _salvar,
-          ),
-        ],
+        actions: [IconButton(icon: const Icon(Icons.save), onPressed: _salvar)],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -402,9 +403,9 @@ class _CadastroEnvolvidoTransitoScreenState
             children: [
               Text(
                 'Fotografias',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               _buildGrupoFotos(
@@ -428,9 +429,9 @@ class _CadastroEnvolvidoTransitoScreenState
               const SizedBox(height: 20),
               Text(
                 'Dados do envolvido',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -448,16 +449,18 @@ class _CadastroEnvolvidoTransitoScreenState
                   Expanded(
                     child: TextFormField(
                       controller: _cnhValidadeCtrl,
-                      decoration:
-                          const InputDecoration(labelText: 'Validade CNH'),
+                      decoration: const InputDecoration(
+                        labelText: 'Validade CNH',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
                       controller: _cnhCategoriaCtrl,
-                      decoration:
-                          const InputDecoration(labelText: 'Categoria CNH'),
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria CNH',
+                      ),
                     ),
                   ),
                 ],
@@ -470,8 +473,9 @@ class _CadastroEnvolvidoTransitoScreenState
               const SizedBox(height: 16),
               TextFormField(
                 controller: _dataNascimentoCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Data de nascimento'),
+                decoration: const InputDecoration(
+                  labelText: 'Data de nascimento',
+                ),
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<CrimeTransitoClassificacaoEnvolvido>(
@@ -481,24 +485,24 @@ class _CadastroEnvolvidoTransitoScreenState
                     .map(
                       (valor) => DropdownMenuItem(
                         value: valor,
-                        child: Text(
-                          switch (valor) {
-                            CrimeTransitoClassificacaoEnvolvido.condutor =>
-                              'Condutor',
-                            CrimeTransitoClassificacaoEnvolvido.passageiro =>
-                              'Passageiro',
-                            CrimeTransitoClassificacaoEnvolvido.pedestre =>
-                              'Pedestre',
-                          },
-                        ),
+                        child: Text(switch (valor) {
+                          CrimeTransitoClassificacaoEnvolvido.condutor =>
+                            'Condutor',
+                          CrimeTransitoClassificacaoEnvolvido.passageiro =>
+                            'Passageiro',
+                          CrimeTransitoClassificacaoEnvolvido.pedestre =>
+                            'Pedestre',
+                        }),
                       ),
                     )
                     .toList(),
                 onChanged: (valor) => setState(() => _classificacao = valor),
               ),
               const SizedBox(height: 12),
-              Text('Equipamentos de segurança',
-                  style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                'Equipamentos de segurança',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               _buildEquipamentos(),
               const SizedBox(height: 20),
               RadioGroup<CrimeTransitoSituacaoEnvolvido>(
@@ -509,17 +513,15 @@ class _CadastroEnvolvidoTransitoScreenState
                       .map(
                         (valor) =>
                             RadioListTile<CrimeTransitoSituacaoEnvolvido>(
-                          title: Text(
-                            switch (valor) {
-                              CrimeTransitoSituacaoEnvolvido.semFerimentos =>
-                                'Sem ferimentos',
-                              CrimeTransitoSituacaoEnvolvido.feridoGrave =>
-                                'Ferido grave (hospital)',
-                              CrimeTransitoSituacaoEnvolvido.obito => 'Óbito',
-                            },
-                          ),
-                          value: valor,
-                        ),
+                              title: Text(switch (valor) {
+                                CrimeTransitoSituacaoEnvolvido.semFerimentos =>
+                                  'Sem ferimentos',
+                                CrimeTransitoSituacaoEnvolvido.feridoGrave =>
+                                  'Ferido grave (hospital)',
+                                CrimeTransitoSituacaoEnvolvido.obito => 'Óbito',
+                              }),
+                              value: valor,
+                            ),
                       )
                       .toList(),
                 ),
@@ -531,18 +533,15 @@ class _CadastroEnvolvidoTransitoScreenState
                 child: Column(
                   children: CrimeTransitoPosicaoEnvolvido.values
                       .map(
-                        (valor) =>
-                            RadioListTile<CrimeTransitoPosicaoEnvolvido>(
-                          title: Text(
-                            switch (valor) {
-                              CrimeTransitoPosicaoEnvolvido.interiorVeiculo =>
-                                'No interior do veículo',
-                              CrimeTransitoPosicaoEnvolvido.leitoVia =>
-                                'No leito da via',
-                              CrimeTransitoPosicaoEnvolvido.exteriorPista =>
-                                'Exterior à pista',
-                            },
-                          ),
+                        (valor) => RadioListTile<CrimeTransitoPosicaoEnvolvido>(
+                          title: Text(switch (valor) {
+                            CrimeTransitoPosicaoEnvolvido.interiorVeiculo =>
+                              'No interior do veículo',
+                            CrimeTransitoPosicaoEnvolvido.leitoVia =>
+                              'No leito da via',
+                            CrimeTransitoPosicaoEnvolvido.exteriorPista =>
+                              'Exterior à pista',
+                          }),
                           value: valor,
                         ),
                       )
@@ -591,8 +590,10 @@ class _CadastroEnvolvidoTransitoScreenState
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('Destino dos pertences',
-                    style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  'Destino dos pertences',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
                 RadioGroup<DestinoPertences>(
                   groupValue: _destinoPertences,
                   onChanged: (v) => setState(() => _destinoPertences = v),
@@ -625,8 +626,9 @@ class _CadastroEnvolvidoTransitoScreenState
               TextField(
                 controller: _observacoesCtrl,
                 maxLines: 3,
-                decoration:
-                    const InputDecoration(labelText: 'Observações gerais'),
+                decoration: const InputDecoration(
+                  labelText: 'Observações gerais',
+                ),
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -642,7 +644,7 @@ class _CadastroEnvolvidoTransitoScreenState
                       : const Icon(Icons.save),
                   label: Text(_salvando ? 'Salvando...' : 'Salvar envolvido'),
                 ),
-              )
+              ),
             ],
           ),
         ),

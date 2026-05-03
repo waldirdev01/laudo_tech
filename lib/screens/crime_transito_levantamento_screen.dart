@@ -11,6 +11,7 @@ import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
+import '../services/photo_backup_service.dart';
 import 'lista_veiculos_screen.dart';
 
 class CrimeTransitoLevantamentoScreen extends StatefulWidget {
@@ -287,6 +288,7 @@ class _CrimeTransitoLevantamentoScreenState
       // (galeria no Android moderno), ao contrário de File.copy().
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -815,13 +817,15 @@ class _CrimeTransitoLevantamentoScreenState
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: _tipoOcorrenciaDerivado ==
+                            color:
+                                _tipoOcorrenciaDerivado ==
                                     CrimeTransitoNaturezaTipo.composta
                                 ? Colors.orange.shade100
                                 : Colors.green.shade100,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: _tipoOcorrenciaDerivado ==
+                              color:
+                                  _tipoOcorrenciaDerivado ==
                                       CrimeTransitoNaturezaTipo.composta
                                   ? Colors.orange.shade400
                                   : Colors.green.shade400,
@@ -834,7 +838,8 @@ class _CrimeTransitoLevantamentoScreenState
                                 : 'Simples',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _tipoOcorrenciaDerivado ==
+                              color:
+                                  _tipoOcorrenciaDerivado ==
                                       CrimeTransitoNaturezaTipo.composta
                                   ? Colors.orange.shade800
                                   : Colors.green.shade800,
@@ -1259,6 +1264,7 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
       final destino = File('${pasta.path}/$nome');
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
+      await PhotoBackupService.saveToGallery(destino.path);
       return destino.path;
     } catch (_) {
       return null;

@@ -2834,7 +2834,17 @@ $conteudo
       }
 
       // Tatuagens e marcas corporais
-      if (cadaver.tatuagensMarcas != null &&
+      if (cadaver.tatuagensMarcasLista != null &&
+          cadaver.tatuagensMarcasLista!.isNotEmpty) {
+        final descricoes = cadaver.tatuagensMarcasLista!
+            .map((t) => t.descricao?.trim())
+            .whereType<String>()
+            .where((d) => d.isNotEmpty)
+            .toList();
+        if (descricoes.isNotEmpty) {
+          linhas.add(['Tatuagens e Marcas Corporais', descricoes.join('\n')]);
+        }
+      } else if (cadaver.tatuagensMarcas != null &&
           cadaver.tatuagensMarcas!.isNotEmpty) {
         linhas.add(['Tatuagens e Marcas Corporais', cadaver.tatuagensMarcas!]);
       }

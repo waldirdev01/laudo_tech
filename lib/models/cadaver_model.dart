@@ -130,6 +130,48 @@ enum EstadoHipostase {
   const EstadoHipostase(this.label);
 }
 
+/// Modelo para tatuagem/marca corporal no cadáver
+class TatuagemMarcaCorporalModel {
+  final String? id;
+  final String? descricao;
+  final List<String> fotosPaths;
+
+  TatuagemMarcaCorporalModel({
+    this.id,
+    this.descricao,
+    this.fotosPaths = const [],
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'descricao': descricao,
+    'fotosPaths': fotosPaths,
+  };
+
+  factory TatuagemMarcaCorporalModel.fromJson(Map<String, dynamic> json) =>
+      TatuagemMarcaCorporalModel(
+        id: json['id'] as String?,
+        descricao: json['descricao'] as String?,
+        fotosPaths:
+            (json['fotosPaths'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+      );
+
+  TatuagemMarcaCorporalModel copyWith({
+    String? id,
+    String? descricao,
+    List<String>? fotosPaths,
+  }) {
+    return TatuagemMarcaCorporalModel(
+      id: id ?? this.id,
+      descricao: descricao ?? this.descricao,
+      fotosPaths: fotosPaths ?? this.fotosPaths,
+    );
+  }
+}
+
 /// Modelo para uma veste do cadáver
 class VesteCadaverModel {
   final String? id;
@@ -662,6 +704,7 @@ class CadaverModel {
 
   // Tatuagens e marcas corporais
   final String? tatuagensMarcas;
+  final List<TatuagemMarcaCorporalModel>? tatuagensMarcasLista;
 
   // Pertences encontrados com o cadáver
   final String? pertences;
@@ -729,6 +772,7 @@ class CadaverModel {
     this.numerosFotosLesoesDefesa,
     this.vestes,
     this.tatuagensMarcas,
+    this.tatuagensMarcasLista,
     this.pertences,
   });
 
@@ -795,6 +839,9 @@ class CadaverModel {
     'numerosFotosLesoesDefesa': numerosFotosLesoesDefesa,
     'vestes': vestes?.map((v) => v.toJson()).toList(),
     'tatuagensMarcas': tatuagensMarcas,
+    'tatuagensMarcasLista': tatuagensMarcasLista
+        ?.map((t) => t.toJson())
+        .toList(),
     'pertences': pertences,
   };
 
@@ -964,6 +1011,12 @@ class CadaverModel {
           ?.map((v) => VesteCadaverModel.fromJson(v as Map<String, dynamic>))
           .toList(),
       tatuagensMarcas: json['tatuagensMarcas'] as String?,
+      tatuagensMarcasLista: (json['tatuagensMarcasLista'] as List<dynamic>?)
+          ?.map(
+            (t) =>
+                TatuagemMarcaCorporalModel.fromJson(t as Map<String, dynamic>),
+          )
+          .toList(),
       pertences: json['pertences'] as String?,
     );
   }
@@ -1031,6 +1084,7 @@ class CadaverModel {
     List<int>? numerosFotosLesoesDefesa,
     List<VesteCadaverModel>? vestes,
     String? tatuagensMarcas,
+    List<TatuagemMarcaCorporalModel>? tatuagensMarcasLista,
     String? pertences,
   }) {
     return CadaverModel(
@@ -1108,6 +1162,8 @@ class CadaverModel {
           numerosFotosLesoesDefesa ?? this.numerosFotosLesoesDefesa,
       vestes: vestes ?? this.vestes,
       tatuagensMarcas: tatuagensMarcas ?? this.tatuagensMarcas,
+      tatuagensMarcasLista:
+          tatuagensMarcasLista ?? this.tatuagensMarcasLista,
       pertences: pertences ?? this.pertences,
     );
   }
