@@ -101,7 +101,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   // Descrição assistida – Imediato
   String? _abrangenciaImediato;
   final Set<String> _ambientesImediato = {};
-  final Set<String> _acessosImediato = {};
+  final Map<String, Set<String>> _acessosPorAmbienteImediato = {};
+  String? _ambienteAcessoSelecionado;
   String? _estadoConservacaoImediato;
   final _observacaoImediatoController = TextEditingController();
 
@@ -170,11 +171,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   ];
   static const _opcoesTiposAcessoMediato = [
     'portão metálico',
-    'portão social embutido no portão maior',
-    'portão basculante',
-    'portão deslizante sob trilho',
-    'porta social',
-    'garagem',
+    'portão metálico com social embutido',
+    'portão metálico do tipo basculante',
+    'portão metálico do tipo deslizante sobre trilho',
+    'portão de madeira',
+    'cancela',
+    'sem portão (cerca de arame)',
   ];
   static const _opcoesPosicoesAcessoMediato = [
     'frontal',
@@ -189,8 +191,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     'janela',
     'corredor interno',
     'escada interna',
-    'varanda',
-    'área de serviço',
+    'acesso livre (sem porta interna)',
   ];
 
   // Vestígios por local
@@ -1079,10 +1080,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       partes.add(frase);
     }
 
-    if (_acessosImediato.isNotEmpty) {
-      partes.add(
-        'O acesso ao(s) ambiente(s) imediato(s) se dava por ${_listarItens(_acessosImediato.toList())}.',
-      );
+    final descricaoAcessos = _gerarDescricaoAcessosInternosImediato();
+    if (descricaoAcessos.isNotEmpty) {
+      partes.add(descricaoAcessos);
     }
 
     final obsImediato = _observacaoImediatoController.text.trim();
@@ -1091,6 +1091,34 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     }
 
     return partes.join(' ');
+  }
+
+  String _gerarDescricaoAcessosInternosImediato() {
+    final descricoes = <String>[];
+    for (final ambiente in _ambientesImediato) {
+      final acessos = _acessosPorAmbienteImediato[ambiente];
+      if (acessos == null || acessos.isEmpty) continue;
+      descricoes.add(
+        'no ambiente ${_capitalize(ambiente)} havia ${_listarItens(acessos.toList())}',
+      );
+    }
+    if (descricoes.isEmpty) return '';
+    return 'Quanto aos acessos internos, ${_listarItens(descricoes)}.';
+  }
+
+  void _sincronizarAcessosPorAmbienteImediato() {
+    _acessosPorAmbienteImediato.removeWhere(
+      (ambiente, _) => !_ambientesImediato.contains(ambiente),
+    );
+    for (final ambiente in _ambientesImediato) {
+      _acessosPorAmbienteImediato.putIfAbsent(ambiente, () => <String>{});
+    }
+    if (_ambienteAcessoSelecionado != null &&
+        !_ambientesImediato.contains(_ambienteAcessoSelecionado)) {
+      _ambienteAcessoSelecionado = null;
+    }
+    _ambienteAcessoSelecionado ??=
+        _ambientesImediato.isEmpty ? null : _ambientesImediato.first;
   }
 
   String _gerarDescricaoViasAcessoMediato() {
@@ -1102,17 +1130,42 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
 
     final partes = <String>[];
     if (qtd != null) {
-      partes.add('$qtd acesso${qtd == 1 ? '' : 's'}');
+      final qtdFormatada = qtd.toString().padLeft(2, '0');
+      final qtdExtenso = _numeroPorExtenso(qtd);
+      if (tipos.isEmpty) {
+        partes.add(
+          '$qtdFormatada ($qtdExtenso) portão${qtd == 1 ? '' : 'ões'}',
+        );
+      } else if (tipos.length == 1) {
+        partes.add('$qtdFormatada ($qtdExtenso) ${tipos.first}');
+      } else {
+        partes.add(
+          '$qtdFormatada ($qtdExtenso) portões, sendo ${_listarItens(tipos)}',
+        );
+      }
     } else {
-      partes.add('acesso(s)');
-    }
-    if (tipos.isNotEmpty) {
-      partes.add('por ${_listarItens(tipos)}');
+      partes.add(tipos.isNotEmpty ? _listarItens(tipos) : 'portão(ões)');
     }
     if (posicoes.isNotEmpty) {
       partes.add('nas posições ${_listarItens(posicoes)}');
     }
     return partes.join(' ');
+  }
+
+  String _numeroPorExtenso(int numero) {
+    const mapa = {
+      1: 'um',
+      2: 'dois',
+      3: 'três',
+      4: 'quatro',
+      5: 'cinco',
+      6: 'seis',
+      7: 'sete',
+      8: 'oito',
+      9: 'nove',
+      10: 'dez',
+    };
+    return mapa[numero] ?? numero.toString();
   }
 
   String _listarItens(List<String> itens) {
@@ -1273,7 +1326,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             isDense: true,
           ),
           items: const [1, 2, 3, 4]
-              .map((n) => DropdownMenuItem(value: n, child: Text('$n')))
+              .map(
+                (n) => DropdownMenuItem(
+                  value: n,
+                  child: Text(n.toString().padLeft(2, '0')),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() {
             _quantidadeAcessosMediato = v;
@@ -1346,7 +1404,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Exemplo comum: portão metálico com portão social, basculante ou deslizante sob trilho.',
+          'Exemplo comum: 02 (dois) portões, sendo portão metálico do tipo basculante e portão metálico do tipo deslizante sobre trilho.',
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 16),
@@ -1391,6 +1449,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                 ..clear()
                 ..add(primeiro);
             }
+            _sincronizarAcessosPorAmbienteImediato();
             _atualizarTextoImediato();
           }),
         ),
@@ -1415,6 +1474,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                         ..clear()
                         ..add(op);
                     }
+                    _sincronizarAcessosPorAmbienteImediato();
                     _atualizarTextoImediato();
                   }),
                 ),
@@ -1441,26 +1501,84 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           }),
         ),
         const SizedBox(height: 12),
-        const Text('Acessos internos ao(s) ambiente(s)'),
+        const Text('Acessos internos por ambiente'),
         const SizedBox(height: 4),
-        Wrap(
-          spacing: 6,
-          runSpacing: 0,
-          children: _opcoesAcessosInternos
-              .map(
-                (op) => FilterChip(
-                  label: Text(_capitalize(op)),
-                  selected: _acessosImediato.contains(op),
-                  onSelected: (_) => setState(() {
-                    _acessosImediato.contains(op)
-                        ? _acessosImediato.remove(op)
-                        : _acessosImediato.add(op);
-                    _atualizarTextoImediato();
-                  }),
-                ),
+        if (_ambientesImediato.isEmpty)
+          Text(
+            'Selecione pelo menos um ambiente para informar os acessos internos.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          )
+        else ...[
+          Text(
+            'Ambiente selecionado',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 0,
+            children: _ambientesImediato
+                .map(
+                  (ambiente) => ChoiceChip(
+                    label: Text(_capitalize(ambiente)),
+                    selected: _ambienteAcessoSelecionado == ambiente,
+                    onSelected: (_) => setState(() {
+                      _ambienteAcessoSelecionado = ambiente;
+                    }),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 0,
+            children: _opcoesAcessosInternos
+                .map(
+                  (op) => FilterChip(
+                    label: Text(_capitalize(op)),
+                    selected:
+                        _ambienteAcessoSelecionado != null &&
+                        (_acessosPorAmbienteImediato[_ambienteAcessoSelecionado!]
+                                ?.contains(op) ??
+                            false),
+                    onSelected: _ambienteAcessoSelecionado == null
+                        ? null
+                        : (_) => setState(() {
+                            final ambiente = _ambienteAcessoSelecionado!;
+                            final acessos =
+                                _acessosPorAmbienteImediato.putIfAbsent(
+                                  ambiente,
+                                  () => <String>{},
+                                );
+                            if (acessos.contains(op)) {
+                              acessos.remove(op);
+                            } else {
+                              acessos.add(op);
+                            }
+                            _atualizarTextoImediato();
+                          }),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          ..._ambientesImediato
+              .where(
+                (ambiente) =>
+                    (_acessosPorAmbienteImediato[ambiente] ?? const <String>{})
+                        .isNotEmpty,
               )
-              .toList(),
-        ),
+              .map(
+                (ambiente) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    '• ${_capitalize(ambiente)}: ${_listarItens((_acessosPorAmbienteImediato[ambiente] ?? const <String>{}).toList())}.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ),
+              ),
+        ],
         const SizedBox(height: 12),
         TextFormField(
           controller: _observacaoImediatoController,
@@ -2390,7 +2508,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Descreva os Locais Mediato, Imediato e Relacionado do geral para o particular. Registre aqui vestígios observados durante a descrição física de cada área. Os quesitos periciais obrigatórios (EV01–EV07) e a coleta de materiais são preenchidos na próxima tela.',
+                          'Descreva os Locais Mediato, Imediato e Relacionado do geral para o particular. Registre aqui vestígios observados durante a descrição física de cada área.',
                           style: TextStyle(
                             fontSize: 12,
                             color: Theme.of(

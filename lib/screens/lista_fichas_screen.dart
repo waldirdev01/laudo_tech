@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -14,6 +13,7 @@ import '../models/tipo_ocorrencia.dart';
 import '../models/veiculo_model.dart';
 import '../models/vestigio_local_model.dart';
 import '../services/ficha_service.dart';
+import '../services/file_open_service.dart';
 import '../services/laudo_generator_service.dart';
 import '../services/perito_service.dart';
 import '../services/photo_backup_service.dart';
@@ -406,7 +406,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         if (resolved != null) {
           orderedPaths.add(resolved);
           pathMap[p] = resolved;
-          final isImediato = (lf?.fotosVistaAmplaImediatoPaths ?? []).contains(p);
+          final isImediato = (lf?.fotosVistaAmplaImediatoPaths ?? []).contains(
+            p,
+          );
           pathToLegenda[resolved] = isImediato
               ? 'Vista ampla do local imediato.'
               : 'Vista ampla do local mediato.';
@@ -692,25 +694,6 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         }
       }
 
-      // Fallback de recuperação: inclui imagens órfãs encontradas no diretório físico
-      // da ficha (quando os metadados de caminhos foram perdidos/parciais).
-      int fotosRecuperadasFisicas = 0;
-      final setOrdered = orderedPaths.toSet();
-      final fotosFisicas = await _listarFotosFisicasDaFicha(
-        fichaAtual.id,
-        dataReferencia: fichaAtual.dataCriacao,
-        incluirTemporarias:
-            fichaAtual.dadosSolicitacao.raiNumero?.trim().isEmpty ?? true,
-      );
-      for (final p in fotosFisicas) {
-        final resolved = await _resolverPath(p, basePath);
-        if (resolved == null || setOrdered.contains(resolved)) continue;
-        orderedPaths.add(resolved);
-        setOrdered.add(resolved);
-        pathToLegenda[resolved] = 'Foto recuperada do armazenamento local.';
-        fotosRecuperadasFisicas++;
-      }
-
       if (orderedPaths.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -731,11 +714,6 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       detalhes.writeln('Vestígios: $totalVestigios (fotos: $vestigioFotosOk)');
       if (vestigiosSemFoto > 0) {
         detalhes.writeln('(!) $vestigiosSemFoto vestígio(s) sem foto');
-      }
-      if (fotosRecuperadasFisicas > 0) {
-        detalhes.writeln(
-          'Recuperadas do armazenamento: $fotosRecuperadasFisicas foto(s)',
-        );
       }
       if ((fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
               fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) &&
@@ -972,9 +950,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
 
   /// Tenta abrir o arquivo; se falhar, oferece compartilhar
   Future<void> _abrirOuCompartilharArquivo(File arquivo, String tipo) async {
-    final result = await OpenFilex.open(arquivo.path);
+    final opened = await FileOpenService.open(arquivo.path);
 
-    if (result.type == ResultType.done) {
+    if (opened) {
       // Abriu com sucesso
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1018,11 +996,38 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       );
 
       if (acao == 'compartilhar' && mounted) {
-        await Share.shareXFiles([
-          XFile(arquivo.path),
-        ], text: '$tipo - Laudo Tech');
+        final origemCompartilhamento = _obterSharePositionOrigin();
+        await Share.shareXFiles(
+          [XFile(arquivo.path)],
+          text: '$tipo - Laudo Tech',
+          sharePositionOrigin: origemCompartilhamento,
+        );
       }
     }
+  }
+
+  Rect _obterSharePositionOrigin() {
+    final overlayBox =
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+    if (overlayBox != null &&
+        overlayBox.hasSize &&
+        overlayBox.size.width > 0 &&
+        overlayBox.size.height > 0) {
+      return Offset.zero & overlayBox.size;
+    }
+
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery != null &&
+        mediaQuery.size.width > 0 &&
+        mediaQuery.size.height > 0) {
+      return Rect.fromCenter(
+        center: mediaQuery.size.center(Offset.zero),
+        width: 1,
+        height: 1,
+      );
+    }
+
+    return const Rect.fromLTWH(1, 1, 1, 1);
   }
 
   // Mantido para eventual uso em outros fluxos (ex.: adicionar fotos em outros tipos de ocorrência).
@@ -1101,52 +1106,6 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       }
     }
     return null;
-  }
-
-  Future<List<String>> _listarFotosFisicasDaFicha(
-    String fichaId, {
-    DateTime? dataReferencia,
-    bool incluirTemporarias = false,
-  }) async {
-    final docs = await getApplicationDocumentsDirectory();
-    final pastas = [
-      Directory('${docs.path}/levantamento_fotografico/$fichaId'),
-      Directory('${docs.path}/levantamento_transito/$fichaId'),
-    ];
-    final extensoes = {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'};
-    final paths = <String>[];
-    for (final pasta in pastas) {
-      if (!await pasta.exists()) continue;
-      await for (final e in pasta.list(recursive: true, followLinks: false)) {
-        if (e is! File) continue;
-        final p = e.path.toLowerCase();
-        if (extensoes.any(p.endsWith)) {
-          paths.add(e.path);
-        }
-      }
-    }
-    if (incluirTemporarias && dataReferencia != null) {
-      final temporarias = Directory('${docs.path}/picked_images');
-      if (await temporarias.exists()) {
-        final inicio = dataReferencia.subtract(const Duration(hours: 6));
-        final fim = dataReferencia.add(const Duration(hours: 18));
-        await for (final e in temporarias.list(
-          recursive: false,
-          followLinks: false,
-        )) {
-          if (e is! File) continue;
-          final p = e.path.toLowerCase();
-          if (!extensoes.any(p.endsWith)) continue;
-          final stat = await e.stat();
-          if (stat.modified.isBefore(inicio) || stat.modified.isAfter(fim)) {
-            continue;
-          }
-          paths.add(e.path);
-        }
-      }
-    }
-    paths.sort();
-    return paths;
   }
 
   Future<List<String>?> _gerenciarFotosLevantamento(

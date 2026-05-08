@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/exame_complementar_model.dart';
 import '../models/ficha_completa_model.dart';
-import '../models/laboratorio_model.dart';
-import '../models/unidade_model.dart';
 import '../models/vestigio_local_model.dart';
 import '../models/vestigio_veiculo_model.dart';
 import '../services/ficha_service.dart';
-import '../services/laboratorio_service.dart';
-import '../services/unidade_service.dart';
 
 class ExamesComplementaresScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -23,13 +19,9 @@ class ExamesComplementaresScreen extends StatefulWidget {
 class _ExamesComplementaresScreenState
     extends State<ExamesComplementaresScreen> {
   final _fichaService = FichaService();
-  final _unidadeService = UnidadeService();
-  final _laboratorioService = LaboratorioService();
 
   late FichaCompletaModel _ficha;
   final List<ExameComplementarModel> _exames = [];
-  List<UnidadeModel> _unidades = const [];
-  List<LaboratorioModel> _laboratorios = const [];
   bool _carregando = true;
   bool _salvando = false;
 
@@ -41,10 +33,6 @@ class _ExamesComplementaresScreenState
   }
 
   Future<void> _inicializar() async {
-    final unidades = await _unidadeService.listarUnidades();
-    final laboratorios = await _laboratorioService.listarLaboratorios();
-    _unidades = unidades;
-    _laboratorios = laboratorios;
     _montarExamesIniciais();
     if (!mounted) return;
     setState(() => _carregando = false);
@@ -69,10 +57,13 @@ class _ExamesComplementaresScreenState
       required bool solicitadoPadrao,
       String? observacaoPadrao,
     }) {
-      final existente = _firstWhereOrNull<ExameComplementarModel>(
-        examesAtuais,
-        (e) => e.tipo == tipo,
-      );
+      ExameComplementarModel? existente;
+      for (final e in examesAtuais) {
+        if (e.tipo == tipo) {
+          existente = e;
+          break;
+        }
+      }
       if (existente != null) {
         if (tipo == TipoExameComplementar.necroscopico &&
             existente.solicitado == false) {
@@ -213,42 +204,15 @@ class _ExamesComplementaresScreenState
     });
   }
 
-  String _rotuloDestino(ExameComplementarModel exame) {
-    if (exame.destinoNome != null && exame.destinoNome!.trim().isNotEmpty) {
-      return exame.destinoNome!.trim();
-    }
-    if (exame.destinoId == null || exame.tipoDestino == null) return '';
-    if (exame.tipoDestino == TipoDestinoExameComplementar.unidade) {
-      final unidade = _firstWhereOrNull<UnidadeModel>(
-        _unidades,
-        (u) => u.id == exame.destinoId,
-      );
-      return unidade?.nome ?? '';
-    }
-    final laboratorio = _firstWhereOrNull<LaboratorioModel>(
-      _laboratorios,
-      (l) => l.id == exame.destinoId,
-    );
-    return laboratorio?.nome ?? '';
-  }
-
   Future<void> _adicionarOutroExame() async {
     final nomeCtrl = TextEditingController();
     final obsCtrl = TextEditingController();
-    TipoDestinoExameComplementar? tipoDestino;
-    String? destinoId;
-    String? destinoNome;
 
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final opcoesDestino = tipoDestino == null
-                ? const <dynamic>[]
-                : (tipoDestino == TipoDestinoExameComplementar.unidade
-                      ? _unidades
-                      : _laboratorios);
             return AlertDialog(
               title: const Text('Novo exame complementar'),
               content: SingleChildScrollView(
@@ -261,80 +225,6 @@ class _ExamesComplementaresScreenState
                         labelText: 'Nome do exame *',
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<TipoDestinoExameComplementar>(
-                      // ignore: deprecated_member_use
-                      value: tipoDestino,
-                      decoration: const InputDecoration(
-                        labelText: 'Destino (opcional)',
-                      ),
-                      items: [
-                        const DropdownMenuItem<TipoDestinoExameComplementar>(
-                          value: TipoDestinoExameComplementar.unidade,
-                          child: Text('Unidade'),
-                        ),
-                        const DropdownMenuItem<TipoDestinoExameComplementar>(
-                          value: TipoDestinoExameComplementar.laboratorio,
-                          child: Text('Laboratório'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setModalState(() {
-                          tipoDestino = value;
-                          destinoId = null;
-                          destinoNome = null;
-                        });
-                      },
-                    ),
-                    if (tipoDestino != null && opcoesDestino.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        // ignore: deprecated_member_use
-                        value: destinoId,
-                        decoration: const InputDecoration(
-                          labelText: 'Selecionar destino',
-                        ),
-                        items: opcoesDestino.map<DropdownMenuItem<String>>((o) {
-                          final String id;
-                          final String nome;
-                          if (tipoDestino ==
-                              TipoDestinoExameComplementar.unidade) {
-                            final unidade = o as UnidadeModel;
-                            id = unidade.id;
-                            nome = unidade.nome;
-                          } else {
-                            final laboratorio = o as LaboratorioModel;
-                            id = laboratorio.id;
-                            nome = laboratorio.nome;
-                          }
-                          return DropdownMenuItem<String>(
-                            value: id,
-                            child: Text(nome),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setModalState(() {
-                            destinoId = value;
-                            if (value == null) {
-                              destinoNome = null;
-                              return;
-                            }
-                            if (tipoDestino ==
-                                TipoDestinoExameComplementar.unidade) {
-                              destinoNome = _firstWhereOrNull<UnidadeModel>(
-                                _unidades,
-                                (u) => u.id == value,
-                              )?.nome;
-                            } else {
-                              destinoNome = _firstWhereOrNull<LaboratorioModel>(
-                                _laboratorios,
-                                (l) => l.id == value,
-                              )?.nome;
-                            }
-                          });
-                        },
-                      ),
-                    ],
                     const SizedBox(height: 12),
                     TextField(
                       controller: obsCtrl,
@@ -374,9 +264,9 @@ class _ExamesComplementaresScreenState
           tipo: TipoExameComplementar.outro,
           nomePersonalizado: nomeCtrl.text.trim(),
           solicitado: true,
-          tipoDestino: tipoDestino,
-          destinoId: destinoId,
-          destinoNome: destinoNome,
+          tipoDestino: null,
+          destinoId: null,
+          destinoNome: null,
           observacao: obsCtrl.text.trim().isEmpty ? null : obsCtrl.text.trim(),
         ),
       );
@@ -386,12 +276,6 @@ class _ExamesComplementaresScreenState
   Widget _buildCardExame(ExameComplementarModel exame) {
     final fixo = exame.tipo == TipoExameComplementar.necroscopico;
     final solicitado = fixo ? true : exame.solicitado;
-    final descricaoDestino = _rotuloDestino(exame);
-    final opcoesDestino = exame.tipoDestino == null
-        ? const <dynamic>[]
-        : (exame.tipoDestino == TipoDestinoExameComplementar.unidade
-              ? _unidades
-              : _laboratorios);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -424,9 +308,9 @@ class _ExamesComplementaresScreenState
                         exame.id,
                         exame.copyWith(
                           solicitado: value,
-                          tipoDestino: value ? exame.tipoDestino : null,
-                          destinoId: value ? exame.destinoId : null,
-                          destinoNome: value ? exame.destinoNome : null,
+                          tipoDestino: null,
+                          destinoId: null,
+                          destinoNome: null,
                         ),
                       );
                     },
@@ -444,102 +328,6 @@ class _ExamesComplementaresScreenState
               ],
             ),
             if (solicitado) ...[
-              const SizedBox(height: 8),
-              DropdownButtonFormField<TipoDestinoExameComplementar>(
-                // ignore: deprecated_member_use
-                value: exame.tipoDestino,
-                decoration: const InputDecoration(
-                  labelText: 'Destino (opcional)',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  const DropdownMenuItem<TipoDestinoExameComplementar>(
-                    value: TipoDestinoExameComplementar.unidade,
-                    child: Text('Unidade'),
-                  ),
-                  const DropdownMenuItem<TipoDestinoExameComplementar>(
-                    value: TipoDestinoExameComplementar.laboratorio,
-                    child: Text('Laboratório'),
-                  ),
-                ],
-                onChanged: fixo
-                    ? null
-                    : (value) {
-                        _atualizarExame(
-                          exame.id,
-                          exame.copyWith(
-                            tipoDestino: value,
-                            destinoId: null,
-                            destinoNome: null,
-                          ),
-                        );
-                      },
-              ),
-              if (exame.tipoDestino != null && opcoesDestino.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  // ignore: deprecated_member_use
-                  value: exame.destinoId,
-                  decoration: const InputDecoration(
-                    labelText: 'Selecionar destino',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: opcoesDestino.map<DropdownMenuItem<String>>((o) {
-                    final String id;
-                    final String nome;
-                    if (exame.tipoDestino ==
-                        TipoDestinoExameComplementar.unidade) {
-                      final unidade = o as UnidadeModel;
-                      id = unidade.id;
-                      nome = unidade.nome;
-                    } else {
-                      final laboratorio = o as LaboratorioModel;
-                      id = laboratorio.id;
-                      nome = laboratorio.nome;
-                    }
-                    return DropdownMenuItem<String>(
-                      value: id,
-                      child: Text(nome),
-                    );
-                  }).toList(),
-                  onChanged: fixo
-                      ? null
-                      : (value) {
-                          String? nomeDestino;
-                          if (value != null) {
-                            if (exame.tipoDestino ==
-                                TipoDestinoExameComplementar.unidade) {
-                              nomeDestino = _firstWhereOrNull<UnidadeModel>(
-                                _unidades,
-                                (u) => u.id == value,
-                              )?.nome;
-                            } else {
-                              nomeDestino = _firstWhereOrNull<LaboratorioModel>(
-                                _laboratorios,
-                                (l) => l.id == value,
-                              )?.nome;
-                            }
-                          }
-                          _atualizarExame(
-                            exame.id,
-                            exame.copyWith(
-                              destinoId: value,
-                              destinoNome: nomeDestino,
-                            ),
-                          );
-                        },
-                ),
-              ],
-              if (descricaoDestino.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Destino selecionado: $descricaoDestino',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
               const SizedBox(height: 12),
               TextFormField(
                 initialValue: exame.observacao,
@@ -628,11 +416,4 @@ class _VestigioResumo {
     required this.isSangueHumano,
     required this.temIndicioPapilar,
   });
-}
-
-T? _firstWhereOrNull<T>(Iterable<T> itens, bool Function(T item) test) {
-  for (final item in itens) {
-    if (test(item)) return item;
-  }
-  return null;
 }

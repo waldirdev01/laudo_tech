@@ -1,10 +1,13 @@
 package com.waldirdev01.laudo_tech
 
 import android.content.ContentValues
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -19,6 +22,7 @@ import java.io.FileOutputStream
 class MainActivity : FlutterActivity() {
   private val PDF_CHANNEL = "laudo_tech/pdf"
   private val PHOTO_BACKUP_CHANNEL = "laudo_tech/photo_backup"
+  private val FILE_OPEN_CHANNEL = "laudo_tech/file_open"
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -78,6 +82,27 @@ class MainActivity : FlutterActivity() {
           result.success(saveImageToGallery(path))
         } catch (e: Exception) {
           result.error("SAVE_ERROR", e.message, null)
+        }
+      }
+
+    MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPEN_CHANNEL)
+      .setMethodCallHandler { call, result ->
+        if (call.method != "openFile") {
+          result.notImplemented()
+          return@setMethodCallHandler
+        }
+
+        try {
+          val args = call.arguments as? Map<*, *>
+          val path = args?.get("path") as? String
+          if (path.isNullOrBlank()) {
+            result.error("ARG_ERROR", "path is required", null)
+            return@setMethodCallHandler
+          }
+
+          result.success(openFile(path))
+        } catch (e: Exception) {
+          result.error("OPEN_ERROR", e.message, null)
         }
       }
   }
@@ -145,5 +170,36 @@ class MainActivity : FlutterActivity() {
       FileOutputStream(destination).use { output -> input.copyTo(output) }
     }
     return true
+  }
+
+  private fun openFile(path: String): Boolean {
+    val file = File(path)
+    if (!file.exists()) return false
+
+    val mimeType = when (file.extension.lowercase()) {
+      "pdf" -> "application/pdf"
+      "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      "doc" -> "application/msword"
+      "jpg", "jpeg" -> "image/jpeg"
+      "png" -> "image/png"
+      else -> "*/*"
+    }
+
+    val uri = FileProvider.getUriForFile(
+      this,
+      "${applicationContext.packageName}.file_provider",
+      file
+    )
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+      setDataAndType(uri, mimeType)
+      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    return try {
+      startActivity(Intent.createChooser(intent, "Abrir arquivo"))
+      true
+    } catch (_: ActivityNotFoundException) {
+      false
+    }
   }
 }

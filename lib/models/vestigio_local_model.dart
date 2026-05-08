@@ -81,7 +81,7 @@ class VestigioLocalModel {
     final d = (descricao ?? '').trim();
     if (n.isEmpty) return d;
     if (d.isEmpty) return n;
-    return '$n — $d';
+    return '$n, $d';
   }
 
   Map<String, dynamic> toJson() => {
@@ -183,4 +183,3 @@ class VestigioLocalModel {
   @override
   String toString() => jsonEncode(toJson());
 }
-

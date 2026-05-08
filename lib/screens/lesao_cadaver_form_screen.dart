@@ -11,8 +11,9 @@ typedef AjudaRegiaoLesaoCallback =
     void Function(BuildContext context, TextEditingController regiaoCtrl);
 
 enum TipoLesaoArmaBranca {
-  perfurante('Perfurante'),
-  cortante('Cortante'),
+  puntiforme('Puntiforme'),
+  incisa('Incisa'),
+  perfuroincisa('Perfuroincisa'),
   perfurocortante('Perfurocortante');
 
   final String label;
@@ -93,7 +94,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
   TipoLesaoPaf _tipoLesaoPaf = TipoLesaoPaf.entrada;
   DistanciaTiro? _distanciaTiro;
   Set<String> _sinaisSelecionados = {};
-  TipoLesaoArmaBranca _tipoLesaoPab = TipoLesaoArmaBranca.perfurocortante;
+  TipoLesaoArmaBranca _tipoLesaoPab = TipoLesaoArmaBranca.perfuroincisa;
   ClassificacaoLamina _classificacaoLamina = ClassificacaoLamina.facaUmGume;
   Set<String> _sinaisPabSelecionados = {};
 
@@ -147,7 +148,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
       _tipoLesaoPaf = TipoLesaoPaf.entrada;
       _distanciaTiro = null;
       _sinaisSelecionados = {};
-      _tipoLesaoPab = TipoLesaoArmaBranca.perfurocortante;
+      _tipoLesaoPab = TipoLesaoArmaBranca.perfuroincisa;
       _classificacaoLamina = ClassificacaoLamina.facaUmGume;
       _sinaisPabSelecionados = {};
       _erroMensagem = null;
@@ -209,8 +210,18 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
     }
 
     if (_isPab) {
+      final descricaoTipo = switch (_tipoLesaoPab) {
+        TipoLesaoArmaBranca.puntiforme =>
+          'Lesão puntiforme, compatível com ação de instrumento perfurante',
+        TipoLesaoArmaBranca.incisa =>
+          'Lesão incisa, compatível com ação de instrumento cortante',
+        TipoLesaoArmaBranca.perfuroincisa =>
+          'Lesão perfuroincisa, compatível com ação de instrumento perfurocortante',
+        TipoLesaoArmaBranca.perfurocortante =>
+          'Lesão por instrumento perfurocortante (padrão perfuroinciso)',
+      };
       final partes = <String>[
-        'Lesão compatível com instrumento ${_tipoLesaoPab.label.toLowerCase()} (${_classificacaoLamina.label.toLowerCase()})',
+        '$descricaoTipo (${_classificacaoLamina.label.toLowerCase()})',
         'em ${_regiaoCtrl.text.trim()}',
       ];
       if (_sinaisPabSelecionados.isNotEmpty) {

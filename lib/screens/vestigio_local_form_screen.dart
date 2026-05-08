@@ -68,8 +68,33 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
   TipoDestinoVestigio? _tipoDestinoSelecionado;
   String? _destinoIdSelecionado;
   bool _isSangueHumano = false;
+  bool _isElementoMunicao = false;
+  String? _tipoManchaSangueSelecionada;
+  String? _tipoElementoMunicaoSelecionado;
+  String? _calibreSelecionado;
+  final List<String> _opcoesElementoMunicao = [
+    'estojo',
+    'projétil de arma de fogo',
+    'fragmento de chumbo',
+    'fragmento de camisa',
+  ];
+  final List<String> _opcoesCalibre = [
+    '.38 SPL',
+    '.22 L.R.',
+    '.32 L.R.',
+    '.380 ACP',
+    '9mm LUGER',
+  ];
   String? _erroMensagem;
   bool _salvando = false;
+  static const _opcoesManchaSangue = [
+    'mancha por contato',
+    'mancha por gotejamento',
+    'mancha por escorrimento',
+    'mancha por projeção',
+    'poça hemática',
+    'impregnação hemática',
+  ];
 
   @override
   void initState() {
@@ -114,6 +139,10 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       _tipoDestinoSelecionado = null;
       _destinoIdSelecionado = null;
       _isSangueHumano = false;
+      _isElementoMunicao = false;
+      _tipoManchaSangueSelecionada = null;
+      _tipoElementoMunicaoSelecionado = null;
+      _calibreSelecionado = null;
       _erroMensagem = null;
     });
     if (_scrollController.hasClients) {
@@ -289,6 +318,69 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     );
   }
 
+  void _aplicarDescricaoSangue(String tipoMancha) {
+    _descricaoCtrl.text = 'Presença de $tipoMancha.';
+    _descricaoCtrl.selection = TextSelection.fromPosition(
+      TextPosition(offset: _descricaoCtrl.text.length),
+    );
+  }
+
+  void _aplicarDescricaoElementoMunicao() {
+    final tipo = _tipoElementoMunicaoSelecionado;
+    if (tipo == null || tipo.isEmpty) return;
+
+    String texto;
+    if (tipo == 'estojo') {
+      if (_calibreSelecionado != null && _calibreSelecionado!.isNotEmpty) {
+        texto = 'Estojo de munição calibre ${_calibreSelecionado!}.';
+      } else {
+        texto = 'Estojo de munição, calibre não identificado.';
+      }
+    } else {
+      texto = '${tipo[0].toUpperCase()}${tipo.substring(1)}.';
+    }
+
+    _descricaoCtrl.text = texto;
+    _descricaoCtrl.selection = TextSelection.fromPosition(
+      TextPosition(offset: _descricaoCtrl.text.length),
+    );
+  }
+
+  Future<void> _adicionarOpcaoPersonalizada({
+    required String titulo,
+    required String label,
+    required List<String> destino,
+    void Function(String valor)? onAdicionada,
+  }) async {
+    final ctrl = TextEditingController();
+    final valor = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(titulo),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(labelText: label),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+    if (valor == null || valor.isEmpty) return;
+    if (!destino.contains(valor)) {
+      setState(() => destino.add(valor));
+    }
+    if (onAdicionada != null) onAdicionada(valor);
+  }
+
   @override
   Widget build(BuildContext context) {
     final existente = widget.vestigioExistente;
@@ -349,7 +441,7 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
             controller: _nomeCtrl,
             decoration: const InputDecoration(
               labelText: 'Nome do vestígio (opcional)',
-              hintText: 'Ex.: mancha hemática próxima à porta',
+              hintText: 'Ex.: EV01: fragmento 01 (ou FGT01)',
               border: OutlineInputBorder(),
             ),
             textInputAction: TextInputAction.next,
@@ -359,11 +451,173 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
             controller: _descricaoCtrl,
             decoration: const InputDecoration(
               labelText: 'Descrição do vestígio *',
+              hintText:
+                  'Ex.: fragmentos de impressões papilares.',
               border: OutlineInputBorder(),
             ),
             maxLines: null,
             textInputAction: TextInputAction.newline,
           ),
+          const SizedBox(height: 12),
+          const Text(
+            'Classificação rápida do vestígio',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Sangue humano'),
+            value: _isSangueHumano,
+            onChanged: (value) {
+              setState(() {
+                final ativo = value ?? false;
+                _isSangueHumano = ativo;
+                if (ativo) {
+                  _isElementoMunicao = false;
+                  _tipoElementoMunicaoSelecionado = null;
+                  _calibreSelecionado = null;
+                } else {
+                  _tipoManchaSangueSelecionada = null;
+                }
+              });
+            },
+          ),
+          if (_isSangueHumano) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Selecione um tipo de mancha para preencher a descrição e complemente se necessário.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 0,
+              children: _opcoesManchaSangue
+                  .map(
+                    (op) => ChoiceChip(
+                      label: Text(op),
+                      selected: _tipoManchaSangueSelecionada == op,
+                      onSelected: (_) {
+                        setState(() {
+                          _tipoManchaSangueSelecionada = op;
+                          _aplicarDescricaoSangue(op);
+                        });
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: 6),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Elemento de munição'),
+            value: _isElementoMunicao,
+            onChanged: (value) {
+              setState(() {
+                final ativo = value ?? false;
+                _isElementoMunicao = ativo;
+                if (ativo) {
+                  _isSangueHumano = false;
+                  _tipoManchaSangueSelecionada = null;
+                } else {
+                  _tipoElementoMunicaoSelecionado = null;
+                  _calibreSelecionado = null;
+                }
+              });
+            },
+          ),
+          if (_isElementoMunicao) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Tipo de elemento',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Adicionar tipo',
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _adicionarOpcaoPersonalizada(
+                    titulo: 'Novo tipo de elemento',
+                    label: 'Tipo',
+                    destino: _opcoesElementoMunicao,
+                    onAdicionada: (valor) {
+                      _tipoElementoMunicaoSelecionado = valor;
+                      _calibreSelecionado = null;
+                      _aplicarDescricaoElementoMunicao();
+                    },
+                  ),
+                ),
+              ],
+            ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 0,
+              children: _opcoesElementoMunicao
+                  .map(
+                    (op) => ChoiceChip(
+                      label: Text(op),
+                      selected: _tipoElementoMunicaoSelecionado == op,
+                      onSelected: (_) {
+                        setState(() {
+                          _tipoElementoMunicaoSelecionado = op;
+                          if (op != 'estojo') _calibreSelecionado = null;
+                          _aplicarDescricaoElementoMunicao();
+                        });
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+            if (_tipoElementoMunicaoSelecionado == 'estojo') ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      // ignore: deprecated_member_use
+                      value: _calibreSelecionado,
+                      decoration: const InputDecoration(
+                        labelText: 'Selecionar calibre',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: _opcoesCalibre
+                          .map(
+                            (c) => DropdownMenuItem<String>(
+                              value: c,
+                              child: Text(c),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _calibreSelecionado = value;
+                          _aplicarDescricaoElementoMunicao();
+                        });
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Adicionar calibre',
+                    icon: const Icon(Icons.add),
+                    onPressed: () => _adicionarOpcaoPersonalizada(
+                      titulo: 'Novo calibre',
+                      label: 'Calibre',
+                      destino: _opcoesCalibre,
+                      onAdicionada: (valor) {
+                        _calibreSelecionado = valor;
+                        _aplicarDescricaoElementoMunicao();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
           const SizedBox(height: 12),
           const Text(
             'Fotografias do vestígio *',
@@ -473,18 +727,6 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
               border: OutlineInputBorder(),
             ),
             keyboardType: TextInputType.text,
-          ),
-          const SizedBox(height: 16),
-          CheckboxListTile(
-            title: const Text('Sangue humano'),
-            subtitle: const Text(
-              'Marque se este vestígio é sangue humano (para textos específicos no laudo)',
-              style: TextStyle(fontSize: 12),
-            ),
-            value: _isSangueHumano,
-            onChanged: (value) {
-              setState(() => _isSangueHumano = value ?? false);
-            },
           ),
           const SizedBox(height: 16),
           const Divider(),

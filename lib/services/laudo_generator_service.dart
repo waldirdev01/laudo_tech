@@ -88,8 +88,10 @@ class LaudoGeneratorService {
     File? imagemMapaLocal;
     final capturaPath = ficha.local?.capturaTelaLocalPath;
     if (capturaPath != null && capturaPath.isNotEmpty) {
-      final f = File(capturaPath);
-      if (await f.exists()) imagemMapaLocal = f;
+      imagemMapaLocal = await _resolverArquivoLocal(
+        capturaPath,
+        markers: const ['laudo_tech/captura_local/', 'captura_local/'],
+      );
     }
 
     // Processar relationships: imagem do mapa (rId maxId+1) + fotos do anexo (maxId+2, ...)
@@ -209,6 +211,34 @@ class LaudoGeneratorService {
     await outputFile.writeAsBytes(zipBytes);
 
     return outputFile;
+  }
+
+  Future<File?> _resolverArquivoLocal(
+    String path, {
+    required List<String> markers,
+  }) async {
+    final original = File(path);
+    if (await original.exists()) return original;
+
+    final docs = await getApplicationDocumentsDirectory();
+    final candidatos = <String>{};
+    for (final marker in markers) {
+      final idx = path.indexOf(marker);
+      if (idx < 0) continue;
+
+      final relative = path.substring(idx);
+      candidatos.add('${docs.path}/$relative');
+      if (relative.startsWith('captura_local/')) {
+        candidatos.add('${docs.path}/laudo_tech/$relative');
+      }
+    }
+
+    for (final candidato in candidatos) {
+      final arquivo = File(candidato);
+      if (await arquivo.exists()) return arquivo;
+    }
+
+    return null;
   }
 
   Future<String> _gerarConteudoLaudo(
@@ -372,9 +402,9 @@ class LaudoGeneratorService {
       case TipoOcorrencia.furtoDanoExameLocal:
         return 'LOCAL DE CRIME CONTRA O PATRIMÔNIO';
       case TipoOcorrencia.cvli:
-        return 'CRIMES VIOLENTOS LETAIS INTENCIONAIS';
+        return 'EXAME EM LOCAL DE MORTE VIOLENTA';
       case TipoOcorrencia.morteEsclarecer:
-        return 'MORTE A ESCLARECER';
+        return 'EXAME EM LOCAL DE MORTE VIOLENTA';
       case TipoOcorrencia.crimeTransito:
         return 'CRIME DE TRÂNSITO';
       default:
@@ -4195,95 +4225,17 @@ class LaudoGeneratorService {
     final buffer = StringBuffer();
     final examesSolicitados =
         (ficha.examesComplementares ?? const <ExameComplementarModel>[])
-            .where((e) => e.solicitado)
+            .where(
+              (e) =>
+                  e.solicitado && e.tipo != TipoExameComplementar.necroscopico,
+            )
             .toList();
 
     buffer.writeln(_gerarTituloSecao('7. EXAMES COMPLEMENTARES'));
 
-    buffer.writeln(
-      _gerarParagrafoHistorico(
-        'Esta seção apresenta os exames complementares solicitados no '
-        'levantamento pericial.',
-      ),
-    );
-
     int proximaSubsecao = 1;
-
-    void adicionarSubsecaoExame({
-      required TipoExameComplementar tipo,
-      required String titulo,
-      required String textoNaoSolicitado,
-      bool exibirQuandoNaoSolicitado = true,
-    }) {
-      final itens = examesSolicitados.where((e) => e.tipo == tipo).toList();
-      if (itens.isEmpty && !exibirQuandoNaoSolicitado) {
-        return;
-      }
-
-      buffer.writeln(_gerarParagrafoVazio());
-      buffer.writeln(_gerarTituloSubSecao('7.$proximaSubsecao $titulo'));
-      proximaSubsecao++;
-
-      if (itens.isEmpty) {
-        buffer.writeln(_gerarParagrafoHistorico(textoNaoSolicitado));
-        return;
-      }
-      for (final exame in itens) {
-        buffer.writeln(
-          _gerarParagrafoHistorico(_textoExameComplementarSolicitado(exame)),
-        );
-      }
-    }
-
-    adicionarSubsecaoExame(
-      tipo: TipoExameComplementar.pesquisaDna,
-      titulo: 'Pesquisa por DNA',
-      textoNaoSolicitado: 'Pesquisa por DNA não solicitada até o momento.',
-    );
-    adicionarSubsecaoExame(
-      tipo: TipoExameComplementar.analiseImpressoesPapilares,
-      titulo: 'Análise de Fragmentos de Impressões Papilares',
-      textoNaoSolicitado:
-          'Análise de fragmentos de impressões papilares não solicitada até o momento.',
-    );
-    adicionarSubsecaoExame(
-      tipo: TipoExameComplementar.caracterizacaoObjetos,
-      titulo: 'Caracterização de Objetos',
-      textoNaoSolicitado:
-          'Caracterização de objetos não solicitada até o momento.',
-    );
-    adicionarSubsecaoExame(
-      tipo: TipoExameComplementar.caracterizacaoElementosMunicao,
-      titulo: 'Caracterização de Elementos de Munição',
-      textoNaoSolicitado:
-          'Caracterização de elementos de munição não solicitada até o momento.',
-    );
-    adicionarSubsecaoExame(
-      tipo: TipoExameComplementar.balistico,
-      titulo: 'Exame Balístico',
-      textoNaoSolicitado: '',
-      exibirQuandoNaoSolicitado: false,
-    );
-
-    final outros = examesSolicitados
-        .where((e) => e.tipo == TipoExameComplementar.outro)
-        .toList();
-    if (outros.isNotEmpty) {
-      buffer.writeln(_gerarParagrafoVazio());
-      buffer.writeln(
-        _gerarTituloSubSecao('7.$proximaSubsecao Outros Exames Complementares'),
-      );
-      for (final exame in outros) {
-        buffer.writeln(
-          _gerarParagrafoHistorico(_textoExameComplementarSolicitado(exame)),
-        );
-      }
-    }
-
-    buffer.writeln(_gerarParagrafoVazio());
-    buffer.writeln(
-      _gerarTituloSubSecao('7.$proximaSubsecao Exame Necroscópico'),
-    );
+    buffer.writeln(_gerarTituloSubSecao('7.$proximaSubsecao Exame Cadavérico'));
+    proximaSubsecao++;
 
     // Verificar se há número de laudo cadavérico nos cadáveres
     if (ficha.cadaveres != null && ficha.cadaveres!.isNotEmpty) {
@@ -4311,40 +4263,39 @@ class LaudoGeneratorService {
       );
     }
 
+    for (final exame in examesSolicitados) {
+      buffer.writeln(_gerarParagrafoVazio());
+      buffer.writeln(
+        _gerarTituloSubSecao(
+          '7.$proximaSubsecao ${_tituloExameComplementar(exame)}',
+        ),
+      );
+      proximaSubsecao++;
+      buffer.writeln(
+        _gerarParagrafoHistorico(_textoExameComplementarSolicitado(exame)),
+      );
+    }
+
     return buffer.toString();
+  }
+
+  String _tituloExameComplementar(ExameComplementarModel exame) {
+    final nome = exame.nomeExibicao.trim();
+    if (nome.isEmpty) return 'Exame Complementar';
+    return nome[0].toUpperCase() + nome.substring(1);
   }
 
   String _textoExameComplementarSolicitado(ExameComplementarModel exame) {
     final nomeExame = exame.nomeExibicao.trim();
-    final destino = _textoDestinoExameComplementar(exame);
     final observacao = exame.observacao?.trim();
 
-    var texto = 'Foi solicitado $nomeExame';
-    if (destino.isNotEmpty) {
-      texto += ' $destino';
-    }
-    texto += '.';
+    var texto = 'Foi solicitado $nomeExame.';
 
     if (observacao != null && observacao.isNotEmpty) {
       texto += ' Observação: $observacao.';
     }
 
     return texto;
-  }
-
-  String _textoDestinoExameComplementar(ExameComplementarModel exame) {
-    if (exame.tipoDestino == null) return '';
-    final destinoNome = exame.destinoNome?.trim();
-    if (exame.tipoDestino == TipoDestinoExameComplementar.unidade) {
-      if (destinoNome != null && destinoNome.isNotEmpty) {
-        return 'para análise na Unidade $destinoNome';
-      }
-      return 'para análise na unidade responsável';
-    }
-    if (destinoNome != null && destinoNome.isNotEmpty) {
-      return 'para análise no Laboratório $destinoNome';
-    }
-    return 'para análise em laboratório especializado';
   }
 
   /// Gera a seção 8. CONSIDERAÇÕES TÉCNICO-PERICIAIS para CVLI
