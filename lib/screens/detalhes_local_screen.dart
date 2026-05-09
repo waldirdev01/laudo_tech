@@ -14,8 +14,11 @@ import '../models/unidade_model.dart';
 import '../models/vestigio_local_model.dart';
 import '../services/ficha_service.dart';
 import '../services/laboratorio_service.dart';
+import '../services/openai_service.dart';
 import '../services/photo_backup_service.dart';
 import '../services/unidade_service.dart';
+import '../widgets/ai_suggestion_button.dart';
+import 'bloodstain_analysis_screen.dart';
 import 'evidencias_furto_screen.dart';
 import 'lista_veiculos_screen.dart';
 import 'vestigio_local_form_screen.dart';
@@ -773,7 +776,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         posicoesAcessoMediato: _posicoesAcessoMediato.isEmpty
             ? null
             : _posicoesAcessoMediato.toList(),
-        sinaisArrombamentoDescricao: (_sinaisArrombamentoSim == true &&
+        sinaisArrombamentoDescricao:
+            (_sinaisArrombamentoSim == true &&
                 _sinaisArrombamentoController.text.trim().isNotEmpty)
             ? _sinaisArrombamentoController.text.trim()
             : null,
@@ -791,8 +795,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             _descricaoRelacionadoController.text.trim().isEmpty
             ? null
             : _descricaoRelacionadoController.text.trim(),
-        marcoZeroMediato: (_classificacaoMediato == true &&
-                _temVestigiosMediato == true)
+        marcoZeroMediato:
+            (_classificacaoMediato == true && _temVestigiosMediato == true)
             ? MarcoZeroLocalModel(
                 descricao:
                     _marcoZeroDescricaoMediatoController.text.trim().isEmpty
@@ -1117,8 +1121,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         !_ambientesImediato.contains(_ambienteAcessoSelecionado)) {
       _ambienteAcessoSelecionado = null;
     }
-    _ambienteAcessoSelecionado ??=
-        _ambientesImediato.isEmpty ? null : _ambientesImediato.first;
+    _ambienteAcessoSelecionado ??= _ambientesImediato.isEmpty
+        ? null
+        : _ambientesImediato.first;
   }
 
   String _gerarDescricaoViasAcessoMediato() {
@@ -1546,11 +1551,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                         ? null
                         : (_) => setState(() {
                             final ambiente = _ambienteAcessoSelecionado!;
-                            final acessos =
-                                _acessosPorAmbienteImediato.putIfAbsent(
-                                  ambiente,
-                                  () => <String>{},
-                                );
+                            final acessos = _acessosPorAmbienteImediato
+                                .putIfAbsent(ambiente, () => <String>{});
                             if (acessos.contains(op)) {
                               acessos.remove(op);
                             } else {
@@ -1601,6 +1603,136 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   String _capitalize(String s) {
     if (s.isEmpty) return s;
     return s[0].toUpperCase() + s.substring(1);
+  }
+
+  String _buildAiContextLocal({
+    required String titulo,
+    required String local,
+    required List<VestigioLocalModel> vestigios,
+    required bool? pisoSeco,
+    required bool? pisoUmido,
+    required bool? pisoMolhado,
+    required bool? iluminacaoArtificial,
+    required bool? iluminacaoNatural,
+    required bool? iluminacaoAusente,
+  }) {
+    final partes = <String>[];
+
+    final piso = <String>[];
+    if (pisoSeco == true) piso.add('seco');
+    if (pisoUmido == true) piso.add('úmido');
+    if (pisoMolhado == true) piso.add('molhado');
+    if (piso.isNotEmpty) partes.add('Piso: ${_listarItens(piso)}.');
+
+    final iluminacao = <String>[];
+    if (iluminacaoArtificial == true) iluminacao.add('artificial');
+    if (iluminacaoNatural == true) iluminacao.add('natural');
+    if (iluminacaoAusente == true) iluminacao.add('ausente');
+    if (iluminacao.isNotEmpty) {
+      partes.add('Iluminação: ${_listarItens(iluminacao)}.');
+    }
+
+    if (local == 'mediato') {
+      if (_tipoRegiaoMediato != null) {
+        partes.add('Região: $_tipoRegiaoMediato.');
+      }
+      if (_tipoImovelMediato != null) {
+        partes.add('Imóvel/local: $_tipoImovelMediato.');
+      }
+      if (_infraestruturaMediato.isNotEmpty) {
+        partes.add(
+          'Infraestrutura: ${_listarItens(_infraestruturaMediato.toList())}.',
+        );
+      }
+      if (_delimitacaoMediato.isNotEmpty) {
+        partes.add(
+          'Delimitação: ${_listarItens(_delimitacaoMediato.toList())}.',
+        );
+      }
+      final acessos = _gerarDescricaoViasAcessoMediato();
+      if (acessos.isNotEmpty) partes.add('Acessos: $acessos.');
+    }
+
+    if (local == 'imediato') {
+      if (_abrangenciaImediato != null) {
+        partes.add('Abrangência: $_abrangenciaImediato.');
+      }
+      if (_ambientesImediato.isNotEmpty) {
+        partes.add('Ambientes: ${_listarItens(_ambientesImediato.toList())}.');
+      }
+      if (_estadoConservacaoImediato != null) {
+        partes.add('Conservação: $_estadoConservacaoImediato.');
+      }
+      if (_observacaoImediatoController.text.trim().isNotEmpty) {
+        partes.add(
+          'Observações: ${_observacaoImediatoController.text.trim()}.',
+        );
+      }
+    }
+
+    if (vestigios.isNotEmpty) {
+      final descricoes = vestigios
+          .map((v) => v.descricao?.trim())
+          .whereType<String>()
+          .where((d) => d.isNotEmpty)
+          .toList();
+      if (descricoes.isNotEmpty) {
+        partes.add('Vestígios observados: ${_listarItens(descricoes)}.');
+      }
+    }
+
+    return partes.join('\n');
+  }
+
+  List<String> _imagePathsForLocal(String local) {
+    if (local == 'mediato') return _fotosVistaAmplaPaths;
+    if (local == 'imediato') return _fotosVistaAmplaImediatoPaths;
+    return const [];
+  }
+
+  void _replaceControllerText(TextEditingController controller, String text) {
+    setState(() => controller.text = text.trim());
+  }
+
+  void _appendControllerText(TextEditingController controller, String text) {
+    final atual = controller.text.trim();
+    setState(() {
+      controller.text = atual.isEmpty
+          ? text.trim()
+          : '$atual\n\n${text.trim()}';
+    });
+  }
+
+  bool get _podeAnalisarManchasSangue =>
+      widget.ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
+      widget.ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer;
+
+  Future<void> _abrirAnaliseManchasSangue() async {
+    final initialContext = _buildAiContextLocal(
+      titulo: 'Local Imediato',
+      local: 'imediato',
+      vestigios: _vestigiosImediato,
+      pisoSeco: _pisoSecoImediato,
+      pisoUmido: _pisoUmidoImediato,
+      pisoMolhado: _pisoMolhadoImediato,
+      iluminacaoArtificial: _iluminacaoArtificialImediato,
+      iluminacaoNatural: _iluminacaoNaturalImediato,
+      iluminacaoAusente: _iluminacaoAusenteImediato,
+    );
+
+    final overviewImages = <String>[
+      ..._fotosVistaAmplaPaths,
+      ..._fotosVistaAmplaImediatoPaths,
+    ];
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BloodstainAnalysisScreen(
+          initialContextText: initialContext,
+          initialOverviewImagePaths: overviewImages,
+        ),
+      ),
+    );
   }
 
   Widget _buildSecaoLocalDetalhado({
@@ -1683,6 +1815,29 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                   maxLines: null,
                   minLines: 4,
                   textInputAction: TextInputAction.newline,
+                ),
+                const SizedBox(height: 8),
+                AiSuggestionButton(
+                  fieldLabel: 'Descrição do $titulo',
+                  currentText: descricaoController.text,
+                  currentTextBuilder: () => descricaoController.text,
+                  profile: AiSuggestionProfile.furtoDanoExameLocal,
+                  contextTextBuilder: () => _buildAiContextLocal(
+                    titulo: titulo,
+                    local: local,
+                    vestigios: vestigios,
+                    pisoSeco: pisoSeco,
+                    pisoUmido: pisoUmido,
+                    pisoMolhado: pisoMolhado,
+                    iluminacaoArtificial: iluminacaoArtificial,
+                    iluminacaoNatural: iluminacaoNatural,
+                    iluminacaoAusente: iluminacaoAusente,
+                  ),
+                  imagePathsBuilder: () => _imagePathsForLocal(local),
+                  onReplace: (text) =>
+                      _replaceControllerText(descricaoController, text),
+                  onAppend: (text) =>
+                      _appendControllerText(descricaoController, text),
                 ),
                 if (exibirSinaisArrombamento) ...[
                   const SizedBox(height: 16),
@@ -1924,7 +2079,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'Defina o marco zero: ponto de referência utilizado para amarração e posicionamento dos vestígios.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -1988,7 +2146,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     },
                   ),
                 ],
-                if ((usarFluxoVestigioMediato && _temVestigiosMediato == true) ||
+                if ((usarFluxoVestigioMediato &&
+                        _temVestigiosMediato == true) ||
                     (!usarFluxoVestigioMediato && !semVestigios)) ...[
                   Align(
                     alignment: Alignment.centerRight,
@@ -2279,130 +2438,110 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             // Tipo de local (apenas no mediato)
             if (_etapaLocalAtual == 0)
               Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'O local é em imóvel (fechado) ou em via pública / área aberta?',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  ),
-                  const SizedBox(height: 12),
-                  RadioGroup<bool>(
-                    groupValue: _localEmViaPublica,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _localEmViaPublica = value;
-                          if (value == true) {
-                            _sinaisArrombamentoNaoSeAplica = true;
-                            _sinaisArrombamentoSim = false;
-                            _sinaisArrombamentoNao = false;
-                          }
-                        });
-                      }
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Radio<bool>(value: false),
-                            const Expanded(
-                              child: Text(
-                                'Imóvel (fechado)',
-                                style: TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            Radio<bool>(value: true),
-                            const Expanded(
-                              child: Text(
-                                'Via pública ou área aberta',
-                                style: TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'O local é em imóvel (fechado) ou em via pública / área aberta?',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    RadioGroup<bool>(
+                      groupValue: _localEmViaPublica,
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _localEmViaPublica = value;
+                            if (value == true) {
+                              _sinaisArrombamentoNaoSeAplica = true;
+                              _sinaisArrombamentoSim = false;
+                              _sinaisArrombamentoNao = false;
+                            }
+                          });
+                        }
+                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Radio<bool>(value: false),
+                              const Expanded(
+                                child: Text(
+                                  'Imóvel (fechado)',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Radio<bool>(value: true),
+                              const Expanded(
+                                child: Text(
+                                  'Via pública ou área aberta',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
             // Foto(s) vista ampla por etapa (mediato/imediato)
             if (_etapaLocalAtual == 0 || _etapaLocalAtual == 1)
               Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Foto(s) vista ampla do local',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _etapaLocalAtual == 0
-                        ? (_localEmViaPublica == true
-                              ? 'Vista geral do local mediato (ex.: trecho da via, ponto do fato).'
-                              : 'Ex.: fachada ou porção anterior do imóvel (local mediato).')
-                        : 'Registre a vista ampla específica do local imediato.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final foto = await _imagePicker.pickImage(
-                            source: ImageSource.camera,
-                            imageQuality: 90,
-                          );
-                          if (foto != null && mounted) {
-                            final path = await _persistirFotoVestigio(foto);
-                            if (path != null) {
-                              setState(() {
-                                if (_etapaLocalAtual == 0) {
-                                  _fotosVistaAmplaPaths.add(path);
-                                } else {
-                                  _fotosVistaAmplaImediatoPaths.add(path);
-                                }
-                              });
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.photo_camera),
-                        label: const Text('Câmera'),
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Foto(s) vista ampla do local',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
                       ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final result = await FilePicker.platform.pickFiles(
-                            type: FileType.image,
-                            allowMultiple: true,
-                          );
-                          if (result != null &&
-                              result.files.isNotEmpty &&
-                              mounted) {
-                            for (final f in result.files) {
-                              if (f.path == null) continue;
-                              final path = await _persistirFotoVestigio(
-                                XFile(f.path!),
-                              );
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _etapaLocalAtual == 0
+                          ? (_localEmViaPublica == true
+                                ? 'Vista geral do local mediato (ex.: trecho da via, ponto do fato).'
+                                : 'Ex.: fachada ou porção anterior do imóvel (local mediato).')
+                          : 'Registre a vista ampla específica do local imediato.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final foto = await _imagePicker.pickImage(
+                              source: ImageSource.camera,
+                              imageQuality: 90,
+                            );
+                            if (foto != null && mounted) {
+                              final path = await _persistirFotoVestigio(foto);
                               if (path != null) {
                                 setState(() {
                                   if (_etapaLocalAtual == 0) {
@@ -2413,78 +2552,151 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                 });
                               }
                             }
-                          }
-                        },
-                        icon: const Icon(Icons.photo_library),
-                        label: const Text('Galeria'),
+                          },
+                          icon: const Icon(Icons.photo_camera),
+                          label: const Text('Câmera'),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.image,
+                              allowMultiple: true,
+                            );
+                            if (result != null &&
+                                result.files.isNotEmpty &&
+                                mounted) {
+                              for (final f in result.files) {
+                                if (f.path == null) continue;
+                                final path = await _persistirFotoVestigio(
+                                  XFile(f.path!),
+                                );
+                                if (path != null) {
+                                  setState(() {
+                                    if (_etapaLocalAtual == 0) {
+                                      _fotosVistaAmplaPaths.add(path);
+                                    } else {
+                                      _fotosVistaAmplaImediatoPaths.add(path);
+                                    }
+                                  });
+                                }
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.photo_library),
+                          label: const Text('Galeria'),
+                        ),
+                      ],
+                    ),
+                    if ((_etapaLocalAtual == 0
+                            ? _fotosVistaAmplaPaths
+                            : _fotosVistaAmplaImediatoPaths)
+                        .isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                            (_etapaLocalAtual == 0
+                                    ? _fotosVistaAmplaPaths
+                                    : _fotosVistaAmplaImediatoPaths)
+                                .asMap()
+                                .entries
+                                .map((e) {
+                                  return Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.file(
+                                          File(e.value),
+                                          width: 72,
+                                          height: 72,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, _, _) => Container(
+                                            width: 72,
+                                            height: 72,
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.shade800,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: const Icon(
+                                              Icons.broken_image,
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.close,
+                                            size: 20,
+                                          ),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.black54,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.all(4),
+                                          ),
+                                          onPressed: () {
+                                            setState(
+                                              () =>
+                                                  (_etapaLocalAtual == 0
+                                                          ? _fotosVistaAmplaPaths
+                                                          : _fotosVistaAmplaImediatoPaths)
+                                                      .removeAt(e.key),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                })
+                                .toList(),
                       ),
                     ],
-                  ),
-                  if ((_etapaLocalAtual == 0
-                          ? _fotosVistaAmplaPaths
-                          : _fotosVistaAmplaImediatoPaths)
-                      .isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: (_etapaLocalAtual == 0
-                              ? _fotosVistaAmplaPaths
-                              : _fotosVistaAmplaImediatoPaths)
-                          .asMap()
-                          .entries
-                          .map((e) {
-                        return Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(
-                                File(e.value),
-                                width: 72,
-                                height: 72,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade800,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.broken_image,
-                                    color: Colors.white54,
-                                  ),
+                    if (_etapaLocalAtual == 1 && _podeAnalisarManchasSangue) ...[
+                      const SizedBox(height: 16),
+                      Card(
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Análise assistiva de manchas de sangue',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Abra a ferramenta para enviar fotos amplas e aproximadas da mancha, informar a superfície e obter uma leitura assistiva conservadora.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: IconButton(
-                                icon: const Icon(Icons.close, size: 20),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.black54,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.all(4),
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                onPressed: _abrirAnaliseManchasSangue,
+                                icon: const Icon(Icons.bloodtype_outlined),
+                                label: const Text(
+                                  'Abrir análise de manchas de sangue',
                                 ),
-                                onPressed: () {
-                                  setState(
-                                    () => (_etapaLocalAtual == 0
-                                            ? _fotosVistaAmplaPaths
-                                            : _fotosVistaAmplaImediatoPaths)
-                                        .removeAt(e.key),
-                                  );
-                                },
                               ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
             // Tabela de dados
             Container(
               decoration: BoxDecoration(

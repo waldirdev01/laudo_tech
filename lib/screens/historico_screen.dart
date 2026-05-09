@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/ficha_base_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
+import '../services/openai_service.dart';
+import '../widgets/ai_suggestion_button.dart';
 import 'isolamento_screen.dart';
 
 class HistoricoScreen extends StatefulWidget {
@@ -83,6 +85,47 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
     final partes = hora.split(':');
     if (partes.length < 2) return hora;
     return '${partes[0]}h${partes[1]}min';
+  }
+
+  String _buildAiContextHistorico() {
+    final origem = widget.ficha.dadosSolicitacao;
+    final local = widget.ficha.local;
+    final partes = <String>[
+      'Tipo de ocorrência: ${widget.ficha.tipoOcorrencia.label}.',
+    ];
+
+    if (origem.dataHoraComunicacao?.trim().isNotEmpty == true) {
+      partes.add('Data/hora informada: ${origem.dataHoraComunicacao!.trim()}.');
+    }
+
+    final endereco = local?.endereco?.trim().isNotEmpty == true
+        ? local!.endereco!.trim()
+        : origem.endereco?.trim();
+    final municipio = local?.municipio?.trim().isNotEmpty == true
+        ? local!.municipio!.trim()
+        : origem.municipio?.trim();
+    if ((endereco != null && endereco.isNotEmpty) ||
+        (municipio != null && municipio.isNotEmpty)) {
+      final localPartes = <String>[];
+      if (endereco != null && endereco.isNotEmpty) localPartes.add(endereco);
+      if (municipio != null && municipio.isNotEmpty) localPartes.add(municipio);
+      partes.add('Local informado: ${localPartes.join(', ')}.');
+    }
+
+    return partes.join('\n');
+  }
+
+  void _replaceHistorico(String text) {
+    setState(() => _historicoController.text = text.trim());
+  }
+
+  void _appendHistorico(String text) {
+    final atual = _historicoController.text.trim();
+    setState(() {
+      _historicoController.text = atual.isEmpty
+          ? text.trim()
+          : '$atual\n\n${text.trim()}';
+    });
   }
 
   @override
@@ -217,19 +260,36 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                   // Campo de texto
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: TextFormField(
-                      controller: _historicoController,
-                      decoration: const InputDecoration(
-                        hintText: 'Descreva o histórico da ocorrência...',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                      ),
-                      maxLines: null,
-                      minLines: 10,
-                      textInputAction: TextInputAction.newline,
-                      keyboardType: TextInputType.multiline,
-                      // O sistema iOS/Android já oferece voz para texto nativamente
-                      // através do teclado, não precisa configurar nada especial
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          controller: _historicoController,
+                          decoration: const InputDecoration(
+                            hintText: 'Descreva o histórico da ocorrência...',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          maxLines: null,
+                          minLines: 10,
+                          textInputAction: TextInputAction.newline,
+                          keyboardType: TextInputType.multiline,
+                          // O sistema iOS/Android já oferece voz para texto nativamente
+                          // através do teclado, não precisa configurar nada especial
+                        ),
+                        const SizedBox(height: 8),
+                        AiSuggestionButton(
+                          fieldLabel: 'Histórico da ocorrência',
+                          currentText: _historicoController.text,
+                          currentTextBuilder: () => _historicoController.text,
+                          contextTextBuilder: _buildAiContextHistorico,
+                          profile: AiSuggestionProfile.fromTipoOcorrencia(
+                            widget.ficha.tipoOcorrencia,
+                          ),
+                          onReplace: _replaceHistorico,
+                          onAppend: _appendHistorico,
+                        ),
+                      ],
                     ),
                   ),
                 ],

@@ -11,7 +11,9 @@ import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
+import '../services/openai_service.dart';
 import '../services/photo_backup_service.dart';
+import '../widgets/ai_suggestion_button.dart';
 import 'lista_veiculos_screen.dart';
 
 class CrimeTransitoLevantamentoScreen extends StatefulWidget {
@@ -684,6 +686,39 @@ class _CrimeTransitoLevantamentoScreenState
     CrimeTransitoFormaInteracao.outro => 'Outro',
   };
 
+  String _buildAiContextDinamicaOutro() {
+    final partes = <String>['Tipo de ocorrência: crime de trânsito.'];
+
+    if (_formasInteracao.isNotEmpty) {
+      partes.add(
+        'Formas de interação selecionadas: ${_formasInteracao.map(_labelFormaInteracao).join(', ')}.',
+      );
+    }
+
+    if (_dinamicaDerivada != null) {
+      partes.add(
+        'Dinâmica principal derivada: ${CausasDeterminantesCatalogo.labelDinamica(_dinamicaDerivada!)}.',
+      );
+    }
+
+    partes.add('Quantidade de veículos considerada: $_qtdVeiculos.');
+
+    return partes.join('\n');
+  }
+
+  void _replaceDinamicaOutro(String text) {
+    setState(() => _dinamicaOutroCtrl.text = text.trim());
+  }
+
+  void _appendDinamicaOutro(String text) {
+    final atual = _dinamicaOutroCtrl.text.trim();
+    setState(() {
+      _dinamicaOutroCtrl.text = atual.isEmpty
+          ? text.trim()
+          : '$atual\n\n${text.trim()}';
+    });
+  }
+
   String _labelTipoVestigio(TipoVestigioVia t) => switch (t) {
     TipoVestigioVia.marcaFrenagem => 'Marca de frenagem',
     TipoVestigioVia.marcaDerrapagem => 'Marca de derrapagem',
@@ -789,6 +824,16 @@ class _CrimeTransitoLevantamentoScreenState
                           labelText: 'Descreva a dinâmica',
                           border: OutlineInputBorder(),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      AiSuggestionButton(
+                        fieldLabel: 'Descrição da dinâmica do acidente',
+                        currentText: _dinamicaOutroCtrl.text,
+                        currentTextBuilder: () => _dinamicaOutroCtrl.text,
+                        contextTextBuilder: _buildAiContextDinamicaOutro,
+                        profile: AiSuggestionProfile.crimeTransito,
+                        onReplace: _replaceDinamicaOutro,
+                        onAppend: _appendDinamicaOutro,
                       ),
                     ],
                     const SizedBox(height: 16),

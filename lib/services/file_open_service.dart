@@ -6,7 +6,7 @@ class FileOpenService {
   static const MethodChannel _channel = MethodChannel('laudo_tech/file_open');
 
   static Future<bool> open(String path) async {
-    if (!Platform.isAndroid) return false;
+    if (!Platform.isAndroid && !Platform.isIOS) return false;
     if (!await File(path).exists()) return false;
 
     try {

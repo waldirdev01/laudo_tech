@@ -7,6 +7,8 @@ import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
+import '../services/openai_service.dart';
+import '../widgets/ai_suggestion_button.dart';
 
 /// Last screen in the traffic flow when the nature of the occurrence does not
 /// have a velocity calculation yet (e.g. not Atropelamento). Shows the dynamics
@@ -85,6 +87,58 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
       CrimeTransitoFormaInteracao.pedestre => 'Pedestre',
       CrimeTransitoFormaInteracao.animal => 'Animal',
     };
+  }
+
+  String _buildAiContextComplemento() {
+    final natureza = widget.ficha.crimeTransitoNatureza;
+    final partes = <String>['Tipo de ocorrência: crime de trânsito.'];
+
+    if (natureza?.tipo != null) {
+      partes.add(
+        'Natureza: ${natureza!.tipo == CrimeTransitoNaturezaTipo.simples ? 'simples' : 'composta'}.',
+      );
+    }
+
+    final formas =
+        natureza?.formasInteracao ?? const <CrimeTransitoFormaInteracao>[];
+    if (formas.isNotEmpty) {
+      partes.add('Formas de interação: ${formas.map(_labelForma).join(', ')}.');
+    }
+
+    if (_dinamicaPrincipal != null) {
+      partes.add(
+        'Dinâmica principal derivada: ${CausasDeterminantesCatalogo.labelDinamica(_dinamicaPrincipal!)}.',
+      );
+    }
+
+    if (natureza?.observacoes?.trim().isNotEmpty == true) {
+      partes.add('Observações da natureza: ${natureza!.observacoes!.trim()}.');
+    }
+
+    if (_causasSelecionadas.isNotEmpty && _dinamicaPrincipal != null) {
+      final opcoes = CausasDeterminantesCatalogo.opcoesPara(_dinamicaPrincipal!)
+          .where((c) => _causasSelecionadas.contains(c.id))
+          .map((c) => '${c.referencia} - ${c.titulo}')
+          .toList();
+      if (opcoes.isNotEmpty) {
+        partes.add('Causas determinantes marcadas: ${opcoes.join('; ')}.');
+      }
+    }
+
+    return partes.join('\n');
+  }
+
+  void _replaceComplemento(String text) {
+    setState(() => _complementoCtrl.text = text.trim());
+  }
+
+  void _appendComplemento(String text) {
+    final atual = _complementoCtrl.text.trim();
+    setState(() {
+      _complementoCtrl.text = atual.isEmpty
+          ? text.trim()
+          : '$atual\n\n${text.trim()}';
+    });
   }
 
   Future<void> _finalizar() async {
@@ -281,6 +335,16 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
                 alignLabelWithHint: true,
               ),
               maxLines: 4,
+            ),
+            const SizedBox(height: 8),
+            AiSuggestionButton(
+              fieldLabel: 'Complemento da dinâmica do fato',
+              currentText: _complementoCtrl.text,
+              currentTextBuilder: () => _complementoCtrl.text,
+              contextTextBuilder: _buildAiContextComplemento,
+              profile: AiSuggestionProfile.crimeTransito,
+              onReplace: _replaceComplemento,
+              onAppend: _appendComplemento,
             ),
             const SizedBox(height: 24),
             Container(

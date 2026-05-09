@@ -1,0 +1,59 @@
+{
+  "id": "bloodstain_analysis",
+  "version": 1,
+  "status": "draft_for_internal_use",
+  "feature": {
+    "name": "Análise assistiva de manchas de sangue",
+    "scope": "Suporte interpretativo limitado para vestígios hemáticos em contexto de morte violenta",
+    "role": "assistive_only",
+    "domain_profile": "cvli_bloodstain"
+  },
+  "provider_policy": {
+    "forced_provider": "openai",
+    "requires_image_capable_provider": true,
+    "supports_user_model_selection": true,
+    "model_source": "provider_settings",
+    "reason": "A funcionalidade depende de análise com imagem e, nesta integração, isso fica restrito ao OpenAI / ChatGPT."
+  },
+  "behavior": {
+    "conservative_mode": true,
+    "allow_indeterminate_output": true,
+    "require_human_review_flags": true,
+    "block_without_minimum_inputs": true,
+    "confidence_cap_required": true
+  },
+  "linked_assets": {
+    "knowledge_base": "assets/ai/bloodstain/bloodstain_knowledge_base.json",
+    "response_templates": "assets/ai/bloodstain/bloodstain_response_templates.json",
+    "ui_messages": "assets/ai/bloodstain/bloodstain_ui_messages.json"
+  },
+  "output_contract": {
+    "response_schema": {
+      "status_da_analise": "string",
+      "qualidade_da_documentacao": "string",
+      "observacoes_visuais": "string[]",
+      "padrao_principal_compativel": "string|null",
+      "padroes_alternativos": "string[]",
+      "limitacoes_relevantes": "string[]",
+      "dados_ausentes": "string[]",
+      "recomendacoes_de_documentacao_complementar": "string[]",
+      "nivel_de_cautela": "string",
+      "necessidade_de_revisao_humana": "boolean"
+    }
+  },
+  "load_order": [
+    "knowledge_base",
+    "response_templates",
+    "ui_messages"
+  ],
+  "implementation_notes": {
+    "goal": "Fornecer um ponto unico de entrada para a feature sem perder a separacao entre conhecimento, templates e mensagens.",
+    "recommended_usage": [
+      "Carregar este arquivo primeiro.",
+      "Resolver linked_assets para montar a feature.",
+      "Usar knowledge_base para regras e taxonomia.",
+      "Usar response_templates para saidas padronizadas.",
+      "Usar ui_messages para validacoes e textos de interface."
+    ]
+  }
+}

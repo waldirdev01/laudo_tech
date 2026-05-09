@@ -8,7 +8,9 @@ import '../constants/evidencias_cadaver_regioes.dart';
 import '../constants/tipos_barba_referencia.dart';
 import '../models/cadaver_model.dart';
 import '../models/ficha_completa_model.dart';
+import '../services/openai_service.dart';
 import '../services/photo_backup_service.dart';
+import '../widgets/ai_suggestion_button.dart';
 import 'lesao_cadaver_form_screen.dart';
 
 class CadastroCadaverScreen extends StatefulWidget {
@@ -458,6 +460,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          dividerColor: Colors.transparent,
           tabs: const [
             Tab(text: 'Cena', icon: Icon(Icons.photo_camera)),
             Tab(text: 'Vestes', icon: Icon(Icons.checkroom)),
@@ -1738,6 +1744,19 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       ),
                       maxLines: 2,
                     ),
+                    const SizedBox(height: 8),
+                    AiSuggestionButton(
+                      fieldLabel: 'Observações sobre lesões de defesa',
+                      currentText: _obsLesoesDefesaCtrl.text,
+                      currentTextBuilder: () => _obsLesoesDefesaCtrl.text,
+                      profile: AiSuggestionProfile.cvli,
+                      contextTextBuilder: _buildAiContextLesoesDefesa,
+                      imagePathsBuilder: () => _fotosLesoesDefesa,
+                      onReplace: (text) =>
+                          _replaceControllerText(_obsLesoesDefesaCtrl, text),
+                      onAppend: (text) =>
+                          _appendControllerText(_obsLesoesDefesaCtrl, text),
+                    ),
                     const SizedBox(height: 12),
                     _buildSecaoFotos(
                       titulo: 'Fotos dos membros',
@@ -1986,6 +2005,35 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       return '${lesao.tipo}: Lesão em ${lesao.regiao}';
     }
     return 'Lesão em ${lesao.regiao}';
+  }
+
+  String _buildAiContextLesoesDefesa() {
+    final partes = <String>[
+      'Contexto: lesões de defesa no cadáver ${widget.cadaver.numero}.',
+    ];
+
+    if (_membrosExaminadosDefesa.isNotEmpty) {
+      partes.add(
+        'Membros examinados: ${_membrosExaminadosDefesa.join(', ')}.',
+      );
+    }
+
+    if (_ausenciaLesoesDefesa) {
+      partes.add('Foi marcada ausência de lesões de defesa.');
+    }
+
+    return partes.join('\n');
+  }
+
+  void _replaceControllerText(TextEditingController controller, String text) {
+    setState(() => controller.text = text.trim());
+  }
+
+  void _appendControllerText(TextEditingController controller, String text) {
+    final atual = controller.text.trim();
+    setState(() {
+      controller.text = atual.isEmpty ? text.trim() : '$atual\n\n${text.trim()}';
+    });
   }
 
   static const String _assetCorpoMasculino = 'assets/images/corpo_homem.png';
@@ -2698,6 +2746,45 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
     return idx >= 0 ? path.substring(idx + 1) : path;
   }
 
+  String _buildAiContextVeste() {
+    final partes = <String>[
+      'Contexto: descrição de veste do cadáver ${widget.cadaverNumero}.',
+      'Número da veste: ${widget.numeroVeste}.',
+    ];
+
+    if (_tipoMarcaCtrl.text.trim().isNotEmpty) {
+      partes.add('Tipo/marca: ${_tipoMarcaCtrl.text.trim()}.');
+    }
+    if (_corCtrl.text.trim().isNotEmpty) {
+      partes.add('Cor: ${_corCtrl.text.trim()}.');
+    }
+    if (_sujidades != null) {
+      partes.add('Sujidades: ${_sujidades! ? 'sim' : 'não'}.');
+    }
+    if (_sangue != null) {
+      partes.add('Sangue: ${_sangue! ? 'sim' : 'não'}.');
+    }
+    if (_bolsos != null) {
+      partes.add('Possui bolsos: ${_bolsos! ? 'sim' : 'não'}.');
+    }
+    if (_bolsos == true && _bolsosVazios != null) {
+      partes.add('Bolsos vazios: ${_bolsosVazios! ? 'sim' : 'não'}.');
+    }
+
+    return partes.join('\n');
+  }
+
+  void _replaceNotas(String text) {
+    setState(() => _notasCtrl.text = text.trim());
+  }
+
+  void _appendNotas(String text) {
+    final atual = _notasCtrl.text.trim();
+    setState(() {
+      _notasCtrl.text = atual.isEmpty ? text.trim() : '$atual\n\n${text.trim()}';
+    });
+  }
+
   Widget _buildSecaoFotos() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2959,6 +3046,17 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
                 border: OutlineInputBorder(),
               ),
               maxLines: 2,
+            ),
+            const SizedBox(height: 8),
+            AiSuggestionButton(
+              fieldLabel: 'Notas da veste',
+              currentText: _notasCtrl.text,
+              currentTextBuilder: () => _notasCtrl.text,
+              profile: AiSuggestionProfile.cvli,
+              contextTextBuilder: _buildAiContextVeste,
+              imagePathsBuilder: () => _fotosVeste,
+              onReplace: _replaceNotas,
+              onAppend: _appendNotas,
             ),
             const SizedBox(height: 16),
             const Divider(),

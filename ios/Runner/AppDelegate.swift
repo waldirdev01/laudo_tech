@@ -4,9 +4,11 @@ import PDFKit
 import Photos
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, UIDocumentInteractionControllerDelegate {
   private let PDF_CHANNEL = "laudo_tech/pdf"
   private let PHOTO_BACKUP_CHANNEL = "laudo_tech/photo_backup"
+  private let FILE_OPEN_CHANNEL = "laudo_tech/file_open"
+  private var documentInteractionController: UIDocumentInteractionController?
   
   override func application(
     _ application: UIApplication,
@@ -75,6 +77,32 @@ import Photos
       }
 
       self?.saveImageToGallery(path: path, result: result)
+    }
+
+    let fileOpenChannel = FlutterMethodChannel(
+      name: FILE_OPEN_CHANNEL,
+      binaryMessenger: controller.binaryMessenger
+    )
+
+    fileOpenChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard call.method == "openFile" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+
+      guard let args = call.arguments as? [String: Any],
+            let path = args["path"] as? String else {
+        result(FlutterError(
+          code: "ARG_ERROR",
+          message: "path is required",
+          details: nil
+        ))
+        return
+      }
+
+      DispatchQueue.main.async {
+        result(self?.openFile(path: path) ?? false)
+      }
     }
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -189,5 +217,53 @@ import Photos
         save()
       }
     }
+  }
+
+  private func openFile(path: String) -> Bool {
+    guard FileManager.default.fileExists(atPath: path) else {
+      return false
+    }
+
+    guard let presenter = topViewController() else {
+      return false
+    }
+
+    let fileURL = URL(fileURLWithPath: path)
+    let controller = UIDocumentInteractionController(url: fileURL)
+    controller.delegate = self
+    controller.name = fileURL.lastPathComponent
+    documentInteractionController = controller
+
+    if controller.presentPreview(animated: true) {
+      return true
+    }
+
+    let rect = presenter.view.bounds.insetBy(dx: presenter.view.bounds.midX, dy: presenter.view.bounds.midY)
+    return controller.presentOptionsMenu(from: rect, in: presenter.view, animated: true)
+  }
+
+  private func topViewController(base: UIViewController? = nil) -> UIViewController? {
+    let root = base ?? window?.rootViewController
+
+    if let nav = root as? UINavigationController {
+      return topViewController(base: nav.visibleViewController)
+    }
+
+    if let tab = root as? UITabBarController,
+       let selected = tab.selectedViewController {
+      return topViewController(base: selected)
+    }
+
+    if let presented = root?.presentedViewController {
+      return topViewController(base: presented)
+    }
+
+    return root
+  }
+
+  func documentInteractionControllerViewControllerForPreview(
+    _ controller: UIDocumentInteractionController
+  ) -> UIViewController {
+    topViewController() ?? window!.rootViewController!
   }
 }

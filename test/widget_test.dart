@@ -5,8 +5,7 @@ void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const LaudoTechApp());
 
-    expect(find.text('Laudo Tech'), findsWidgets);
-    expect(find.text('Nova Ocorrência'), findsOneWidget);
+    expect(find.text('Bem-vindo ao Laudo Tech'), findsOneWidget);
+    expect(find.text('Cadastrar Perito'), findsOneWidget);
   });
 }
-
