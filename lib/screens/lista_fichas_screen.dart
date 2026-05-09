@@ -12,6 +12,7 @@ import '../models/ficha_completa_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../models/veiculo_model.dart';
 import '../models/vestigio_local_model.dart';
+import '../models/vestigio_veiculo_model.dart';
 import '../services/ficha_service.dart';
 import '../services/file_open_service.dart';
 import '../services/laudo_generator_service.dart';
@@ -80,6 +81,37 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         ).showSnackBar(SnackBar(content: Text('Erro ao carregar fichas: $e')));
       }
     }
+  }
+
+  String _textoLegendaVestigioLocal(VestigioLocalModel vestigio) {
+    final nome = vestigio.nome?.trim() ?? '';
+    if (nome.isNotEmpty) return nome;
+
+    final descricao = vestigio.descricao?.trim() ?? '';
+    if (descricao.isNotEmpty) return descricao;
+
+    return 'vestígio registrado';
+  }
+
+  String _textoLegendaVestigioVeiculo(VestigioVeiculoModel vestigio) {
+    final nome = vestigio.nome?.trim() ?? '';
+    if (nome.isNotEmpty) return nome;
+
+    final descricao = vestigio.descricao?.trim() ?? '';
+    if (descricao.isNotEmpty) return descricao;
+
+    final localizacao = vestigio.localizacao?.trim() ?? '';
+    if (localizacao.isNotEmpty) return localizacao;
+
+    return 'vestígio registrado';
+  }
+
+  String _normalizarLegendaFoto(String texto, {int maxLength = 80}) {
+    final trimmed = texto.trim();
+    final legenda = trimmed.length > maxLength
+        ? '${trimmed.substring(0, maxLength)}...'
+        : trimmed;
+    return legenda.endsWith('.') ? legenda : '$legenda.';
   }
 
   Future<void> _abrirFicha(FichaCompletaModel ficha) async {
@@ -374,9 +406,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         fichaAtual.tipoOcorrencia == TipoOcorrencia.crimeTransito;
     final useLevantamentoVestigios =
         fichaAtual.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
-        fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
-        fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
-        isTransito;
+            fichaAtual.tipoOcorrencia == TipoOcorrencia.cvli ||
+            fichaAtual.tipoOcorrencia == TipoOcorrencia.morteEsclarecer ||
+            isTransito;
 
     if (useLevantamentoVestigios) {
       final lf = fichaAtual.localFurto;
@@ -426,15 +458,9 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
             vestigiosSemFoto++;
             continue;
           }
-          final descVestigio = v.rotuloNomeDescricao.trim().isEmpty
-              ? 'vestígio registrado'
-              : v.rotuloNomeDescricao.trim();
-          final legenda = descVestigio.isEmpty
-              ? 'Vestígio registrado.'
-              : (descVestigio.length > 80
-                        ? '${descVestigio.substring(0, 80)}...'
-                        : descVestigio) +
-                    (descVestigio.endsWith('.') ? '' : '.');
+          final legenda = _normalizarLegendaFoto(
+            _textoLegendaVestigioLocal(v),
+          );
           for (final p in v.fotosVinculadasPaths) {
             final resolved = await _resolverPath(p, basePath);
             if (resolved != null) {
@@ -470,8 +496,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           if (resolved != null) {
             orderedPaths.add(resolved);
             pathMap[f.path] = resolved;
-            pathToLegenda[resolved] =
-                f.legendaIndividual ??
+            pathToLegenda[resolved] = f.legendaIndividual ??
                 lev.fotosLocalEncontrado?.legendaGrupo ??
                 'Vista do local do evento.';
             vistaAmplaOk++;
@@ -495,8 +520,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           if (resolved != null) {
             orderedPaths.add(resolved);
             pathMap[f.path] = resolved;
-            pathToLegenda[resolved] =
-                f.legendaIndividual ??
+            pathToLegenda[resolved] = f.legendaIndividual ??
                 lev.fotosSinalizacao?.legendaGrupo ??
                 'Sinalização viária.';
           }
@@ -520,8 +544,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
           if (resolved != null) {
             orderedPaths.add(resolved);
             pathMap[f.path] = resolved;
-            pathToLegenda[resolved] =
-                f.legendaIndividual ??
+            pathToLegenda[resolved] = f.legendaIndividual ??
                 lev.fotosComplementares?.legendaGrupo ??
                 'Foto complementar.';
           }
@@ -628,7 +651,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
             }
           }
           for (final vest in v.vestigios ?? []) {
-            final descResumo = vest.textoLegendaFoto;
+            final descResumo = _textoLegendaVestigioVeiculo(vest);
             final legendaTexto = descResumo.length > 60
                 ? '${descResumo.substring(0, 60)}...'
                 : descResumo;
@@ -773,15 +796,12 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         return v.copyWith(numerosFotografias: nums);
       }
 
-      final vestigiosMediato = (lf?.vestigiosMediato ?? [])
-          .map(comNumeros)
-          .toList();
-      final vestigiosImediato = (lf?.vestigiosImediato ?? [])
-          .map(comNumeros)
-          .toList();
-      final vestigiosRelacionado = (lf?.vestigiosRelacionado ?? [])
-          .map(comNumeros)
-          .toList();
+      final vestigiosMediato =
+          (lf?.vestigiosMediato ?? []).map(comNumeros).toList();
+      final vestigiosImediato =
+          (lf?.vestigiosImediato ?? []).map(comNumeros).toList();
+      final vestigiosRelacionado =
+          (lf?.vestigiosRelacionado ?? []).map(comNumeros).toList();
 
       final localFurtoParaLaudo = lf?.copyWith(
         vestigiosMediato: vestigiosMediato,
@@ -850,9 +870,8 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         cadaveres: cadaveresParaLaudo ?? fichaAtual.cadaveres,
         veiculos: veiculosParaLaudo ?? fichaAtual.veiculos,
       );
-      fotosSelecionadas = pathsFinais.isEmpty
-          ? null
-          : pathsFinais.map((p) => File(p)).toList();
+      fotosSelecionadas =
+          pathsFinais.isEmpty ? null : pathsFinais.map((p) => File(p)).toList();
       legendasFotos = pathsFinais.isEmpty
           ? null
           : pathsFinais.map((p) => pathToLegenda[p] ?? '').toList();
@@ -1211,14 +1230,13 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
         break;
       case 'natureza_ocorrencia':
         if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
-          final formas =
-              ficha.crimeTransitoLevantamento?.formasInteracao ??
+          final formas = ficha.crimeTransitoLevantamento?.formasInteracao ??
               ficha.crimeTransitoNatureza?.formasInteracao ??
               [];
           telaDestino =
               formas.contains(CrimeTransitoFormaInteracao.atropelamento)
-              ? AtropelamentoCalculoScreen(ficha: ficha)
-              : DinamicaFatoTransitoScreen(ficha: ficha);
+                  ? AtropelamentoCalculoScreen(ficha: ficha)
+                  : DinamicaFatoTransitoScreen(ficha: ficha);
         }
         break;
       case 'dinamica_fato':
@@ -1290,207 +1308,213 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : _fichas.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.description_outlined,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Nenhuma ficha salva',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Crie uma nova ocorrência para começar',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _carregarFichas,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _fichas.length,
-                itemBuilder: (context, index) {
-                  final ficha = _fichas[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      leading: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.description,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                        ),
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.description_outlined,
+                        size: 80,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      title: Text(
-                        ficha.dadosSolicitacao.raiNumero ?? 'Sem RAI',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Nenhuma ficha salva',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Text(
-                            ficha.tipoOcorrencia.label,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w500,
+                      const SizedBox(height: 8),
+                      Text(
+                        'Crie uma nova ocorrência para começar',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _carregarFichas,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _fichas.length,
+                    itemBuilder: (context, index) {
+                      final ficha = _fichas[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          leading: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.description,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          if (ficha.dadosSolicitacao.numeroOcorrencia != null)
-                            Text(
-                              'Ocorrência: ${ficha.dadosSolicitacao.numeroOcorrencia}',
+                          title: Text(
+                            ficha.dadosSolicitacao.raiNumero ?? 'Sem RAI',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Criada em: ${DateFormat('dd/MM/yyyy HH:mm').format(ficha.dataCriacao)}',
-                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          if (ficha.dataHoraTermino == null ||
-                              ficha.dataHoraTermino!.isEmpty) ...[
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                ficha.tipoOcorrencia.label,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade100,
-                                borderRadius: BorderRadius.circular(4),
+                              const SizedBox(height: 4),
+                              if (ficha.dadosSolicitacao.numeroOcorrencia !=
+                                  null)
+                                Text(
+                                  'Ocorrência: ${ficha.dadosSolicitacao.numeroOcorrencia}',
+                                ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Criada em: ${DateFormat('dd/MM/yyyy HH:mm').format(ficha.dataCriacao)}',
+                                style: Theme.of(context).textTheme.bodySmall,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.access_time,
-                                    size: 14,
-                                    color: Colors.orange.shade900,
+                              if (ficha.dataHoraTermino == null ||
+                                  ficha.dataHoraTermino!.isEmpty) ...[
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Em atendimento',
-                                    style: TextStyle(
-                                      color: Colors.orange.shade900,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 14,
+                                        color: Colors.orange.shade900,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Em atendimento',
+                                        style: TextStyle(
+                                          color: Colors.orange.shade900,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          trailing: PopupMenuButton(
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'editar',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Editar'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'navegar',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.navigation, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('Navegar para Tela'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'gerar_ficha',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.description,
+                                      size: 20,
+                                      color: Colors.blue,
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Gerar Ficha',
+                                      style: TextStyle(color: Colors.blue),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      trailing: PopupMenuButton(
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'editar',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit, size: 20),
-                                SizedBox(width: 8),
-                                Text('Editar'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'navegar',
-                            child: Row(
-                              children: [
-                                Icon(Icons.navigation, size: 20),
-                                SizedBox(width: 8),
-                                Text('Navegar para Tela'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'gerar_ficha',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.description,
-                                  size: 20,
-                                  color: Colors.blue,
+                              const PopupMenuItem(
+                                value: 'gerar_laudo',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.article,
+                                      size: 20,
+                                      color: Colors.green,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Gerar Laudo',
+                                      style: TextStyle(color: Colors.green),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Gerar Ficha',
-                                  style: TextStyle(color: Colors.blue),
+                              ),
+                              const PopupMenuItem(
+                                value: 'excluir',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete,
+                                        size: 20, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Excluir',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
+                            onSelected: (value) {
+                              if (value == 'editar') {
+                                _abrirFicha(ficha);
+                              } else if (value == 'navegar') {
+                                _mostrarMenuNavegacao(ficha);
+                              } else if (value == 'gerar_ficha') {
+                                _gerarDocumentoWord(ficha);
+                              } else if (value == 'gerar_laudo') {
+                                _gerarDocumentoLaudo(ficha);
+                              } else if (value == 'excluir') {
+                                _removerFicha(ficha);
+                              }
+                            },
                           ),
-                          const PopupMenuItem(
-                            value: 'gerar_laudo',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.article,
-                                  size: 20,
-                                  color: Colors.green,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Gerar Laudo',
-                                  style: TextStyle(color: Colors.green),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'excluir',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, size: 20, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Excluir',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        onSelected: (value) {
-                          if (value == 'editar') {
-                            _abrirFicha(ficha);
-                          } else if (value == 'navegar') {
-                            _mostrarMenuNavegacao(ficha);
-                          } else if (value == 'gerar_ficha') {
-                            _gerarDocumentoWord(ficha);
-                          } else if (value == 'gerar_laudo') {
-                            _gerarDocumentoLaudo(ficha);
-                          } else if (value == 'excluir') {
-                            _removerFicha(ficha);
-                          }
-                        },
-                      ),
-                      onTap: () => _abrirFicha(ficha),
-                    ),
-                  );
-                },
-              ),
-            ),
+                          onTap: () => _abrirFicha(ficha),
+                        ),
+                      );
+                    },
+                  ),
+                ),
     );
   }
 }
@@ -1596,19 +1620,19 @@ class _GerenciarFotosLevantamentoSheetState
                                       ? Image.file(
                                           File(displayPath),
                                           fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (
-                                                context,
-                                                error,
-                                                stackTrace,
-                                              ) => Container(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .surfaceContainerHighest,
-                                                child: const Icon(
-                                                  Icons.broken_image,
-                                                ),
-                                              ),
+                                          errorBuilder: (
+                                            context,
+                                            error,
+                                            stackTrace,
+                                          ) =>
+                                              Container(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
+                                            child: const Icon(
+                                              Icons.broken_image,
+                                            ),
+                                          ),
                                         )
                                       : Container(
                                           color: Theme.of(
@@ -1620,7 +1644,9 @@ class _GerenciarFotosLevantamentoSheetState
                               ),
                               title: Text(
                                 numero,
-                                style: Theme.of(context).textTheme.titleMedium
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               trailing: Row(

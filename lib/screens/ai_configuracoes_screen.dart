@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/ai_model_catalog_service.dart';
 import '../services/ai_settings_service.dart';
 import '../services/openai_service.dart';
 
@@ -12,6 +13,9 @@ class AiConfiguracoesScreen extends StatefulWidget {
 
 class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
   final _settingsService = AiSettingsService();
+  late final _modelCatalogService = AiModelCatalogService(
+    settingsService: _settingsService,
+  );
   final _apiKeyController = TextEditingController();
   final _modelController = TextEditingController();
 
@@ -22,6 +26,8 @@ class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _testing = false;
+  bool _loadingModels = false;
+  List<String> _loadedModels = const [];
 
   @override
   void initState() {
@@ -44,6 +50,7 @@ class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
       _provider = settings.provider;
       _hasSavedKey = settings.hasApiKey;
       _modelController.text = settings.model;
+      _loadedModels = const [];
       _loading = false;
     });
   }
@@ -115,7 +122,34 @@ class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
       _hasSavedKey = hasApiKey;
       _modelController.text = model;
       _apiKeyController.clear();
+      _loadedModels = const [];
     });
+  }
+
+  Future<void> _loadAvailableModels() async {
+    setState(() => _loadingModels = true);
+    try {
+      final models = await _modelCatalogService.fetchModels(
+        provider: _provider,
+        apiKeyOverride: _apiKeyController.text,
+      );
+      if (!mounted) return;
+      setState(() => _loadedModels = models);
+      if (models.isEmpty) {
+        _showMessage('Nenhum modelo compatível foi retornado.');
+        return;
+      }
+      _showMessage('${models.length} modelo(s) disponível(is).');
+      await _selectModel();
+    } on AiServiceException catch (e) {
+      if (!mounted) return;
+      _showMessage(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Não foi possível carregar a lista de modelos.');
+    } finally {
+      if (mounted) setState(() => _loadingModels = false);
+    }
   }
 
   void _showMessage(String message) {
@@ -127,7 +161,7 @@ class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
   @override
   Widget build(BuildContext context) {
     final providerLabel = AiSettingsService.providerLabel(_provider);
-    final defaultModel = AiSettingsService.defaultModelFor(_provider);
+    final selectedModel = _modelController.text.trim();
 
     return Scaffold(
       appBar: AppBar(
@@ -201,14 +235,57 @@ class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
                               'Nesta integração, o DeepSeek usa apenas texto. Para análise com foto, mantenha o OpenAI selecionado.',
                             ),
                           ),
-                        TextField(
-                          controller: _modelController,
-                          decoration: InputDecoration(
-                            labelText: 'Modelo do $providerLabel',
-                            border: OutlineInputBorder(),
-                            hintText: defaultModel,
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('Modelo do $providerLabel'),
+                          subtitle: Text(
+                            selectedModel.isEmpty
+                                ? 'Carregue os modelos permitidos pela chave e selecione um.'
+                                : selectedModel,
                           ),
+                          trailing: _loadingModels
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.keyboard_arrow_down),
+                          onTap: _saving || _testing || _loadingModels
+                              ? null
+                              : () async {
+                                  if (_loadedModels.isEmpty) {
+                                    await _loadAvailableModels();
+                                  } else {
+                                    await _selectModel();
+                                  }
+                                },
                         ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _saving || _testing || _loadingModels
+                              ? null
+                              : _loadAvailableModels,
+                          icon: _loadingModels
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.cloud_sync_outlined),
+                          label: const Text('Carregar modelos da chave'),
+                        ),
+                        if (_loadedModels.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '${_loadedModels.length} modelo(s) carregado(s) pela chave. Somente o modelo selecionado será usado.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _apiKeyController,
@@ -277,5 +354,38 @@ class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
               ],
             ),
     );
+  }
+
+  Future<void> _selectModel() async {
+    if (_loadedModels.isEmpty) {
+      _showMessage('Carregue os modelos da chave antes de selecionar.');
+      return;
+    }
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: _loadedModels.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final model = _loadedModels[index];
+              final isSelected = model == _modelController.text.trim();
+              return ListTile(
+                title: Text(model),
+                trailing: isSelected ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(context).pop(model),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !mounted) return;
+    setState(() => _modelController.text = selected);
   }
 }

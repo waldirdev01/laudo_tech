@@ -41,6 +41,7 @@ class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
   String _planeOrientation = 'não informado';
   bool _loadingSettings = true;
   bool _analyzing = false;
+  AiSuggestionStyle? _refiningStyle;
   AiSettings? _openAiSettings;
   String? _result;
   String? _errorText;
@@ -137,15 +138,16 @@ class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
     Map<String, dynamic> knowledgeBase,
     Map<String, dynamic> responseTemplates,
   ) {
-    final safety = (knowledgeBase['safety_principles'] as List<dynamic>? ?? const [])
-        .map((item) {
-          if (item is Map<String, dynamic>) {
-            return item['rule']?.toString() ?? '';
-          }
-          return item.toString();
-        })
-        .where((item) => item.trim().isNotEmpty)
-        .join('\n- ');
+    final safety =
+        (knowledgeBase['safety_principles'] as List<dynamic>? ?? const [])
+            .map((item) {
+              if (item is Map<String, dynamic>) {
+                return item['rule']?.toString() ?? '';
+              }
+              return item.toString();
+            })
+            .where((item) => item.trim().isNotEmpty)
+            .join('\n- ');
 
     final prohibited =
         (knowledgeBase['prohibited_claims'] as List<dynamic>? ?? const [])
@@ -160,10 +162,10 @@ class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
             .join(', ');
 
     final featurePurpose =
-        (knowledgeBase['feature_purpose'] as Map<String, dynamic>? ?? const {})
-            ['scope']
-            ?.toString() ??
-        '';
+        (knowledgeBase['feature_purpose'] as Map<String, dynamic>? ??
+                    const {})['scope']
+                ?.toString() ??
+            '';
 
     return '''
 Contexto específico da funcionalidade: $featurePurpose
@@ -193,9 +195,8 @@ Necessidade de revisão humana:
 ''';
     }
 
-    final fields = schema.keys
-        .map((key) => '${key.replaceAll('_', ' ')}:')
-        .join('\n');
+    final fields =
+        schema.keys.map((key) => '${key.replaceAll('_', ' ')}:').join('\n');
     return 'Responda exatamente com os seguintes campos, nesta ordem:\n$fields';
   }
 
@@ -218,7 +219,7 @@ Necessidade de revisão humana:
   }
 
   Future<void> _runAnalysis(BloodstainFeatureProvider provider) async {
-    final bundle = provider.bundle;
+    var bundle = provider.bundle;
     final uiMessages = bundle?.uiMessages;
 
     if (_overviewImagePaths.isEmpty) {
@@ -273,6 +274,12 @@ Necessidade de revisão humana:
       return;
     }
 
+    if (bundle == null && !provider.isLoading) {
+      await provider.reload();
+      if (!mounted) return;
+      bundle = provider.bundle;
+    }
+
     if (bundle == null) {
       _showMessage(
         'A base da análise de manchas ainda não foi carregada. Tente novamente em instantes.',
@@ -298,7 +305,8 @@ Necessidade de revisão humana:
           bundle.knowledgeBase,
           bundle.responseTemplates,
         ),
-        responseDirective: _buildResponseDirective(bundle.config.outputContract),
+        responseDirective:
+            _buildResponseDirective(bundle.config.outputContract),
       );
 
       final response = await _aiService.generateSuggestion(request);
@@ -315,6 +323,84 @@ Necessidade de revisão humana:
         setState(() => _analyzing = false);
       }
     }
+  }
+
+  Future<void> _refineAnalysis(
+    BloodstainFeatureProvider provider,
+    AiSuggestionStyle style,
+  ) async {
+    final currentResult = _result?.trim();
+    if (currentResult == null || currentResult.isEmpty) {
+      _showMessage('Execute a primeira análise antes de ajustar o texto.');
+      return;
+    }
+
+    var bundle = provider.bundle;
+    if (bundle == null && !provider.isLoading) {
+      await provider.reload();
+      if (!mounted) return;
+      bundle = provider.bundle;
+    }
+
+    if (bundle == null) {
+      _showMessage(
+        'A base da análise de manchas ainda não foi carregada. Tente novamente em instantes.',
+      );
+      return;
+    }
+
+    setState(() {
+      _analyzing = true;
+      _refiningStyle = style;
+      _errorText = null;
+    });
+
+    try {
+      final request = AiSuggestionRequest(
+        fieldLabel: 'Revisão da análise assistiva de manchas de sangue',
+        currentText: currentResult,
+        contextText: _buildContextText(),
+        imagePaths: [..._overviewImagePaths, ..._closeUpImagePaths],
+        style: style,
+        profile: AiSuggestionProfile.bloodstainAnalysis,
+        providerOverride: bundle.config.providerPolicy.forcedProvider,
+        additionalInstructions: '''
+${_buildAdditionalInstructions(bundle.knowledgeBase, bundle.responseTemplates)}
+Reescreva o texto atual da análise no estilo solicitado.
+Não acrescente achados, interpretações, conclusões ou dados que não estejam no texto atual, no contexto ou nas imagens.
+Preserve as cautelas, limitações e necessidade de revisão humana quando existirem.
+''',
+        responseDirective: _refinementDirective(style),
+      );
+
+      final response = await _aiService.generateSuggestion(request);
+      if (!mounted) return;
+      setState(() => _result = response.trim());
+    } on AiServiceException catch (e) {
+      if (!mounted) return;
+      setState(() => _errorText = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorText = 'Falha ao ajustar a análise: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _analyzing = false;
+          _refiningStyle = null;
+        });
+      }
+    }
+  }
+
+  String _refinementDirective(AiSuggestionStyle style) {
+    return switch (style) {
+      AiSuggestionStyle.concise =>
+        'Reescreva em versão mais sucinta, mantendo apenas os pontos técnicos essenciais e sem perder as limitações relevantes.',
+      AiSuggestionStyle.objective =>
+        'Reescreva em versão mais objetiva, com frases diretas, sem floreios e sem reduzir cautelas técnicas necessárias.',
+      _ =>
+        'Reescreva o texto atual mantendo o conteúdo técnico e sem acrescentar fatos novos.',
+    };
   }
 
   void _showMessage(String message) {
@@ -344,17 +430,15 @@ Necessidade de revisão humana:
             Row(
               children: [
                 OutlinedButton.icon(
-                  onPressed: _analyzing
-                      ? null
-                      : () => _addCameraImage(imagePaths),
+                  onPressed:
+                      _analyzing ? null : () => _addCameraImage(imagePaths),
                   icon: const Icon(Icons.photo_camera),
                   label: const Text('Câmera'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
-                  onPressed: _analyzing
-                      ? null
-                      : () => _addGalleryImages(imagePaths),
+                  onPressed:
+                      _analyzing ? null : () => _addGalleryImages(imagePaths),
                   icon: const Icon(Icons.photo_library),
                   label: const Text('Galeria'),
                 ),
@@ -391,8 +475,8 @@ Necessidade de revisão humana:
                           onPressed: _analyzing
                               ? null
                               : () => setState(
-                                  () => imagePaths.removeAt(entry.key),
-                                ),
+                                    () => imagePaths.removeAt(entry.key),
+                                  ),
                           icon: const Icon(Icons.close, size: 18),
                           style: IconButton.styleFrom(
                             backgroundColor: Colors.black54,
@@ -418,6 +502,7 @@ Necessidade de revisão humana:
     final bundle = provider.bundle;
     final uiMessages = bundle?.uiMessages;
     final providerPolicy = bundle?.config.providerPolicy;
+    final canRunAnalysis = !_analyzing && !provider.isLoading;
 
     return Scaffold(
       appBar: AppBar(
@@ -448,7 +533,8 @@ Necessidade de revisão humana:
                             'Esta funcionalidade possui caráter exclusivamente assistivo e não substitui a análise pericial humana.',
                           ),
                         ),
-                        if (providerPolicy?.reason.trim().isNotEmpty == true) ...[
+                        if (providerPolicy?.reason.trim().isNotEmpty ==
+                            true) ...[
                           const SizedBox(height: 8),
                           Text(
                             providerPolicy!.reason,
@@ -511,7 +597,8 @@ Necessidade de revisão humana:
                                       _loadOpenAiSettings();
                                     },
                                     icon: const Icon(Icons.settings),
-                                    label: const Text('Abrir configurações de IA'),
+                                    label:
+                                        const Text('Abrir configurações de IA'),
                                   ),
                                 ),
                               ],
@@ -545,7 +632,8 @@ Necessidade de revisão humana:
                           controller: _surfaceTypeController,
                           decoration: const InputDecoration(
                             labelText: 'Tipo de superfície',
-                            hintText: 'Ex.: piso cerâmico, parede pintada, tecido',
+                            hintText:
+                                'Ex.: piso cerâmico, parede pintada, tecido',
                             border: OutlineInputBorder(),
                           ),
                         ),
@@ -614,8 +702,9 @@ Necessidade de revisão humana:
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
-                  onPressed: _analyzing ? null : () => _runAnalysis(provider),
-                  icon: _analyzing
+                  onPressed:
+                      canRunAnalysis ? () => _runAnalysis(provider) : null,
+                  icon: _analyzing || provider.isLoading
                       ? const SizedBox(
                           height: 18,
                           width: 18,
@@ -625,7 +714,9 @@ Necessidade de revisão humana:
                   label: Text(
                     _analyzing
                         ? 'Analisando...'
-                        : 'Executar análise assistiva',
+                        : provider.isLoading
+                            ? 'Carregando base...'
+                            : 'Executar análise assistiva',
                   ),
                 ),
                 if (_errorText != null) ...[
@@ -650,6 +741,51 @@ Necessidade de revisão humana:
                             const Text(
                               'Resultado assistivo',
                               style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: _analyzing
+                                      ? null
+                                      : () => _refineAnalysis(
+                                            provider,
+                                            AiSuggestionStyle.concise,
+                                          ),
+                                  icon: _refiningStyle ==
+                                          AiSuggestionStyle.concise
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.short_text),
+                                  label: const Text('Mais sucinto'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: _analyzing
+                                      ? null
+                                      : () => _refineAnalysis(
+                                            provider,
+                                            AiSuggestionStyle.objective,
+                                          ),
+                                  icon: _refiningStyle ==
+                                          AiSuggestionStyle.objective
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.fact_check_outlined),
+                                  label: const Text('Mais objetivo'),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
                             Text(_result!.trim()),

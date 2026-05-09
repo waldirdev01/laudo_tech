@@ -143,17 +143,16 @@ class TatuagemMarcaCorporalModel {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'descricao': descricao,
-    'fotosPaths': fotosPaths,
-  };
+        'id': id,
+        'descricao': descricao,
+        'fotosPaths': fotosPaths,
+      };
 
   factory TatuagemMarcaCorporalModel.fromJson(Map<String, dynamic> json) =>
       TatuagemMarcaCorporalModel(
         id: json['id'] as String?,
         descricao: json['descricao'] as String?,
-        fotosPaths:
-            (json['fotosPaths'] as List<dynamic>?)
+        fotosPaths: (json['fotosPaths'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
@@ -199,17 +198,17 @@ class VesteCadaverModel {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'numero': numero,
-    'tipoMarca': tipoMarca,
-    'cor': cor,
-    'sujidades': sujidades,
-    'sangue': sangue,
-    'bolsos': bolsos,
-    'bolsosVazios': bolsosVazios,
-    'notas': notas,
-    'fotosPaths': fotosPaths,
-  };
+        'id': id,
+        'numero': numero,
+        'tipoMarca': tipoMarca,
+        'cor': cor,
+        'sujidades': sujidades,
+        'sangue': sangue,
+        'bolsos': bolsos,
+        'bolsosVazios': bolsosVazios,
+        'notas': notas,
+        'fotosPaths': fotosPaths,
+      };
 
   factory VesteCadaverModel.fromJson(Map<String, dynamic> json) =>
       VesteCadaverModel(
@@ -222,8 +221,7 @@ class VesteCadaverModel {
         bolsos: json['bolsos'] as bool?,
         bolsosVazios: json['bolsosVazios'] as bool?,
         notas: json['notas'] as String?,
-        fotosPaths:
-            (json['fotosPaths'] as List<dynamic>?)
+        fotosPaths: (json['fotosPaths'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
@@ -290,14 +288,14 @@ class SinaisPaf {
   static const bordasEvertidas = 'Bordas evertidas';
 
   static List<String> get todos => [
-    orlaEscoriacao,
-    orlaEnxugo,
-    esfumacamento,
-    chamuscamento,
-    tatuagem,
-    bordasInvertidas,
-    bordasEvertidas,
-  ];
+        orlaEscoriacao,
+        orlaEnxugo,
+        esfumacamento,
+        chamuscamento,
+        tatuagem,
+        bordasInvertidas,
+        bordasEvertidas,
+      ];
 }
 
 /// Dados específicos de lesão PAF
@@ -315,26 +313,26 @@ class PafData {
   }) : sinais = sinais ?? {};
 
   Map<String, dynamic> toJson() => {
-    'tipo': tipo.name,
-    'distancia': distancia?.name,
-    'diametro': diametro,
-    'sinais': sinais.toList(),
-  };
+        'tipo': tipo.name,
+        'distancia': distancia?.name,
+        'diametro': diametro,
+        'sinais': sinais.toList(),
+      };
 
   factory PafData.fromJson(Map<String, dynamic> json) => PafData(
-    tipo: TipoLesaoPaf.values.firstWhere(
-      (e) => e.name == json['tipo'],
-      orElse: () => TipoLesaoPaf.entrada,
-    ),
-    distancia: json['distancia'] != null
-        ? DistanciaTiro.values.firstWhere(
-            (e) => e.name == json['distancia'],
-            orElse: () => DistanciaTiro.indeterminada,
-          )
-        : null,
-    diametro: (json['diametro'] as num?)?.toDouble(),
-    sinais: Set<String>.from(json['sinais'] as List? ?? []),
-  );
+        tipo: TipoLesaoPaf.values.firstWhere(
+          (e) => e.name == json['tipo'],
+          orElse: () => TipoLesaoPaf.entrada,
+        ),
+        distancia: json['distancia'] != null
+            ? DistanciaTiro.values.firstWhere(
+                (e) => e.name == json['distancia'],
+                orElse: () => DistanciaTiro.indeterminada,
+              )
+            : null,
+        diametro: (json['diametro'] as num?)?.toDouble(),
+        sinais: Set<String>.from(json['sinais'] as List? ?? []),
+      );
 
   PafData copyWith({
     TipoLesaoPaf? tipo,
@@ -535,15 +533,15 @@ class LesaoCadaverModel {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'nome': nome,
-    'regiao': regiao,
-    'descricao': descricao,
-    'tipo': tipo,
-    'isPaf': isPaf,
-    'paf': paf?.toJson(),
-    'fotosPaths': fotosPaths,
-  };
+        'id': id,
+        'nome': nome,
+        'regiao': regiao,
+        'descricao': descricao,
+        'tipo': tipo,
+        'isPaf': isPaf,
+        'paf': paf?.toJson(),
+        'fotosPaths': fotosPaths,
+      };
 
   factory LesaoCadaverModel.fromJson(Map<String, dynamic> json) =>
       LesaoCadaverModel(
@@ -556,8 +554,7 @@ class LesaoCadaverModel {
         paf: json['paf'] != null
             ? PafData.fromJson(json['paf'] as Map<String, dynamic>)
             : null,
-        fotosPaths:
-            (json['fotosPaths'] as List<dynamic>?)
+        fotosPaths: (json['fotosPaths'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
@@ -574,10 +571,12 @@ class LesaoCadaverModel {
   /// Texto para legenda de fotos no anexo.
   String get textoLegendaFoto {
     final n = nome?.trim();
+    if (n != null && n.isNotEmpty) return n;
+
     final desc = descricao?.trim();
-    final base = (desc != null && desc.isNotEmpty) ? desc : regiao.trim();
-    if (n != null && n.isNotEmpty) return '$n: $base';
-    return base;
+    if (desc != null && desc.isNotEmpty) return desc;
+
+    return regiao.trim();
   }
 
   LesaoCadaverModel copyWith({
@@ -637,7 +636,7 @@ class CadaverModel {
 
   // Localização no ambiente
   final String?
-  localizacaoAmbiente; // ex: "sobre a cama", "no centro do quarto"
+      localizacaoAmbiente; // ex: "sobre a cama", "no centro do quarto"
 
   // Coordenadas opcionais para pontos-chave do corpo
   final String? coordenadaCabecaX; // Coordenada X da cabeça (opcional)
@@ -647,15 +646,15 @@ class CadaverModel {
   final String? coordenadaPesY; // Coordenada Y dos pés (opcional)
   final String? alturaPes; // Altura dos pés em relação ao piso (opcional)
   final String?
-  coordenadaCentroTroncoX; // Coordenada X do centro do tronco (opcional)
+      coordenadaCentroTroncoX; // Coordenada X do centro do tronco (opcional)
   final String?
-  coordenadaCentroTroncoY; // Coordenada Y do centro do tronco (opcional)
+      coordenadaCentroTroncoY; // Coordenada Y do centro do tronco (opcional)
   final String?
-  alturaCentroTronco; // Altura do centro do tronco em relação ao piso (opcional)
+      alturaCentroTronco; // Altura do centro do tronco em relação ao piso (opcional)
 
   // Posição do corpo
   final String?
-  posicaoCorpoPreset; // "decubito_dorsal", "ventral", "lateral_direito", etc.
+      posicaoCorpoPreset; // "decubito_dorsal", "ventral", "lateral_direito", etc.
   final String? posicaoCorpoLivre; // texto livre se preset == "outra"
 
   // Exames - Rigidez
@@ -683,9 +682,9 @@ class CadaverModel {
 
   // Fotos dos exames (paths locais)
   final List<String>
-  fotosVistaCadaversAmbiente; // obrigatório: vista do cadáver no ambiente
+      fotosVistaCadaversAmbiente; // obrigatório: vista do cadáver no ambiente
   final List<String>
-  fotosPosicaoEncontrada; // obrigatório: posição em que foi encontrado
+      fotosPosicaoEncontrada; // obrigatório: posição em que foi encontrado
   final List<String> fotosHipostaseSecrecoes; // opcional
   final List<String> fotosTatuagens; // opcional (tatuagens e marcas corporais)
 
@@ -777,73 +776,72 @@ class CadaverModel {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'numero': numero,
-    'numeroLaudoCadaverico': numeroLaudoCadaverico,
-    'nomeDaVitima': nomeDaVitima,
-    'documentoIdentificacao': documentoIdentificacao,
-    'dataNascimento': dataNascimento,
-    'filiacao': filiacao,
-    'faixaEtaria': faixaEtaria?.name,
-    'sexo': sexo?.name,
-    'compleicao': compleicao?.name,
-    'corPele': corPele?.name,
-    'corCabelo': corCabelo?.name,
-    'corCabeloOutro': corCabeloOutro,
-    'tipoCabelo': tipoCabelo?.name,
-    'tipoCabeloOutro': tipoCabeloOutro,
-    'tamanhoCabelo': tamanhoCabelo?.name,
-    'tamanhoCabeloOutro': tamanhoCabeloOutro,
-    'tipoBarba': tipoBarba?.name,
-    'tipoBarbaOutro': tipoBarbaOutro,
-    'corBarba': corBarba?.name,
-    'corBarbaOutra': corBarbaOutra,
-    'tamanhoBarba': tamanhoBarba?.name,
-    'tamanhoBarbaOutro': tamanhoBarbaOutro,
-    'localizacaoAmbiente': localizacaoAmbiente,
-    'coordenadaCabecaX': coordenadaCabecaX,
-    'coordenadaCabecaY': coordenadaCabecaY,
-    'alturaCabeca': alturaCabeca,
-    'coordenadaPesX': coordenadaPesX,
-    'coordenadaPesY': coordenadaPesY,
-    'alturaPes': alturaPes,
-    'coordenadaCentroTroncoX': coordenadaCentroTroncoX,
-    'coordenadaCentroTroncoY': coordenadaCentroTroncoY,
-    'alturaCentroTronco': alturaCentroTronco,
-    'posicaoCorpoPreset': posicaoCorpoPreset,
-    'posicaoCorpoLivre': posicaoCorpoLivre,
-    'rigidezMandibula': rigidezMandibula?.name,
-    'rigidezMemSuperior': rigidezMemSuperior?.name,
-    'rigidezMemInferior': rigidezMemInferior?.name,
-    'hipostasePosicao': hipostasePosicao,
-    'hipostaseEstado': hipostaseEstado?.name,
-    'hipostaseCompativeis': hipostaseCompativeis,
-    'secrecaoNasal': secrecaoNasal,
-    'secrecaoNasalTipo': secrecaoNasalTipo,
-    'secrecaoOral': secrecaoOral,
-    'secrecaoOralTipo': secrecaoOralTipo,
-    'secrecaoAnal': secrecaoAnal,
-    'secrecaoAnalTipo': secrecaoAnalTipo,
-    'secrecaoPenianaVaginal': secrecaoPenianaVaginal,
-    'secrecaoPenianaVaginalTipo': secrecaoPenianaVaginalTipo,
-    'outrasObservacoes': outrasObservacoes,
-    'fotosVistaCadaversAmbiente': fotosVistaCadaversAmbiente,
-    'fotosPosicaoEncontrada': fotosPosicaoEncontrada,
-    'fotosHipostaseSecrecoes': fotosHipostaseSecrecoes,
-    'fotosTatuagens': fotosTatuagens,
-    'lesoes': lesoes?.map((l) => l.toJson()).toList(),
-    'ausenciaLesoesDefesa': ausenciaLesoesDefesa,
-    'membrosExaminadosDefesa': membrosExaminadosDefesa,
-    'observacoesLesoesDefesa': observacoesLesoesDefesa,
-    'fotosLesoesDefesa': fotosLesoesDefesa,
-    'numerosFotosLesoesDefesa': numerosFotosLesoesDefesa,
-    'vestes': vestes?.map((v) => v.toJson()).toList(),
-    'tatuagensMarcas': tatuagensMarcas,
-    'tatuagensMarcasLista': tatuagensMarcasLista
-        ?.map((t) => t.toJson())
-        .toList(),
-    'pertences': pertences,
-  };
+        'id': id,
+        'numero': numero,
+        'numeroLaudoCadaverico': numeroLaudoCadaverico,
+        'nomeDaVitima': nomeDaVitima,
+        'documentoIdentificacao': documentoIdentificacao,
+        'dataNascimento': dataNascimento,
+        'filiacao': filiacao,
+        'faixaEtaria': faixaEtaria?.name,
+        'sexo': sexo?.name,
+        'compleicao': compleicao?.name,
+        'corPele': corPele?.name,
+        'corCabelo': corCabelo?.name,
+        'corCabeloOutro': corCabeloOutro,
+        'tipoCabelo': tipoCabelo?.name,
+        'tipoCabeloOutro': tipoCabeloOutro,
+        'tamanhoCabelo': tamanhoCabelo?.name,
+        'tamanhoCabeloOutro': tamanhoCabeloOutro,
+        'tipoBarba': tipoBarba?.name,
+        'tipoBarbaOutro': tipoBarbaOutro,
+        'corBarba': corBarba?.name,
+        'corBarbaOutra': corBarbaOutra,
+        'tamanhoBarba': tamanhoBarba?.name,
+        'tamanhoBarbaOutro': tamanhoBarbaOutro,
+        'localizacaoAmbiente': localizacaoAmbiente,
+        'coordenadaCabecaX': coordenadaCabecaX,
+        'coordenadaCabecaY': coordenadaCabecaY,
+        'alturaCabeca': alturaCabeca,
+        'coordenadaPesX': coordenadaPesX,
+        'coordenadaPesY': coordenadaPesY,
+        'alturaPes': alturaPes,
+        'coordenadaCentroTroncoX': coordenadaCentroTroncoX,
+        'coordenadaCentroTroncoY': coordenadaCentroTroncoY,
+        'alturaCentroTronco': alturaCentroTronco,
+        'posicaoCorpoPreset': posicaoCorpoPreset,
+        'posicaoCorpoLivre': posicaoCorpoLivre,
+        'rigidezMandibula': rigidezMandibula?.name,
+        'rigidezMemSuperior': rigidezMemSuperior?.name,
+        'rigidezMemInferior': rigidezMemInferior?.name,
+        'hipostasePosicao': hipostasePosicao,
+        'hipostaseEstado': hipostaseEstado?.name,
+        'hipostaseCompativeis': hipostaseCompativeis,
+        'secrecaoNasal': secrecaoNasal,
+        'secrecaoNasalTipo': secrecaoNasalTipo,
+        'secrecaoOral': secrecaoOral,
+        'secrecaoOralTipo': secrecaoOralTipo,
+        'secrecaoAnal': secrecaoAnal,
+        'secrecaoAnalTipo': secrecaoAnalTipo,
+        'secrecaoPenianaVaginal': secrecaoPenianaVaginal,
+        'secrecaoPenianaVaginalTipo': secrecaoPenianaVaginalTipo,
+        'outrasObservacoes': outrasObservacoes,
+        'fotosVistaCadaversAmbiente': fotosVistaCadaversAmbiente,
+        'fotosPosicaoEncontrada': fotosPosicaoEncontrada,
+        'fotosHipostaseSecrecoes': fotosHipostaseSecrecoes,
+        'fotosTatuagens': fotosTatuagens,
+        'lesoes': lesoes?.map((l) => l.toJson()).toList(),
+        'ausenciaLesoesDefesa': ausenciaLesoesDefesa,
+        'membrosExaminadosDefesa': membrosExaminadosDefesa,
+        'observacoesLesoesDefesa': observacoesLesoesDefesa,
+        'fotosLesoesDefesa': fotosLesoesDefesa,
+        'numerosFotosLesoesDefesa': numerosFotosLesoesDefesa,
+        'vestes': vestes?.map((v) => v.toJson()).toList(),
+        'tatuagensMarcas': tatuagensMarcas,
+        'tatuagensMarcasLista':
+            tatuagensMarcasLista?.map((t) => t.toJson()).toList(),
+        'pertences': pertences,
+      };
 
   factory CadaverModel.fromJson(Map<String, dynamic> json) {
     return CadaverModel(
@@ -969,21 +967,19 @@ class CadaverModel {
       outrasObservacoes: json['outrasObservacoes'] as String?,
       fotosVistaCadaversAmbiente:
           (json['fotosVistaCadaversAmbiente'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
-      fotosPosicaoEncontrada:
-          (json['fotosPosicaoEncontrada'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      fotosPosicaoEncontrada: (json['fotosPosicaoEncontrada'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
       fotosHipostaseSecrecoes:
           (json['fotosHipostaseSecrecoes'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
-      fotosTatuagens:
-          ((json['fotosTatuagens'] ?? json['fotosTatuagensLesoes'])
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
+      fotosTatuagens: ((json['fotosTatuagens'] ?? json['fotosTatuagensLesoes'])
                   as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -994,12 +990,11 @@ class CadaverModel {
       ausenciaLesoesDefesa: json['ausenciaLesoesDefesa'] as bool? ?? false,
       membrosExaminadosDefesa:
           (json['membrosExaminadosDefesa'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              const [],
       observacoesLesoesDefesa: json['observacoesLesoesDefesa'] as String?,
-      fotosLesoesDefesa:
-          (json['fotosLesoesDefesa'] as List<dynamic>?)
+      fotosLesoesDefesa: (json['fotosLesoesDefesa'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -1162,8 +1157,7 @@ class CadaverModel {
           numerosFotosLesoesDefesa ?? this.numerosFotosLesoesDefesa,
       vestes: vestes ?? this.vestes,
       tatuagensMarcas: tatuagensMarcas ?? this.tatuagensMarcas,
-      tatuagensMarcasLista:
-          tatuagensMarcasLista ?? this.tatuagensMarcasLista,
+      tatuagensMarcasLista: tatuagensMarcasLista ?? this.tatuagensMarcasLista,
       pertences: pertences ?? this.pertences,
     );
   }

@@ -69,8 +69,7 @@ class AiSettingsService {
 
   Future<AiSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final provider =
-        prefs.getString(_providerKey) ?? openAiProvider;
+    final provider = prefs.getString(_providerKey) ?? openAiProvider;
     return loadForProvider(provider);
   }
 
@@ -124,11 +123,13 @@ class AiSettingsService {
   }
 
   Future<String?> getApiKey(String provider) {
-    return _secureStorage.read(key: _apiKeyStorageKey(normalizeProvider(provider)));
+    return _secureStorage.read(
+        key: _apiKeyStorageKey(normalizeProvider(provider)));
   }
 
   Future<void> clearApiKey(String provider) {
-    return _secureStorage.delete(key: _apiKeyStorageKey(normalizeProvider(provider)));
+    return _secureStorage.delete(
+        key: _apiKeyStorageKey(normalizeProvider(provider)));
   }
 
   String _modelForProvider(String provider, SharedPreferences prefs) {
