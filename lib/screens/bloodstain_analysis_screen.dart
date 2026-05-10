@@ -6,16 +6,20 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../core/ai/bloodstain_feature_provider.dart';
+import '../models/bloodstain_analysis_model.dart';
 import '../services/ai_settings_service.dart';
+import '../services/ficha_service.dart';
 import '../services/openai_service.dart';
 import 'ai_configuracoes_screen.dart';
 
 class BloodstainAnalysisScreen extends StatefulWidget {
+  final String fichaId;
   final String initialContextText;
   final List<String> initialOverviewImagePaths;
 
   const BloodstainAnalysisScreen({
     super.key,
+    required this.fichaId,
     required this.initialContextText,
     this.initialOverviewImagePaths = const [],
   });
@@ -27,6 +31,7 @@ class BloodstainAnalysisScreen extends StatefulWidget {
 
 class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
   final _settingsService = AiSettingsService();
+  final _fichaService = FichaService();
   final _aiService = AiSuggestionService();
   final _imagePicker = ImagePicker();
 
@@ -44,6 +49,7 @@ class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
   AiSuggestionStyle? _refiningStyle;
   AiSettings? _openAiSettings;
   String? _result;
+  String? _savedAnalysisId;
   String? _errorText;
 
   static const _planeOrientationOptions = [
@@ -137,6 +143,8 @@ class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
   String _buildAdditionalInstructions(
     Map<String, dynamic> knowledgeBase,
     Map<String, dynamic> responseTemplates,
+    Map<String, dynamic> glossary,
+    Map<String, dynamic> analysisLevels,
   ) {
     final safety =
         (knowledgeBase['safety_principles'] as List<dynamic>? ?? const [])
@@ -163,9 +171,35 @@ class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
 
     final featurePurpose =
         (knowledgeBase['feature_purpose'] as Map<String, dynamic>? ??
-                    const {})['scope']
-                ?.toString() ??
-            '';
+                const {})['scope']
+            ?.toString() ??
+        '';
+    final terms = (glossary['terms'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((item) {
+          final term = item['term']?.toString() ?? '';
+          final definition = item['definition']?.toString() ?? '';
+          final safeUsage = item['safe_usage']?.toString() ?? '';
+          if (term.trim().isEmpty) return '';
+          return '$term: $definition Uso seguro: $safeUsage';
+        })
+        .where((item) => item.trim().isNotEmpty)
+        .take(40)
+        .join('\n- ');
+    final levels =
+        (analysisLevels['analysis_levels'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map((item) {
+              final level = item['level']?.toString() ?? '';
+              final name = item['name']?.toString() ?? '';
+              final allowed = item['allowed_use']?.toString() ?? '';
+              final blocked = item['must_not_do']?.toString() ?? '';
+              return 'Nível $level - $name: pode $allowed; não deve $blocked';
+            })
+            .where((item) => item.trim().isNotEmpty)
+            .join('\n- ');
+    final operationalRule =
+        analysisLevels['operational_rule']?.toString() ?? '';
 
     return '''
 Contexto específico da funcionalidade: $featurePurpose
@@ -174,6 +208,11 @@ Regras obrigatórias adicionais:
 - Não use nenhuma afirmação proibida, incluindo: $prohibited.
 - Prefira expressões de cautela como: $uncertainty.
 - Se a documentação for fraca ou ambígua, classifique como inespecífica ou indeterminada em vez de forçar uma leitura.
+- Use a terminologia confiável abaixo como vocabulário de consulta, sem expandir além do que as imagens e o contexto sustentarem:
+- $terms
+- Respeite estes níveis de análise:
+- $levels
+- $operationalRule
 ''';
   }
 
@@ -195,8 +234,9 @@ Necessidade de revisão humana:
 ''';
     }
 
-    final fields =
-        schema.keys.map((key) => '${key.replaceAll('_', ' ')}:').join('\n');
+    final fields = schema.keys
+        .map((key) => '${key.replaceAll('_', ' ')}:')
+        .join('\n');
     return 'Responda exatamente com os seguintes campos, nesta ordem:\n$fields';
   }
 
@@ -304,12 +344,16 @@ Necessidade de revisão humana:
         additionalInstructions: _buildAdditionalInstructions(
           bundle.knowledgeBase,
           bundle.responseTemplates,
+          bundle.glossary,
+          bundle.analysisLevels,
         ),
-        responseDirective:
-            _buildResponseDirective(bundle.config.outputContract),
+        responseDirective: _buildResponseDirective(
+          bundle.config.outputContract,
+        ),
       );
 
       final response = await _aiService.generateSuggestion(request);
+      await _saveAnalysisResult(response.trim());
       if (!mounted) return;
       setState(() => _result = response.trim());
     } on AiServiceException catch (e) {
@@ -364,8 +408,9 @@ Necessidade de revisão humana:
         style: style,
         profile: AiSuggestionProfile.bloodstainAnalysis,
         providerOverride: bundle.config.providerPolicy.forcedProvider,
-        additionalInstructions: '''
-${_buildAdditionalInstructions(bundle.knowledgeBase, bundle.responseTemplates)}
+        additionalInstructions:
+            '''
+${_buildAdditionalInstructions(bundle.knowledgeBase, bundle.responseTemplates, bundle.glossary, bundle.analysisLevels)}
 Reescreva o texto atual da análise no estilo solicitado.
 Não acrescente achados, interpretações, conclusões ou dados que não estejam no texto atual, no contexto ou nas imagens.
 Preserve as cautelas, limitações e necessidade de revisão humana quando existirem.
@@ -374,6 +419,7 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
       );
 
       final response = await _aiService.generateSuggestion(request);
+      await _saveAnalysisResult(response.trim());
       if (!mounted) return;
       setState(() => _result = response.trim());
     } on AiServiceException catch (e) {
@@ -409,6 +455,44 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _saveAnalysisResult(String resultText) async {
+    if (resultText.trim().isEmpty) return;
+    final ficha = await _fichaService.obterFicha(widget.fichaId);
+    if (ficha == null) return;
+
+    final analysisId =
+        _savedAnalysisId ?? DateTime.now().microsecondsSinceEpoch.toString();
+    final analysis = BloodstainAnalysisModel(
+      id: analysisId,
+      createdAt: DateTime.now(),
+      contextText: _contextController.text.trim(),
+      surfaceType: _surfaceTypeController.text.trim(),
+      planeOrientation: _planeOrientation,
+      scalePresent: _scalePresent,
+      overviewImagePaths: List<String>.from(_overviewImagePaths),
+      closeUpImagePaths: List<String>.from(_closeUpImagePaths),
+      resultText: resultText.trim(),
+    );
+
+    final analyses = List<BloodstainAnalysisModel>.from(
+      ficha.analisesManchasSangue,
+    );
+    final existingIndex = analyses.indexWhere((item) => item.id == analysisId);
+    if (existingIndex >= 0) {
+      analyses[existingIndex] = analysis;
+    } else {
+      analyses.add(analysis);
+    }
+
+    await _fichaService.salvarFicha(
+      ficha.copyWith(
+        analisesManchasSangue: analyses,
+        dataUltimaAtualizacao: DateTime.now(),
+      ),
+    );
+    _savedAnalysisId = analysisId;
+  }
+
   Widget _buildImageSection({
     required String title,
     required String description,
@@ -430,15 +514,17 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
             Row(
               children: [
                 OutlinedButton.icon(
-                  onPressed:
-                      _analyzing ? null : () => _addCameraImage(imagePaths),
+                  onPressed: _analyzing
+                      ? null
+                      : () => _addCameraImage(imagePaths),
                   icon: const Icon(Icons.photo_camera),
                   label: const Text('Câmera'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
-                  onPressed:
-                      _analyzing ? null : () => _addGalleryImages(imagePaths),
+                  onPressed: _analyzing
+                      ? null
+                      : () => _addGalleryImages(imagePaths),
                   icon: const Icon(Icons.photo_library),
                   label: const Text('Galeria'),
                 ),
@@ -475,8 +561,8 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
                           onPressed: _analyzing
                               ? null
                               : () => setState(
-                                    () => imagePaths.removeAt(entry.key),
-                                  ),
+                                  () => imagePaths.removeAt(entry.key),
+                                ),
                           icon: const Icon(Icons.close, size: 18),
                           style: IconButton.styleFrom(
                             backgroundColor: Colors.black54,
@@ -505,10 +591,7 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
     final canRunAnalysis = !_analyzing && !provider.isLoading;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manchas de Sangue'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Manchas de Sangue'), centerTitle: true),
       body: provider.isLoading && bundle == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -597,8 +680,9 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
                                       _loadOpenAiSettings();
                                     },
                                     icon: const Icon(Icons.settings),
-                                    label:
-                                        const Text('Abrir configurações de IA'),
+                                    label: const Text(
+                                      'Abrir configurações de IA',
+                                    ),
                                   ),
                                 ),
                               ],
@@ -702,8 +786,9 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
-                  onPressed:
-                      canRunAnalysis ? () => _runAnalysis(provider) : null,
+                  onPressed: canRunAnalysis
+                      ? () => _runAnalysis(provider)
+                      : null,
                   icon: _analyzing || provider.isLoading
                       ? const SizedBox(
                           height: 18,
@@ -715,8 +800,8 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
                     _analyzing
                         ? 'Analisando...'
                         : provider.isLoading
-                            ? 'Carregando base...'
-                            : 'Executar análise assistiva',
+                        ? 'Carregando base...'
+                        : 'Executar análise assistiva',
                   ),
                 ),
                 if (_errorText != null) ...[
@@ -751,10 +836,11 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
                                   onPressed: _analyzing
                                       ? null
                                       : () => _refineAnalysis(
-                                            provider,
-                                            AiSuggestionStyle.concise,
-                                          ),
-                                  icon: _refiningStyle ==
+                                          provider,
+                                          AiSuggestionStyle.concise,
+                                        ),
+                                  icon:
+                                      _refiningStyle ==
                                           AiSuggestionStyle.concise
                                       ? const SizedBox(
                                           width: 16,
@@ -770,10 +856,11 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
                                   onPressed: _analyzing
                                       ? null
                                       : () => _refineAnalysis(
-                                            provider,
-                                            AiSuggestionStyle.objective,
-                                          ),
-                                  icon: _refiningStyle ==
+                                          provider,
+                                          AiSuggestionStyle.objective,
+                                        ),
+                                  icon:
+                                      _refiningStyle ==
                                           AiSuggestionStyle.objective
                                       ? const SizedBox(
                                           width: 16,

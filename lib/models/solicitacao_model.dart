@@ -1,4 +1,5 @@
 import 'pessoa_envolvida_model.dart';
+import '../utils/coordinate_formatter.dart';
 
 /// Modelo para dados extraídos do PDF de SOLICITAÇÃO de Perícia
 class SolicitacaoModel {
@@ -81,41 +82,57 @@ class SolicitacaoModel {
     this.coordenadasW,
   });
 
-  Map<String, dynamic> toJson() => {
-        'raiNumero': raiNumero,
-        'numeroOcorrencia': numeroOcorrencia,
-        'naturezaOcorrencia': naturezaOcorrencia,
-        'dataHoraComunicacao': dataHoraComunicacao,
-        'dataHoraDeslocamento': dataHoraDeslocamento,
-        'dataHoraInicio': dataHoraInicio,
-        'dataHoraTermino': dataHoraTermino,
-        'pedidoDilacao': pedidoDilacao,
-        'peritoCriminal': peritoCriminal,
-        'matriculaPerito': matriculaPerito,
-        'fotografoCriminalistico': fotografoCriminalistico,
-        'demaisServidoresPoliciais': demaisServidoresPoliciais,
-        'policiaMilitarRodoviariaViatura': policiaMilitarRodoviariaViatura,
-        'equipePolicial': equipePolicial?.map((e) => e.toJson()).toList(),
-        'autoridadePolicial': autoridadePolicial,
-        'matriculaAutoridade': matriculaAutoridade,
-        'agentesPolicia': agentesPolicia?.map((e) => e.toJson()).toList(),
-        'cbm': cbm,
-        'samu': samu,
-        'semResgate': semResgate,
-        'unidadeNumero': unidadeNumero,
-        'medicoAssistente': medicoAssistente,
-        'crmGo': crmGo,
-        'outrosSocorristas': outrosSocorristas,
-        'unidadeOrigem': unidadeOrigem,
-        'unidadeAfeta': unidadeAfeta,
-        'pessoasEnvolvidas': pessoasEnvolvidas?.map((e) => e.toJson()).toList(),
-        'endereco': endereco,
-        'municipio': municipio,
-        'coordenadasS': coordenadasS,
-        'coordenadasW': coordenadasW,
-      };
+  String? get coordenadasSFormatada {
+    return CoordinateFormatter.formatLatitudeFromSouthString(coordenadasS);
+  }
 
-  factory SolicitacaoModel.fromJson(Map<String, dynamic> json) => SolicitacaoModel(
+  String? get coordenadasWFormatada {
+    return CoordinateFormatter.formatLongitudeFromWestString(coordenadasW);
+  }
+
+  String? get coordenadasFormatadas {
+    return CoordinateFormatter.formatPair(
+      latitude: coordenadasSFormatada,
+      longitude: coordenadasWFormatada,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'raiNumero': raiNumero,
+    'numeroOcorrencia': numeroOcorrencia,
+    'naturezaOcorrencia': naturezaOcorrencia,
+    'dataHoraComunicacao': dataHoraComunicacao,
+    'dataHoraDeslocamento': dataHoraDeslocamento,
+    'dataHoraInicio': dataHoraInicio,
+    'dataHoraTermino': dataHoraTermino,
+    'pedidoDilacao': pedidoDilacao,
+    'peritoCriminal': peritoCriminal,
+    'matriculaPerito': matriculaPerito,
+    'fotografoCriminalistico': fotografoCriminalistico,
+    'demaisServidoresPoliciais': demaisServidoresPoliciais,
+    'policiaMilitarRodoviariaViatura': policiaMilitarRodoviariaViatura,
+    'equipePolicial': equipePolicial?.map((e) => e.toJson()).toList(),
+    'autoridadePolicial': autoridadePolicial,
+    'matriculaAutoridade': matriculaAutoridade,
+    'agentesPolicia': agentesPolicia?.map((e) => e.toJson()).toList(),
+    'cbm': cbm,
+    'samu': samu,
+    'semResgate': semResgate,
+    'unidadeNumero': unidadeNumero,
+    'medicoAssistente': medicoAssistente,
+    'crmGo': crmGo,
+    'outrosSocorristas': outrosSocorristas,
+    'unidadeOrigem': unidadeOrigem,
+    'unidadeAfeta': unidadeAfeta,
+    'pessoasEnvolvidas': pessoasEnvolvidas?.map((e) => e.toJson()).toList(),
+    'endereco': endereco,
+    'municipio': municipio,
+    'coordenadasS': coordenadasS,
+    'coordenadasW': coordenadasW,
+  };
+
+  factory SolicitacaoModel.fromJson(Map<String, dynamic> json) =>
+      SolicitacaoModel(
         raiNumero: json['raiNumero'] as String?,
         numeroOcorrencia: json['numeroOcorrencia'] as String?,
         naturezaOcorrencia: json['naturezaOcorrencia'] as String?,
@@ -128,7 +145,8 @@ class SolicitacaoModel {
         matriculaPerito: json['matriculaPerito'] as String?,
         fotografoCriminalistico: json['fotografoCriminalistico'] as String?,
         demaisServidoresPoliciais: json['demaisServidoresPoliciais'] as String?,
-        policiaMilitarRodoviariaViatura: json['policiaMilitarRodoviariaViatura'] as String?,
+        policiaMilitarRodoviariaViatura:
+            json['policiaMilitarRodoviariaViatura'] as String?,
         equipePolicial: (json['equipePolicial'] as List?)
             ?.map((e) => PessoaEquipe.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -147,7 +165,9 @@ class SolicitacaoModel {
         unidadeOrigem: json['unidadeOrigem'] as String?,
         unidadeAfeta: json['unidadeAfeta'] as String?,
         pessoasEnvolvidas: (json['pessoasEnvolvidas'] as List?)
-            ?.map((e) => PessoaEnvolvidaModel.fromJson(e as Map<String, dynamic>))
+            ?.map(
+              (e) => PessoaEnvolvidaModel.fromJson(e as Map<String, dynamic>),
+            )
             .toList(),
         endereco: json['endereco'] as String?,
         municipio: json['municipio'] as String?,
@@ -162,14 +182,10 @@ class PessoaEquipe {
 
   PessoaEquipe({this.nome, this.matricula});
 
-  Map<String, dynamic> toJson() => {
-        'nome': nome,
-        'matricula': matricula,
-      };
+  Map<String, dynamic> toJson() => {'nome': nome, 'matricula': matricula};
 
   factory PessoaEquipe.fromJson(Map<String, dynamic> json) => PessoaEquipe(
-        nome: json['nome'] as String?,
-        matricula: json['matricula'] as String?,
-      );
+    nome: json['nome'] as String?,
+    matricula: json['matricula'] as String?,
+  );
 }
-

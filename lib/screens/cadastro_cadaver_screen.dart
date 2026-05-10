@@ -2504,6 +2504,7 @@ class CadastroTatuagemMarcaScreen extends StatefulWidget {
 
 class _CadastroTatuagemMarcaScreenState extends State<CadastroTatuagemMarcaScreen> {
   final _descricaoCtrl = TextEditingController();
+  final _numerosFotosCtrl = TextEditingController();
   final _imagePicker = ImagePicker();
   List<String> _fotos = [];
 
@@ -2511,13 +2512,33 @@ class _CadastroTatuagemMarcaScreenState extends State<CadastroTatuagemMarcaScree
   void initState() {
     super.initState();
     _descricaoCtrl.text = widget.existente?.descricao ?? '';
+    if (widget.existente?.numerosFotografias.isNotEmpty == true) {
+      _numerosFotosCtrl.text = widget.existente!.numerosFotografias
+          .map((n) => n.toString().padLeft(2, '0'))
+          .join(', ');
+    }
     _fotos = List<String>.from(widget.existente?.fotosPaths ?? const []);
   }
 
   @override
   void dispose() {
     _descricaoCtrl.dispose();
+    _numerosFotosCtrl.dispose();
     super.dispose();
+  }
+
+  List<int> _parseNumerosFotografia(String raw) {
+    final partes = raw
+        .split(RegExp(r'[,;\s]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty);
+    final nums = <int>{};
+    for (final parte in partes) {
+      final n = int.tryParse(parte);
+      if (n != null && n > 0) nums.add(n);
+    }
+    final lista = nums.toList()..sort();
+    return lista;
   }
 
   Future<String?> _persistirFoto(XFile arquivo) async {
@@ -2554,6 +2575,7 @@ class _CadastroTatuagemMarcaScreenState extends State<CadastroTatuagemMarcaScree
       descricao: _descricaoCtrl.text.trim().isEmpty
           ? null
           : _descricaoCtrl.text.trim(),
+      numerosFotografias: _parseNumerosFotografia(_numerosFotosCtrl.text),
       fotosPaths: List<String>.from(_fotos),
     );
     Navigator.of(context).pop(item);
@@ -2582,6 +2604,16 @@ class _CadastroTatuagemMarcaScreenState extends State<CadastroTatuagemMarcaScree
                 border: OutlineInputBorder(),
               ),
               maxLines: 4,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _numerosFotosCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Nº da(s) fotografia(s)',
+                hintText: 'Ex.: 12, 13',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 12),
             Text(

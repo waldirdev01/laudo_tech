@@ -217,7 +217,9 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                       );
                     },
               icon: const Icon(Icons.edit_note, size: 20),
-              label: const Text('Não tenho a requisição – preencher tudo manualmente'),
+              label: const Text(
+                'Não tenho a requisição – preencher tudo manualmente',
+              ),
             ),
             if (_pdfBytes != null || _caminhoPdf != null) ...[
               const SizedBox(height: 12),
@@ -437,16 +439,11 @@ class _UploadPdfScreenState extends State<UploadPdfScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (_dadosExtraidos!.coordenadasS != null)
+                                    if (_dadosExtraidos!
+                                            .coordenadasFormatadas !=
+                                        null)
                                       Text(
-                                        'S: ${_dadosExtraidos!.coordenadasS}',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodyMedium,
-                                      ),
-                                    if (_dadosExtraidos!.coordenadasW != null)
-                                      Text(
-                                        'W: ${_dadosExtraidos!.coordenadasW}',
+                                        _dadosExtraidos!.coordenadasFormatadas!,
                                         style: Theme.of(
                                           context,
                                         ).textTheme.bodyMedium,

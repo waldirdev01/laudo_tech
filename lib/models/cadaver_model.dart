@@ -134,17 +134,20 @@ enum EstadoHipostase {
 class TatuagemMarcaCorporalModel {
   final String? id;
   final String? descricao;
+  final List<int> numerosFotografias;
   final List<String> fotosPaths;
 
   TatuagemMarcaCorporalModel({
     this.id,
     this.descricao,
+    this.numerosFotografias = const [],
     this.fotosPaths = const [],
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'descricao': descricao,
+        'numerosFotografias': numerosFotografias,
         'fotosPaths': fotosPaths,
       };
 
@@ -152,6 +155,11 @@ class TatuagemMarcaCorporalModel {
       TatuagemMarcaCorporalModel(
         id: json['id'] as String?,
         descricao: json['descricao'] as String?,
+        numerosFotografias: (json['numerosFotografias'] as List<dynamic>?)
+                ?.map((e) => int.tryParse(e.toString()))
+                .whereType<int>()
+                .toList() ??
+            const [],
         fotosPaths: (json['fotosPaths'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
@@ -161,11 +169,13 @@ class TatuagemMarcaCorporalModel {
   TatuagemMarcaCorporalModel copyWith({
     String? id,
     String? descricao,
+    List<int>? numerosFotografias,
     List<String>? fotosPaths,
   }) {
     return TatuagemMarcaCorporalModel(
       id: id ?? this.id,
       descricao: descricao ?? this.descricao,
+      numerosFotografias: numerosFotografias ?? this.numerosFotografias,
       fotosPaths: fotosPaths ?? this.fotosPaths,
     );
   }

@@ -13,6 +13,7 @@ import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
 import '../services/openai_service.dart';
 import '../services/photo_backup_service.dart';
+import '../utils/coordinate_formatter.dart';
 import '../widgets/ai_suggestion_button.dart';
 import 'lista_veiculos_screen.dart';
 
@@ -158,8 +159,10 @@ class _CrimeTransitoLevantamentoScreenState
 
     if (dados.marcoZero != null) {
       _marcoZeroDescricaoCtrl.text = dados.marcoZero!.descricao ?? '';
-      _marcoZeroLatCtrl.text = dados.marcoZero!.latitude ?? '';
-      _marcoZeroLngCtrl.text = dados.marcoZero!.longitude ?? '';
+      _marcoZeroLatCtrl.text = _formatLatitudeValue(dados.marcoZero!.latitude);
+      _marcoZeroLngCtrl.text = _formatLongitudeValue(
+        dados.marcoZero!.longitude,
+      );
       _marcoZeroFotos = List<String>.from(dados.marcoZero!.fotos)
         ..removeWhere((p) => !File(p).existsSync());
     }
@@ -196,6 +199,14 @@ class _CrimeTransitoLevantamentoScreenState
       );
       _legendaComplementaresCtrl.text = dados.fotosComplementares!.legendaGrupo;
     }
+  }
+
+  String _formatLatitudeValue(String? value) {
+    return CoordinateFormatter.formatLatitudeFromSouthString(value) ?? '';
+  }
+
+  String _formatLongitudeValue(String? value) {
+    return CoordinateFormatter.formatLongitudeFromWestString(value) ?? '';
   }
 
   @override
@@ -322,8 +333,12 @@ class _CrimeTransitoLevantamentoScreenState
         ),
       );
       setState(() {
-        _marcoZeroLatCtrl.text = pos.latitude.toStringAsFixed(6);
-        _marcoZeroLngCtrl.text = pos.longitude.toStringAsFixed(6);
+        _marcoZeroLatCtrl.text = _formatLatitudeValue(
+          pos.latitude.toStringAsFixed(6),
+        );
+        _marcoZeroLngCtrl.text = _formatLongitudeValue(
+          pos.longitude.toStringAsFixed(6),
+        );
       });
     } catch (_) {
       if (mounted) {
@@ -386,10 +401,10 @@ class _CrimeTransitoLevantamentoScreenState
                   : _marcoZeroDescricaoCtrl.text.trim(),
               latitude: _marcoZeroLatCtrl.text.trim().isEmpty
                   ? null
-                  : _marcoZeroLatCtrl.text.trim(),
+                  : _formatLatitudeValue(_marcoZeroLatCtrl.text.trim()),
               longitude: _marcoZeroLngCtrl.text.trim().isEmpty
                   ? null
-                  : _marcoZeroLngCtrl.text.trim(),
+                  : _formatLongitudeValue(_marcoZeroLngCtrl.text.trim()),
               fotos: _marcoZeroFotos,
             ),
       fotosLocalEncontrado: _fotosLocalEncontrado.isEmpty
@@ -925,13 +940,9 @@ class _CrimeTransitoLevantamentoScreenState
                         Expanded(
                           child: TextField(
                             controller: _marcoZeroLatCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                              signed: true,
-                            ),
                             decoration: const InputDecoration(
-                              labelText: 'Latitude (graus decimais)',
-                              hintText: 'Ex.: -23.550519',
+                              labelText: 'Latitude',
+                              hintText: 'Ex.: 15°31\'51.2"S',
                               isDense: true,
                             ),
                           ),
@@ -940,13 +951,9 @@ class _CrimeTransitoLevantamentoScreenState
                         Expanded(
                           child: TextField(
                             controller: _marcoZeroLngCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                              signed: true,
-                            ),
                             decoration: const InputDecoration(
-                              labelText: 'Longitude (graus decimais)',
-                              hintText: 'Ex.: -46.633309',
+                              labelText: 'Longitude',
+                              hintText: 'Ex.: 47°17\'47.3"W',
                               isDense: true,
                             ),
                           ),

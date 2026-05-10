@@ -21,11 +21,11 @@ class BloodstainFeatureMetadata {
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'scope': scope,
-        'role': role,
-        'domain_profile': domainProfile,
-      };
+    'name': name,
+    'scope': scope,
+    'role': role,
+    'domain_profile': domainProfile,
+  };
 
   BloodstainFeatureMetadata copyWith({
     String? name,
@@ -71,12 +71,12 @@ class BloodstainFeatureBehavior {
   }
 
   Map<String, dynamic> toJson() => {
-        'conservative_mode': conservativeMode,
-        'allow_indeterminate_output': allowIndeterminateOutput,
-        'require_human_review_flags': requireHumanReviewFlags,
-        'block_without_minimum_inputs': blockWithoutMinimumInputs,
-        'confidence_cap_required': confidenceCapRequired,
-      };
+    'conservative_mode': conservativeMode,
+    'allow_indeterminate_output': allowIndeterminateOutput,
+    'require_human_review_flags': requireHumanReviewFlags,
+    'block_without_minimum_inputs': blockWithoutMinimumInputs,
+    'confidence_cap_required': confidenceCapRequired,
+  };
 
   BloodstainFeatureBehavior copyWith({
     bool? conservativeMode,
@@ -127,12 +127,12 @@ class BloodstainProviderPolicy {
   }
 
   Map<String, dynamic> toJson() => {
-        'forced_provider': forcedProvider,
-        'requires_image_capable_provider': requiresImageCapableProvider,
-        'supports_user_model_selection': supportsUserModelSelection,
-        'model_source': modelSource,
-        'reason': reason,
-      };
+    'forced_provider': forcedProvider,
+    'requires_image_capable_provider': requiresImageCapableProvider,
+    'supports_user_model_selection': supportsUserModelSelection,
+    'model_source': modelSource,
+    'reason': reason,
+  };
 
   BloodstainProviderPolicy copyWith({
     String? forcedProvider,
@@ -157,11 +157,15 @@ class BloodstainLinkedAssets {
   final String knowledgeBase;
   final String responseTemplates;
   final String uiMessages;
+  final String glossary;
+  final String analysisLevels;
 
   const BloodstainLinkedAssets({
     required this.knowledgeBase,
     required this.responseTemplates,
     required this.uiMessages,
+    this.glossary = '',
+    this.analysisLevels = '',
   });
 
   factory BloodstainLinkedAssets.fromJson(Map<String, dynamic> json) {
@@ -169,30 +173,40 @@ class BloodstainLinkedAssets {
       knowledgeBase: json['knowledge_base'] as String? ?? '',
       responseTemplates: json['response_templates'] as String? ?? '',
       uiMessages: json['ui_messages'] as String? ?? '',
+      glossary: json['glossary'] as String? ?? '',
+      analysisLevels: json['analysis_levels'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'knowledge_base': knowledgeBase,
-        'response_templates': responseTemplates,
-        'ui_messages': uiMessages,
-      };
+    'knowledge_base': knowledgeBase,
+    'response_templates': responseTemplates,
+    'ui_messages': uiMessages,
+    'glossary': glossary,
+    'analysis_levels': analysisLevels,
+  };
 
   Map<String, String> toAssetMap() => {
-        'knowledge_base': knowledgeBase,
-        'response_templates': responseTemplates,
-        'ui_messages': uiMessages,
-      };
+    'knowledge_base': knowledgeBase,
+    'response_templates': responseTemplates,
+    'ui_messages': uiMessages,
+    'glossary': glossary,
+    'analysis_levels': analysisLevels,
+  };
 
   BloodstainLinkedAssets copyWith({
     String? knowledgeBase,
     String? responseTemplates,
     String? uiMessages,
+    String? glossary,
+    String? analysisLevels,
   }) {
     return BloodstainLinkedAssets(
       knowledgeBase: knowledgeBase ?? this.knowledgeBase,
       responseTemplates: responseTemplates ?? this.responseTemplates,
       uiMessages: uiMessages ?? this.uiMessages,
+      glossary: glossary ?? this.glossary,
+      analysisLevels: analysisLevels ?? this.analysisLevels,
     );
   }
 }
@@ -215,9 +229,9 @@ class BloodstainImplementationNotes {
   }
 
   Map<String, dynamic> toJson() => {
-        'goal': goal,
-        'recommended_usage': recommendedUsage,
-      };
+    'goal': goal,
+    'recommended_usage': recommendedUsage,
+  };
 
   BloodstainImplementationNotes copyWith({
     String? goal,
@@ -262,16 +276,14 @@ class BloodstainFeatureConfig {
       version: json['version'] as int? ?? 1,
       status: json['status'] as String? ?? '',
       feature: BloodstainFeatureMetadata.fromJson(
-        json['feature'] as Map<String, dynamic>? ??
-            const <String, dynamic>{},
+        json['feature'] as Map<String, dynamic>? ?? const <String, dynamic>{},
       ),
       providerPolicy: BloodstainProviderPolicy.fromJson(
         json['provider_policy'] as Map<String, dynamic>? ??
             const <String, dynamic>{},
       ),
       behavior: BloodstainFeatureBehavior.fromJson(
-        json['behavior'] as Map<String, dynamic>? ??
-            const <String, dynamic>{},
+        json['behavior'] as Map<String, dynamic>? ?? const <String, dynamic>{},
       ),
       linkedAssets: BloodstainLinkedAssets.fromJson(
         json['linked_assets'] as Map<String, dynamic>? ??
@@ -279,7 +291,7 @@ class BloodstainFeatureConfig {
       ),
       outputContract:
           json['output_contract'] as Map<String, dynamic>? ??
-              const <String, dynamic>{},
+          const <String, dynamic>{},
       loadOrder: loadOrder.map((item) => item.toString()).toList(),
       implementationNotes: BloodstainImplementationNotes.fromJson(
         json['implementation_notes'] as Map<String, dynamic>? ??
@@ -289,17 +301,17 @@ class BloodstainFeatureConfig {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'version': version,
-        'status': status,
-        'feature': feature.toJson(),
-        'provider_policy': providerPolicy.toJson(),
-        'behavior': behavior.toJson(),
-        'linked_assets': linkedAssets.toJson(),
-        'output_contract': outputContract,
-        'load_order': loadOrder,
-        'implementation_notes': implementationNotes.toJson(),
-      };
+    'id': id,
+    'version': version,
+    'status': status,
+    'feature': feature.toJson(),
+    'provider_policy': providerPolicy.toJson(),
+    'behavior': behavior.toJson(),
+    'linked_assets': linkedAssets.toJson(),
+    'output_contract': outputContract,
+    'load_order': loadOrder,
+    'implementation_notes': implementationNotes.toJson(),
+  };
 
   BloodstainFeatureConfig copyWith({
     String? id,
@@ -333,6 +345,8 @@ class BloodstainFeatureBundle {
   final Map<String, dynamic> knowledgeBase;
   final Map<String, dynamic> responseTemplates;
   final Map<String, dynamic> uiMessages;
+  final Map<String, dynamic> glossary;
+  final Map<String, dynamic> analysisLevels;
   final Map<String, Map<String, dynamic>> loadedAssets;
 
   const BloodstainFeatureBundle({
@@ -340,6 +354,8 @@ class BloodstainFeatureBundle {
     required this.knowledgeBase,
     required this.responseTemplates,
     required this.uiMessages,
+    this.glossary = const <String, dynamic>{},
+    this.analysisLevels = const <String, dynamic>{},
     required this.loadedAssets,
   });
 

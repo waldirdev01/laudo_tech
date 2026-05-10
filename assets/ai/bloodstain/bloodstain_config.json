@@ -25,7 +25,9 @@
   "linked_assets": {
     "knowledge_base": "assets/ai/bloodstain/bloodstain_knowledge_base.json",
     "response_templates": "assets/ai/bloodstain/bloodstain_response_templates.json",
-    "ui_messages": "assets/ai/bloodstain/bloodstain_ui_messages.json"
+    "ui_messages": "assets/ai/bloodstain/bloodstain_ui_messages.json",
+    "glossary": "assets/ai/bloodstain/bloodstain_glossary.json",
+    "analysis_levels": "assets/ai/bloodstain/bloodstain_analysis_levels.json"
   },
   "output_contract": {
     "response_schema": {
@@ -43,6 +45,8 @@
   },
   "load_order": [
     "knowledge_base",
+    "glossary",
+    "analysis_levels",
     "response_templates",
     "ui_messages"
   ],

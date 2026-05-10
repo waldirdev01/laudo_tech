@@ -1,3 +1,5 @@
+import '../utils/coordinate_formatter.dart';
+
 /// Modelo para dados do local da ocorrência
 class LocalFichaModel {
   final String? endereco;
@@ -15,33 +17,39 @@ class LocalFichaModel {
     this.capturaTelaLocalPath,
   });
 
-  /// Formato único no app: graus decimais com 6 casas (igual ao levantamento da via).
-  static const int _casasDecimaisCoordenada = 6;
-
   String? get coordenadasSFormatada {
-    if (latitude == null) return null;
-    return latitude!.toStringAsFixed(_casasDecimaisCoordenada);
+    return CoordinateFormatter.formatLatitude(latitude);
   }
 
   String? get coordenadasWFormatada {
-    if (longitude == null) return null;
-    return longitude!.toStringAsFixed(_casasDecimaisCoordenada);
+    return CoordinateFormatter.formatLongitude(longitude);
+  }
+
+  String? get coordenadasFormatadas {
+    return CoordinateFormatter.formatPair(
+      latitude: coordenadasSFormatada,
+      longitude: coordenadasWFormatada,
+    );
   }
 
   Map<String, dynamic> toJson() => {
-        'endereco': endereco,
-        'municipio': municipio,
-        'latitude': latitude,
-        'longitude': longitude,
-        'capturaTelaLocalPath': capturaTelaLocalPath,
-      };
+    'endereco': endereco,
+    'municipio': municipio,
+    'latitude': latitude,
+    'longitude': longitude,
+    'capturaTelaLocalPath': capturaTelaLocalPath,
+  };
 
   factory LocalFichaModel.fromJson(Map<String, dynamic> json) =>
       LocalFichaModel(
         endereco: json['endereco'] as String?,
         municipio: json['municipio'] as String?,
-        latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
-        longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+        latitude: json['latitude'] != null
+            ? (json['latitude'] as num).toDouble()
+            : null,
+        longitude: json['longitude'] != null
+            ? (json['longitude'] as num).toDouble()
+            : null,
         capturaTelaLocalPath: json['capturaTelaLocalPath'] as String?,
       );
 
@@ -61,4 +69,3 @@ class LocalFichaModel {
     );
   }
 }
-

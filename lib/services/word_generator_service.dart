@@ -664,15 +664,12 @@ $conteudo
     ]);
 
     // Usar APENAS as coordenadas GPS obtidas na tela LOCAL (não as do PDF)
-    // Formato único: graus decimais com 6 casas (igual ao levantamento da via)
+    // Formato único: graus, minutos e segundos com hemisférios.
     if (local?.latitude != null && local?.longitude != null) {
       final coordS = local!.coordenadasSFormatada ?? '';
       final coordW = local.coordenadasWFormatada ?? '';
       if (coordS.isNotEmpty && coordW.isNotEmpty) {
-        linhas.add([
-          'Coordenadas GPS',
-          'Latitude: $coordS\nLongitude: $coordW',
-        ]);
+        linhas.add(['Coordenadas GPS', '$coordS $coordW']);
       } else {
         linhas.add([
           'Coordenadas GPS',

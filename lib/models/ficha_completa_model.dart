@@ -1,4 +1,5 @@
 import 'atropelamento_calculo_model.dart';
+import 'bloodstain_analysis_model.dart';
 import 'cadaver_model.dart';
 import 'crime_transito_levantamento_model.dart';
 import 'crime_transito_model.dart';
@@ -65,6 +66,7 @@ class FichaCompletaModel {
   // Dados específicos para CVLI - Veículos
   final List<VeiculoModel>? veiculos;
   final List<ExameComplementarModel>? examesComplementares;
+  final List<BloodstainAnalysisModel> analisesManchasSangue;
   // Dados específicos para Crime de Trânsito
   final CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes;
   final CrimeTransitoLevantamentoModel? crimeTransitoLevantamento;
@@ -100,6 +102,7 @@ class FichaCompletaModel {
     this.cadaveres,
     this.veiculos,
     this.examesComplementares,
+    this.analisesManchasSangue = const [],
     this.crimeTransitoCondicoes,
     this.crimeTransitoLevantamento,
     this.envolvidosTransito,
@@ -133,6 +136,9 @@ class FichaCompletaModel {
     'veiculos': veiculos?.map((v) => v.toJson()).toList(),
     'examesComplementares': examesComplementares
         ?.map((e) => e.toJson())
+        .toList(),
+    'analisesManchasSangue': analisesManchasSangue
+        .map((e) => e.toJson())
         .toList(),
     'crimeTransitoCondicoes': crimeTransitoCondicoes?.toJson(),
     'crimeTransitoLevantamento': crimeTransitoLevantamento?.toJson(),
@@ -228,6 +234,14 @@ class FichaCompletaModel {
                 )
                 .toList()
           : null,
+      analisesManchasSangue:
+          (json['analisesManchasSangue'] as List<dynamic>?)
+              ?.map(
+                (e) =>
+                    BloodstainAnalysisModel.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          const [],
       crimeTransitoCondicoes: json['crimeTransitoCondicoes'] != null
           ? CrimeTransitoCondicoesViaModel.fromJson(
               json['crimeTransitoCondicoes'] as Map<String, dynamic>,
@@ -287,6 +301,7 @@ class FichaCompletaModel {
     List<CadaverModel>? cadaveres,
     List<VeiculoModel>? veiculos,
     List<ExameComplementarModel>? examesComplementares,
+    List<BloodstainAnalysisModel>? analisesManchasSangue,
     CrimeTransitoCondicoesViaModel? crimeTransitoCondicoes,
     CrimeTransitoLevantamentoModel? crimeTransitoLevantamento,
     List<CrimeTransitoEnvolvidoModel>? envolvidosTransito,
@@ -324,6 +339,8 @@ class FichaCompletaModel {
       cadaveres: cadaveres ?? this.cadaveres,
       veiculos: veiculos ?? this.veiculos,
       examesComplementares: examesComplementares ?? this.examesComplementares,
+      analisesManchasSangue:
+          analisesManchasSangue ?? this.analisesManchasSangue,
       crimeTransitoCondicoes:
           crimeTransitoCondicoes ?? this.crimeTransitoCondicoes,
       crimeTransitoLevantamento:

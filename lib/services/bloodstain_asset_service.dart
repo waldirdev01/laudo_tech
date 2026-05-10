@@ -44,6 +44,9 @@ class BloodstainAssetService {
       responseTemplates:
           loadedAssets['response_templates'] ?? const <String, dynamic>{},
       uiMessages: loadedAssets['ui_messages'] ?? const <String, dynamic>{},
+      glossary: loadedAssets['glossary'] ?? const <String, dynamic>{},
+      analysisLevels:
+          loadedAssets['analysis_levels'] ?? const <String, dynamic>{},
       loadedAssets: loadedAssets,
     );
   }

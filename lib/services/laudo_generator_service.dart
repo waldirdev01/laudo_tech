@@ -41,6 +41,7 @@ class LaudoGeneratorService {
   static const String _fontSizeTitulo = '44'; // 22pt = 44 half-points
   static const String _fontSizeSubtitulo = '28'; // 14pt = 28 half-points
   static const String _fontSizeNormal = '24'; // 12pt = 24 half-points
+  static const int _lineHeight125 = 300; // 1,25
 
   /// Texto padrão antes da lista de vestígios quando há vestígios cadastrados.
   static const String _textoSistemaCoordenadasVestigios =
@@ -355,6 +356,10 @@ class LaudoGeneratorService {
       );
     }
 
+    if (ficha.analisesManchasSangue.isNotEmpty) {
+      buffer.writeln(_gerarAnexoAnalisesManchasSangue(ficha));
+    }
+
     // Montar o documento completo com namespaces e sectPr
     return _montarDocumentoCompleto(buffer.toString(), sectPr);
   }
@@ -510,7 +515,7 @@ class LaudoGeneratorService {
           <w:p>
             <w:pPr>
               <w:jc w:val="both"/>
-              <w:spacing w:after="120" w:line="240" w:lineRule="auto"/>
+              <w:spacing w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
               <w:ind w:firstLine="0"/>
             </w:pPr>
             <w:r>
@@ -531,7 +536,7 @@ class LaudoGeneratorService {
           <w:p>
             <w:pPr>
               <w:jc w:val="both"/>
-              <w:spacing w:after="120" w:line="240" w:lineRule="auto"/>
+              <w:spacing w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
               <w:ind w:firstLine="0"/>
             </w:pPr>
             ${temValor ? '''<w:r>
@@ -649,7 +654,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="708"/>
       </w:pPr>
     </w:p>''';
@@ -968,7 +973,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="left"/>
-        <w:spacing w:before="240" w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="240" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="0"/>
       </w:pPr>
       <w:r>
@@ -989,7 +994,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="708"/>
       </w:pPr>
       <w:r>
@@ -1013,7 +1018,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="708"/>
       </w:pPr>
       <w:r>
@@ -1376,7 +1381,7 @@ class LaudoGeneratorService {
     final coordS = ficha.local?.coordenadasSFormatada;
     final coordW = ficha.local?.coordenadasWFormatada;
     final textoCoordenadas = (coordS != null && coordW != null)
-        ? 'Coordenadas geográficas: Latitude $coordS, Longitude $coordW.'
+        ? 'Coordenadas geográficas: $coordS $coordW.'
         : 'Coordenadas geográficas: Não obtidas.';
     buffer.writeln(_gerarParagrafoHistorico(textoCoordenadas));
 
@@ -1428,7 +1433,7 @@ class LaudoGeneratorService {
     final coordS = ficha.local?.coordenadasSFormatada;
     final coordW = ficha.local?.coordenadasWFormatada;
     final textoCoordenadas = (coordS != null && coordW != null)
-        ? 'Coordenadas geográficas: Latitude $coordS, Longitude $coordW.'
+        ? 'Coordenadas geográficas: $coordS $coordW.'
         : 'Coordenadas geográficas: Não obtidas.';
     buffer.writeln(_gerarParagrafoHistorico(textoCoordenadas));
     if (mapaRId != null) {
@@ -1565,7 +1570,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="left"/>
-        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="0"/>
       </w:pPr>
       <w:r>
@@ -1585,7 +1590,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="left"/>
-        <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="0"/>
       </w:pPr>
       <w:r>
@@ -1660,15 +1665,22 @@ class LaudoGeneratorService {
       buffer.writeln(_gerarTituloSecao('5. DAS IMAGENS'));
 
       // Converter quantidade para número por extenso
-      String qtdPorExtenso = _numeroPorExtenso(qtdFotos);
-      String qtdNumerica = qtdFotos.toString().padLeft(2, '0');
+      final temImagemSatelite = (ficha.local?.capturaTelaLocalPath ?? '')
+          .trim()
+          .isNotEmpty;
+      final qtdTotalImagens = qtdFotos + (temImagemSatelite ? 1 : 0);
+      String qtdPorExtenso = _numeroPorExtenso(qtdTotalImagens);
+      String qtdNumerica = qtdTotalImagens.toString().padLeft(2, '0');
+      final trechoSatelite = temImagemSatelite
+          ? ' incluindo 01 (uma) imagem de satélite proveniente de captura de tela do local,'
+          : '';
 
       // Gerar parágrafo com "XX" em vermelho
       buffer.writeln(
         _gerarParagrafoHistoricoComTextoColorido(
           'Integra o presente laudo o levantamento fotográfico composto por $qtdNumerica ($qtdPorExtenso) imagens, todas produzidas pelo próprio Perito Criminal responsável pela elaboração deste documento. As fotografias encontram-se organizadas e inseridas a partir da página ',
           'XX',
-          ', destinando-se à documentação objetiva do local, dos vestígios e das condições observadas durante a realização dos exames periciais.',
+          '$trechoSatelite destinando-se à documentação objetiva do local, dos vestígios e das condições observadas durante a realização dos exames periciais.',
         ),
       );
 
@@ -1677,13 +1689,20 @@ class LaudoGeneratorService {
 
     if (ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito) {
       buffer.writeln(_gerarTituloSecao('5. LEVANTAMENTO DE IMAGENS'));
-      final qtdPorExtenso = _numeroPorExtenso(qtdFotos);
-      final qtdNumerica = qtdFotos.toString().padLeft(2, '0');
+      final temImagemSatelite = (ficha.local?.capturaTelaLocalPath ?? '')
+          .trim()
+          .isNotEmpty;
+      final qtdTotalImagens = qtdFotos + (temImagemSatelite ? 1 : 0);
+      final qtdPorExtenso = _numeroPorExtenso(qtdTotalImagens);
+      final qtdNumerica = qtdTotalImagens.toString().padLeft(2, '0');
+      final trechoSatelite = temImagemSatelite
+          ? ' incluindo 01 (uma) imagem de satélite proveniente de captura de tela do local,'
+          : '';
       buffer.writeln(
         _gerarParagrafoHistoricoComTextoColorido(
           'Integra o presente laudo o levantamento fotográfico composto por $qtdNumerica ($qtdPorExtenso) imagens, todas produzidas pelo próprio Perito Criminal responsável pela elaboração deste documento. As fotografias encontram-se organizadas e inseridas a partir da página ',
           'XX',
-          ', destinando-se à documentação objetiva do local, dos vestígios e das condições observadas durante a realização dos exames periciais.',
+          '$trechoSatelite destinando-se à documentação objetiva do local, dos vestígios e das condições observadas durante a realização dos exames periciais.',
         ),
       );
       return buffer.toString();
@@ -1948,7 +1967,7 @@ class LaudoGeneratorService {
           : 'unidade';
       buffer.writeln(
         _gerarParagrafoHistorico(
-          'Os vestígios coletados foram devidamente acondicionados, identificados e encaminhados para processamento na $nomeUnidade, conforme rotina técnica.',
+          'Os vestígios coletados foram devidamente acondicionados, identificados e encaminhados para processamento na $nomeUnidade, para a realização de exames complementares.',
         ),
       );
 
@@ -2449,7 +2468,7 @@ class LaudoGeneratorService {
         if (temNaoColetados) {
           buffer.writeln(
             _gerarParagrafoHistorico(
-              'Os vestígios não coletados foram devidamente documentados por registro fotográfico.',
+              'Os demais vestígios, que não demandaram recolhimento para exame complementar, foram suficientemente registrados e documentados pericialmente no local.',
             ),
           );
         }
@@ -2768,7 +2787,7 @@ class LaudoGeneratorService {
         if (temNaoColetados) {
           buffer.writeln(
             _gerarParagrafoHistorico(
-              'Os vestígios não coletados foram devidamente documentados por registro fotográfico.',
+              'Os demais vestígios, que não demandaram recolhimento para exame complementar, foram suficientemente registrados e documentados pericialmente no local.',
             ),
           );
         }
@@ -2853,6 +2872,7 @@ class LaudoGeneratorService {
       // 6.3.X.1 Identificação
       buffer.writeln(_gerarTituloSubSubSecao('$prefixo.1 Identificação'));
       buffer.writeln(_gerarIdentificacaoCadaver(cadaver));
+      buffer.writeln(_gerarTatuagensMarcasCadaver(cadaver));
 
       // 6.3.X.2 Localização e Posição
       buffer.writeln(
@@ -2885,7 +2905,7 @@ class LaudoGeneratorService {
     return '''
 <w:p>
   <w:pPr>
-    <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
+    <w:spacing w:before="0" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
     <w:jc w:val="both"/>
     <w:rPr>
       <w:rFonts w:ascii="$_fontName" w:hAnsi="$_fontName"/>
@@ -2909,7 +2929,7 @@ class LaudoGeneratorService {
     return '''
 <w:p>
   <w:pPr>
-    <w:spacing w:before="0" w:after="0" w:line="312" w:lineRule="auto"/>
+    <w:spacing w:before="0" w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
     <w:jc w:val="left"/>
   </w:pPr>
   <w:r>
@@ -3043,59 +3063,14 @@ class LaudoGeneratorService {
       );
     }
 
-    if (cadaver.corCabelo != null ||
-        cadaver.tipoCabelo != null ||
-        cadaver.tamanhoCabelo != null) {
-      final cabelo = <String>[];
-      if (cadaver.tamanhoCabelo != null) {
-        cabelo.add(
-          cadaver.tamanhoCabelo == TamanhoCabelo.outro
-              ? cadaver.tamanhoCabeloOutro ?? ''
-              : cadaver.tamanhoCabelo!.label.toLowerCase(),
-        );
-      }
-      if (cadaver.tipoCabelo != null) {
-        cabelo.add(
-          cadaver.tipoCabelo == TipoCabelo.outro
-              ? cadaver.tipoCabeloOutro ?? ''
-              : cadaver.tipoCabelo!.label.toLowerCase(),
-        );
-      }
-      if (cadaver.corCabelo != null) {
-        cabelo.add(
-          cadaver.corCabelo == CorCabelo.outro
-              ? cadaver.corCabeloOutro ?? ''
-              : cadaver.corCabelo!.label.toLowerCase(),
-        );
-      }
-      if (cabelo.isNotEmpty) {
-        caracteristicas.add('cabelo ${cabelo.join(', ')}');
-      }
+    final descricaoCabelo = _descreverCabelo(cadaver);
+    if (descricaoCabelo != null && descricaoCabelo.isNotEmpty) {
+      caracteristicas.add(descricaoCabelo);
     }
 
-    if (cadaver.tipoBarba != null &&
-        cadaver.tipoBarba != TipoBarba.naoSeAplica) {
-      final barba = <String>[];
-      barba.add(
-        cadaver.tipoBarba == TipoBarba.outro
-            ? cadaver.tipoBarbaOutro ?? ''
-            : cadaver.tipoBarba!.label.toLowerCase(),
-      );
-      if (cadaver.tamanhoBarba != null) {
-        barba.add(
-          cadaver.tamanhoBarba == TamanhoBarba.outro
-              ? cadaver.tamanhoBarbaOutro ?? ''
-              : cadaver.tamanhoBarba!.label.toLowerCase(),
-        );
-      }
-      if (cadaver.corBarba != null) {
-        barba.add(
-          cadaver.corBarba == CorBarba.outra
-              ? cadaver.corBarbaOutra ?? ''
-              : cadaver.corBarba!.label.toLowerCase(),
-        );
-      }
-      caracteristicas.add('barba ${barba.join(', ')}');
+    final descricaoBarba = _descreverBarba(cadaver);
+    if (descricaoBarba != null && descricaoBarba.isNotEmpty) {
+      caracteristicas.add(descricaoBarba);
     }
 
     if (caracteristicas.isNotEmpty) {
@@ -3105,6 +3080,125 @@ class LaudoGeneratorService {
           : '${caracteristicas.join(', ')} e $ultimo';
       buffer.writeln(
         _gerarParagrafoHistorico('Apresentava $textoCaracteristicas.'),
+      );
+    }
+
+    return buffer.toString();
+  }
+
+  String? _descreverCabelo(CadaverModel cadaver) {
+    final tamanhoTexto = cadaver.tamanhoCabelo == null
+        ? ''
+        : (cadaver.tamanhoCabelo == TamanhoCabelo.outro
+              ? (cadaver.tamanhoCabeloOutro ?? '').trim().toLowerCase()
+              : cadaver.tamanhoCabelo!.label.toLowerCase());
+    final tipoTexto = cadaver.tipoCabelo == null
+        ? ''
+        : (cadaver.tipoCabelo == TipoCabelo.outro
+              ? (cadaver.tipoCabeloOutro ?? '').trim().toLowerCase()
+              : cadaver.tipoCabelo!.label.toLowerCase());
+    final corTexto = cadaver.corCabelo == null
+        ? ''
+        : (cadaver.corCabelo == CorCabelo.outro
+              ? (cadaver.corCabeloOutro ?? '').trim().toLowerCase()
+              : cadaver.corCabelo!.label.toLowerCase());
+
+    if (tamanhoTexto.isEmpty && tipoTexto.isEmpty && corTexto.isEmpty) {
+      return null;
+    }
+
+    if (tamanhoTexto == 'calvo') {
+      return corTexto.isEmpty ? 'calvície' : 'calvície, com cabelos $corTexto';
+    }
+
+    final partes = <String>['cabelos'];
+    if (tamanhoTexto.isNotEmpty) partes.add(tamanhoTexto);
+    if (tipoTexto.isNotEmpty) partes.add(tipoTexto);
+    if (corTexto.isNotEmpty) partes.add('de coloração $corTexto');
+    return partes.join(' ');
+  }
+
+  String? _descreverBarba(CadaverModel cadaver) {
+    final tipo = cadaver.tipoBarba;
+    if (tipo == null || tipo == TipoBarba.naoSeAplica) return null;
+
+    final tipoTexto = tipo == TipoBarba.outro
+        ? (cadaver.tipoBarbaOutro ?? '').trim().toLowerCase()
+        : tipo.label.toLowerCase();
+    final tamanhoTexto = cadaver.tamanhoBarba == null
+        ? ''
+        : (cadaver.tamanhoBarba == TamanhoBarba.outro
+              ? (cadaver.tamanhoBarbaOutro ?? '').trim().toLowerCase()
+              : cadaver.tamanhoBarba!.label.toLowerCase());
+    final corTexto = cadaver.corBarba == null
+        ? ''
+        : (cadaver.corBarba == CorBarba.outra
+              ? (cadaver.corBarbaOutra ?? '').trim().toLowerCase()
+              : cadaver.corBarba!.label.toLowerCase());
+
+    if (tipoTexto.isEmpty && tamanhoTexto.isEmpty && corTexto.isEmpty) {
+      return null;
+    }
+
+    if (tipo == TipoBarba.bigode) {
+      final partes = <String>['bigode'];
+      if (tamanhoTexto.isNotEmpty) partes.add(tamanhoTexto);
+      if (corTexto.isNotEmpty) partes.add('de coloração $corTexto');
+      return partes.join(' ');
+    }
+
+    if (tipo == TipoBarba.cavanhaque) {
+      final partes = <String>['cavanhaque'];
+      if (tamanhoTexto.isNotEmpty) partes.add(tamanhoTexto);
+      if (corTexto.isNotEmpty) partes.add('de coloração $corTexto');
+      return partes.join(' ');
+    }
+
+    final partes = <String>['barba'];
+    if (tipoTexto.isNotEmpty) partes.add('do tipo $tipoTexto');
+    if (tamanhoTexto.isNotEmpty) partes.add(tamanhoTexto);
+    if (corTexto.isNotEmpty) partes.add('de coloração $corTexto');
+    return partes.join(' ');
+  }
+
+  String _gerarTatuagensMarcasCadaver(CadaverModel cadaver) {
+    final buffer = StringBuffer();
+
+    if (cadaver.tatuagensMarcasLista != null &&
+        cadaver.tatuagensMarcasLista!.isNotEmpty) {
+      for (var i = 0; i < cadaver.tatuagensMarcasLista!.length; i++) {
+        final item = cadaver.tatuagensMarcasLista![i];
+        final desc = item.descricao?.trim();
+        if (desc == null || desc.isEmpty) continue;
+
+        var texto = 'Tatuagem/Marca ${i + 1}: $desc';
+        if (item.numerosFotografias.isNotEmpty) {
+          final nums = item.numerosFotografias.toSet().toList()..sort();
+          final numsFmt = nums
+              .map((n) => n.toString().padLeft(2, '0'))
+              .toList();
+          if (numsFmt.length == 1) {
+            texto += ' (Fotografia ${numsFmt.first}).';
+          } else if (numsFmt.length == 2) {
+            texto += ' (Fotografias ${numsFmt[0]} e ${numsFmt[1]}).';
+          } else {
+            texto +=
+                ' (Fotografias ${numsFmt.sublist(0, numsFmt.length - 1).join(', ')} e ${numsFmt.last}).';
+          }
+        } else {
+          texto += '.';
+        }
+        buffer.writeln(_gerarParagrafoHistorico(texto));
+      }
+      return buffer.toString();
+    }
+
+    if (cadaver.tatuagensMarcas != null &&
+        cadaver.tatuagensMarcas!.isNotEmpty) {
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Tatuagens/Marcas Corporais: ${cadaver.tatuagensMarcas}.',
+        ),
       );
     }
 
@@ -3449,27 +3543,6 @@ class LaudoGeneratorService {
       );
     } else {
       buffer.writeln(_gerarParagrafoHistorico('Secreções: Não observadas'));
-    }
-
-    // Tatuagens e marcas corporais (lista nova + fallback texto legado)
-    if (cadaver.tatuagensMarcasLista != null &&
-        cadaver.tatuagensMarcasLista!.isNotEmpty) {
-      for (var i = 0; i < cadaver.tatuagensMarcasLista!.length; i++) {
-        final item = cadaver.tatuagensMarcasLista![i];
-        final desc = item.descricao?.trim();
-        if (desc != null && desc.isNotEmpty) {
-          buffer.writeln(
-            _gerarParagrafoHistorico('Tatuagem/Marca ${i + 1}: $desc'),
-          );
-        }
-      }
-    } else if (cadaver.tatuagensMarcas != null &&
-        cadaver.tatuagensMarcas!.isNotEmpty) {
-      buffer.writeln(
-        _gerarParagrafoHistorico(
-          'Tatuagens/Marcas Corporais: ${cadaver.tatuagensMarcas}',
-        ),
-      );
     }
 
     // Outras observações
@@ -4643,7 +4716,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="right"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="0"/>
       </w:pPr>
       <w:r>
@@ -4662,7 +4735,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="center"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:firstLine="0"/>
       </w:pPr>
       <w:r>
@@ -4746,7 +4819,7 @@ class LaudoGeneratorService {
     return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:left="0" w:hanging="283"/>
       </w:pPr>
       <w:r>
@@ -4768,7 +4841,7 @@ class LaudoGeneratorService {
       return '''    <w:p>
       <w:pPr>
         <w:jc w:val="both"/>
-        <w:spacing w:after="0" w:line="312" w:lineRule="auto"/>
+        <w:spacing w:after="0" w:line="$_lineHeight125" w:lineRule="auto"/>
         <w:ind w:left="0" w:hanging="283"/>
       </w:pPr>
       <w:r>
@@ -4863,6 +4936,81 @@ class LaudoGeneratorService {
         );
         buffer.writeln('      </w:pPr>');
         buffer.writeln('    </w:p>');
+      }
+    }
+
+    return buffer.toString();
+  }
+
+  String _gerarAnexoAnalisesManchasSangue(FichaCompletaModel ficha) {
+    final buffer = StringBuffer();
+
+    buffer.writeln('    <w:p>');
+    buffer.writeln('      <w:r>');
+    buffer.writeln('        <w:br w:type="page"/>');
+    buffer.writeln('      </w:r>');
+    buffer.writeln('    </w:p>');
+
+    buffer.writeln(
+      _gerarTituloPrincipal('ANEXO - ANÁLISES ASSISTIVAS DE MANCHAS DE SANGUE'),
+    );
+    buffer.writeln(_gerarLinhaEmBranco());
+
+    for (var i = 0; i < ficha.analisesManchasSangue.length; i++) {
+      final analise = ficha.analisesManchasSangue[i];
+      final numero = (i + 1).toString().padLeft(2, '0');
+      final data = DateFormat('dd/MM/yyyy HH:mm').format(analise.createdAt);
+
+      buffer.writeln(
+        _gerarParagrafoHistoricoNegrito('Análise assistiva $numero'),
+      );
+      buffer.writeln(_gerarParagrafoHistorico('Data de geração: $data.'));
+      if (analise.contextText.trim().isNotEmpty) {
+        buffer.writeln(
+          _gerarParagrafoHistorico('Contexto: ${analise.contextText.trim()}'),
+        );
+      }
+      if (analise.surfaceType.trim().isNotEmpty) {
+        buffer.writeln(
+          _gerarParagrafoHistorico(
+            'Superfície informada: ${analise.surfaceType.trim()}.',
+          ),
+        );
+      }
+      if (analise.planeOrientation.trim().isNotEmpty) {
+        buffer.writeln(
+          _gerarParagrafoHistorico(
+            'Orientação do plano: ${analise.planeOrientation.trim()}.',
+          ),
+        );
+      }
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Escala métrica visível: ${analise.scalePresent ? 'sim' : 'não'}.',
+        ),
+      );
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Imagens consideradas: ${analise.overviewImagePaths.length} ampla(s)/contextual(is) e ${analise.closeUpImagePaths.length} aproximada(s).',
+        ),
+      );
+      buffer.writeln(_gerarParagrafoHistoricoNegrito('Resultado assistivo'));
+      for (final line in analise.resultText.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) {
+          buffer.writeln(_gerarLinhaEmBranco());
+        } else {
+          buffer.writeln(_gerarParagrafoHistorico(trimmed));
+        }
+      }
+      buffer.writeln(
+        _gerarParagrafoHistorico(
+          'Observação: o conteúdo acima possui caráter assistivo e deve ser validado pelo perito responsável antes de qualquer aproveitamento técnico.',
+        ),
+      );
+
+      if (i < ficha.analisesManchasSangue.length - 1) {
+        buffer.writeln(_gerarLinhaEmBranco());
       }
     }
 

@@ -322,7 +322,9 @@ class _LocalScreenState extends State<LocalScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Não foi possível acessar a imagem. Tente novamente.'),
+              content: Text(
+                'Não foi possível acessar a imagem. Tente novamente.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -476,17 +478,12 @@ class _LocalScreenState extends State<LocalScreen> {
                               const SizedBox(height: 8),
                               if (_latitude != null && _longitude != null) ...[
                                 Text(
-                                  'Latitude: ${localModel.coordenadasSFormatada ?? '-'}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Longitude: ${localModel.coordenadasWFormatada ?? '-'}',
+                                  localModel.coordenadasFormatadas ?? '-',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ] else
                                 Text(
-                                  'Latitude: —\nLongitude: —',
+                                  '—',
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: Theme.of(

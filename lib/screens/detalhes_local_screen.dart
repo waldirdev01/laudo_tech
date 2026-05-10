@@ -865,14 +865,17 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         localEmViaPublica: _localEmViaPublica,
       );
 
-      // Preservar todos os dados existentes
-      final fichaAtualizada = widget.ficha.copyWith(
+      final fichaBaseAtual =
+          await _fichaService.obterFicha(widget.ficha.id) ?? widget.ficha;
+
+      // Preservar todos os dados existentes, inclusive análises salvas em telas auxiliares.
+      final fichaAtualizada = fichaBaseAtual.copyWith(
         localFurto: localFurto,
         dataUltimaAtualizacao: DateTime.now(),
-        equipe: widget.ficha.equipe,
-        equipesPoliciais: widget.ficha.equipesPoliciais,
-        local: widget.ficha.local,
-        dadosFichaBase: widget.ficha.dadosFichaBase,
+        equipe: fichaBaseAtual.equipe,
+        equipesPoliciais: fichaBaseAtual.equipesPoliciais,
+        local: fichaBaseAtual.local,
+        dadosFichaBase: fichaBaseAtual.dadosFichaBase,
       );
 
       await _fichaService.salvarFicha(fichaAtualizada);
@@ -1728,6 +1731,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => BloodstainAnalysisScreen(
+          fichaId: widget.ficha.id,
           initialContextText: initialContext,
           initialOverviewImagePaths: overviewImages,
         ),
@@ -2657,11 +2661,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                                 .toList(),
                       ),
                     ],
-                    if (_etapaLocalAtual == 1 && _podeAnalisarManchasSangue) ...[
+                    if (_etapaLocalAtual == 1 &&
+                        _podeAnalisarManchasSangue) ...[
                       const SizedBox(height: 16),
                       Card(
-                        color:
-                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
