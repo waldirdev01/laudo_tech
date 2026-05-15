@@ -153,10 +153,7 @@ class _DinamicaScreenState extends State<DinamicaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dinâmica'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Dinâmica'), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -228,18 +225,14 @@ class _DinamicaScreenState extends State<DinamicaScreen> {
             // Botão Finalizar
             FilledButton(
               onPressed: _salvando ? null : _finalizar,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.all(16),
-              ),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
               child: _salvando
                   ? const SizedBox(
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white,
-                        ),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : const Text('Finalizar'),

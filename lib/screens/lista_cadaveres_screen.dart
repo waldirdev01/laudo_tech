@@ -24,8 +24,17 @@ class _ListaCadaveresScreenState extends State<ListaCadaveresScreen> {
   @override
   void initState() {
     super.initState();
-    _ficha = widget.ficha;
-    _cadaveres = List<CadaverModel>.from(_ficha.cadaveres ?? []);
+    _carregarDados();
+  }
+
+  Future<void> _carregarDados() async {
+    final fichaAtualizada = await _fichaService.obterFicha(widget.ficha.id);
+    final fichaBase = fichaAtualizada ?? widget.ficha;
+    if (!mounted) return;
+    setState(() {
+      _ficha = fichaBase;
+      _cadaveres = List<CadaverModel>.from(_ficha.cadaveres ?? []);
+    });
   }
 
   Future<void> _adicionarCadaver() async {
@@ -104,7 +113,9 @@ class _ListaCadaveresScreenState extends State<ListaCadaveresScreen> {
   }
 
   Future<void> _salvarCadaveres() async {
-    final fichaAtualizada = _ficha.copyWith(
+    final fichaBaseAtual =
+        await _fichaService.obterFicha(widget.ficha.id) ?? _ficha;
+    final fichaAtualizada = fichaBaseAtual.copyWith(
       cadaveres: _cadaveres,
       dataUltimaAtualizacao: DateTime.now(),
     );

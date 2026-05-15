@@ -5,21 +5,20 @@ import '../services/equipe_service.dart';
 class CadastroMembroEquipeScreen extends StatefulWidget {
   final MembroEquipeModel? membro; // Se fornecido, está editando
 
-  const CadastroMembroEquipeScreen({
-    super.key,
-    this.membro,
-  });
+  const CadastroMembroEquipeScreen({super.key, this.membro});
 
   @override
-  State<CadastroMembroEquipeScreen> createState() => _CadastroMembroEquipeScreenState();
+  State<CadastroMembroEquipeScreen> createState() =>
+      _CadastroMembroEquipeScreenState();
 }
 
-class _CadastroMembroEquipeScreenState extends State<CadastroMembroEquipeScreen> {
+class _CadastroMembroEquipeScreenState
+    extends State<CadastroMembroEquipeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _cargoController = TextEditingController();
   final _nomeController = TextEditingController();
   final _matriculaController = TextEditingController();
-  
+
   bool _salvando = false;
   final _equipeService = EquipeService();
 
@@ -51,8 +50,9 @@ class _CadastroMembroEquipeScreenState extends State<CadastroMembroEquipeScreen>
     });
 
     try {
-      final id = widget.membro?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
-      
+      final id =
+          widget.membro?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+
       final membro = MembroEquipeModel(
         id: id,
         cargo: _cargoController.text.trim(),
@@ -69,9 +69,11 @@ class _CadastroMembroEquipeScreenState extends State<CadastroMembroEquipeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.membro != null
-                ? 'Membro atualizado com sucesso!'
-                : 'Membro adicionado à equipe!'),
+            content: Text(
+              widget.membro != null
+                  ? 'Membro atualizado com sucesso!'
+                  : 'Membro adicionado à equipe!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -99,7 +101,9 @@ class _CadastroMembroEquipeScreenState extends State<CadastroMembroEquipeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.membro != null ? 'Editar Membro' : 'Adicionar Membro'),
+        title: Text(
+          widget.membro != null ? 'Editar Membro' : 'Adicionar Membro',
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -167,10 +171,16 @@ class _CadastroMembroEquipeScreenState extends State<CadastroMembroEquipeScreen>
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
-                    : Text(widget.membro != null ? 'Salvar Alterações' : 'Adicionar à Equipe'),
+                    : Text(
+                        widget.membro != null
+                            ? 'Salvar Alterações'
+                            : 'Adicionar à Equipe',
+                      ),
               ),
             ],
           ),
@@ -179,4 +189,3 @@ class _CadastroMembroEquipeScreenState extends State<CadastroMembroEquipeScreen>
     );
   }
 }
-

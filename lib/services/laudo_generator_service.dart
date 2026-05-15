@@ -17,6 +17,7 @@ import '../models/exame_complementar_model.dart';
 import '../models/ficha_base_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/laboratorio_model.dart';
+import '../models/marco_zero_local_model.dart';
 import '../models/membro_equipe_model.dart';
 import '../models/perito_model.dart';
 import '../models/pessoa_envolvida_model.dart';
@@ -28,6 +29,7 @@ import '../models/vestigio_veiculo_model.dart';
 import '../services/equipe_service.dart';
 import '../services/laboratorio_service.dart';
 import '../services/unidade_service.dart';
+import '../utils/equipe_hierarchy.dart';
 
 /// Serviço responsável por gerar documentos de LAUDO em formato Word (DOCX)
 /// a partir de uma FichaCompletaModel
@@ -852,12 +854,25 @@ class LaudoGeneratorService {
           .toList();
       if (membrosValidos.isEmpty) continue;
 
+      membrosValidos.sort(
+        (a, b) =>
+            EquipeHierarchy.ordemQualificacaoPolicial(
+              equipe.tipo,
+              a.postoGraduacao,
+            ).compareTo(
+              EquipeHierarchy.ordemQualificacaoPolicial(
+                equipe.tipo,
+                b.postoGraduacao,
+              ),
+            ),
+      );
+
       final membrosTexto = membrosValidos.map((m) {
-        final posto = m.postoGraduacao?.trim().isNotEmpty == true
+        final qualificacao = m.postoGraduacao?.trim().isNotEmpty == true
             ? m.postoGraduacao!.trim()
             : null;
-        final nomeComCargo = isPM && posto != null
-            ? '$posto ${m.nome}'
+        final nomeComCargo = qualificacao != null
+            ? '$qualificacao ${m.nome}'
             : m.nome;
         return _textoMembroComMatricula(
           nomeComCargo.trim(),
@@ -922,7 +937,20 @@ class LaudoGeneratorService {
 
     final policiais = <String>[];
     for (final equipe in equipesPm) {
-      for (final m in equipe.membros) {
+      final membrosOrdenados = [...equipe.membros]
+        ..sort(
+          (a, b) =>
+              EquipeHierarchy.ordemQualificacaoPolicial(
+                equipe.tipo,
+                a.postoGraduacao,
+              ).compareTo(
+                EquipeHierarchy.ordemQualificacaoPolicial(
+                  equipe.tipo,
+                  b.postoGraduacao,
+                ),
+              ),
+        );
+      for (final m in membrosOrdenados) {
         final nome = m.nome.trim();
         if (nome.isEmpty) continue;
         final posto = m.postoGraduacao?.trim();
@@ -1156,7 +1184,17 @@ class LaudoGeneratorService {
 
     for (final equipe in equipes) {
       final tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
-      final membros = equipe.membros
+      final membrosOrdenados = [...equipe.membros]
+        ..sort(
+          (a, b) =>
+              EquipeHierarchy.ordemQualificacaoResgate(
+                equipe.tipo,
+                a.cargo,
+              ).compareTo(
+                EquipeHierarchy.ordemQualificacaoResgate(equipe.tipo, b.cargo),
+              ),
+        );
+      final membros = membrosOrdenados
           .map((m) {
             final partesMembro = <String>[];
             if (m.cargo != null) {
@@ -2411,11 +2449,25 @@ class LaudoGeneratorService {
         buffer.writeln(
           _gerarParagrafoHistorico(_textoSistemaCoordenadasVestigios),
         );
-        buffer.writeln(_gerarParagrafoHistorico('Vestígios encontrados:'));
-        for (var i = 0; i < lf.vestigiosImediato!.length; i++) {
-          final vestigio = lf.vestigiosImediato![i];
-          final textoVestigio = _gerarTextoVestigioLocal(vestigio, i);
-          buffer.writeln(_gerarParagrafoLista(textoVestigio));
+        buffer.writeln(
+          _gerarParagrafoHistorico('Vestígios encontrados por ambiente:'),
+        );
+        final grupos = _agruparVestigiosPorAmbiente(lf.vestigiosImediato!);
+        for (final entry in grupos.entries) {
+          final ambiente = entry.key;
+          buffer.writeln(
+            _gerarParagrafoHistorico('Ambiente: ${_capitalizar(ambiente)}.'),
+          );
+          final marco = lf.marcosZeroAmbientesImediato?[ambiente];
+          final textoMarco = _formatarMarcoZeroLocal(marco);
+          if (textoMarco.isNotEmpty) {
+            buffer.writeln(_gerarParagrafoHistorico(textoMarco));
+          }
+          for (var i = 0; i < entry.value.length; i++) {
+            final vestigio = entry.value[i];
+            final textoVestigio = _gerarTextoVestigioLocal(vestigio, i);
+            buffer.writeln(_gerarParagrafoLista(textoVestigio));
+          }
         }
         final resumoEnc = await _gerarResumoEncaminhamentoLocais(
           lf.vestigiosImediato!,
@@ -2482,6 +2534,40 @@ class LaudoGeneratorService {
     }
 
     return buffer.toString();
+  }
+
+  Map<String, List<VestigioLocalModel>> _agruparVestigiosPorAmbiente(
+    List<VestigioLocalModel> vestigios,
+  ) {
+    final grupos = <String, List<VestigioLocalModel>>{};
+    for (final vestigio in vestigios) {
+      final ambiente = vestigio.ambiente?.trim();
+      final chave = ambiente == null || ambiente.isEmpty
+          ? 'ambiente não especificado'
+          : ambiente;
+      grupos.putIfAbsent(chave, () => <VestigioLocalModel>[]).add(vestigio);
+    }
+    return grupos;
+  }
+
+  String _formatarMarcoZeroLocal(MarcoZeroLocalModel? marco) {
+    if (marco == null) return '';
+    final partes = <String>[];
+    final descricao = marco.descricao?.trim();
+    final x = marco.coordenadaX?.trim();
+    final y = marco.coordenadaY?.trim();
+    if (descricao != null && descricao.isNotEmpty) {
+      partes.add('descrição: $descricao');
+    }
+    if (x != null && x.isNotEmpty) partes.add('X=$x');
+    if (y != null && y.isNotEmpty) partes.add('Y=$y');
+    if (partes.isEmpty) return '';
+    return 'Marco zero do ambiente: ${partes.join(', ')}.';
+  }
+
+  String _capitalizar(String texto) {
+    if (texto.isEmpty) return texto;
+    return texto[0].toUpperCase() + texto.substring(1);
   }
 
   String _enumerarLetrasOrdinal(List<String> letras) {
@@ -2628,7 +2714,7 @@ class LaudoGeneratorService {
     return frases.join(' ');
   }
 
-  /// Gera o texto de um vestígio de local (descrição e coordenadas; encaminhamento em parágrafo à parte).
+  /// Gera o texto de um vestígio de local sem incluir seu posicionamento técnico.
   String _gerarTextoVestigioLocal(VestigioLocalModel vestigio, int indice) {
     final letra = _indicePraLetra(indice);
     final partes = <String>[];
@@ -2648,22 +2734,6 @@ class LaudoGeneratorService {
     }
     if (descricao.isNotEmpty) {
       partes.add('Presença de $descricao');
-    }
-
-    // Coordenadas (se houver)
-    if (vestigio.coordenadaX != null &&
-        vestigio.coordenadaX!.isNotEmpty &&
-        vestigio.coordenadaY != null &&
-        vestigio.coordenadaY!.isNotEmpty) {
-      partes.add(
-        'Coordenadas: X=${vestigio.coordenadaX}, Y=${vestigio.coordenadaY}',
-      );
-    }
-
-    // Altura (se houver)
-    if (vestigio.alturaRelacaoPiso != null &&
-        vestigio.alturaRelacaoPiso!.isNotEmpty) {
-      partes.add('Altura: ${vestigio.alturaRelacaoPiso}');
     }
 
     if (partes.isEmpty) return '$letra) Vestígio registrado.';
@@ -4965,6 +5035,13 @@ class LaudoGeneratorService {
         _gerarParagrafoHistoricoNegrito('Análise assistiva $numero'),
       );
       buffer.writeln(_gerarParagrafoHistorico('Data de geração: $data.'));
+      if ((analise.ambiente ?? '').trim().isNotEmpty) {
+        buffer.writeln(
+          _gerarParagrafoHistorico(
+            'Ambiente vinculado: ${analise.ambiente!.trim()}.',
+          ),
+        );
+      }
       if (analise.contextText.trim().isNotEmpty) {
         buffer.writeln(
           _gerarParagrafoHistorico('Contexto: ${analise.contextText.trim()}'),

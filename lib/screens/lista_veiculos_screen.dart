@@ -275,96 +275,94 @@ class _ListaVeiculosScreenState extends State<ListaVeiculosScreen> {
                     ),
                   )
                 : _ignorarVeiculos
-                    ? Container(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.check_circle,
-                              size: 64,
-                              color: Colors.green.shade400,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Veículos ignorados',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Nenhum veículo foi cadastrado',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                            const SizedBox(height: 24),
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _ignorarVeiculos = false;
-                                });
-                                _salvarVeiculos();
-                              },
-                              icon: const Icon(Icons.add),
-                              label: const Text('Adicionar veículos'),
-                            ),
-                          ],
+                ? Container(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 64,
+                          color: Colors.green.shade400,
                         ),
-                      )
-                    : Column(
-                        children: _veiculos.map((veiculo) {
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.blue.shade100,
-                                child: Icon(
-                                  Icons.directions_car,
-                                  color: Colors.blue.shade700,
-                                ),
-                              ),
-                              title: Text(
-                                veiculo.marcaModelo ??
-                                    'Veículo ${veiculo.numero}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (veiculo.tipoVeiculo != null)
-                                    Text('Tipo: ${veiculo.tipoVeiculo!.label}'),
-                                  if (veiculo.placa != null)
-                                    Text('Placa: ${veiculo.placa}'),
-                                  if (veiculo.cor != null)
-                                    Text('Cor: ${veiculo.cor}'),
-                                  if (veiculo.relacao != null)
-                                    Text('Relação: ${veiculo.relacao!.label}'),
-                                ],
-                              ),
-                              isThreeLine: true,
-                              trailing: PopupMenuButton(
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'editar',
-                                    child: Text('Editar'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'excluir',
-                                    child: Text('Excluir'),
-                                  ),
-                                ],
-                                onSelected: (value) {
-                                  if (value == 'editar') {
-                                    _editarVeiculo(veiculo);
-                                  } else if (value == 'excluir') {
-                                    _excluirVeiculo(veiculo);
-                                  }
-                                },
-                              ),
-                              onTap: () => _editarVeiculo(veiculo),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Veículos ignorados',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Nenhum veículo foi cadastrado',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 24),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _ignorarVeiculos = false;
+                            });
+                            _salvarVeiculos();
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Adicionar veículos'),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
+                    children: _veiculos.map((veiculo) {
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.blue.shade100,
+                            child: Icon(
+                              Icons.directions_car,
+                              color: Colors.blue.shade700,
                             ),
-                          );
-                        }).toList(),
-                      ),
+                          ),
+                          title: Text(
+                            veiculo.marcaModelo ?? 'Veículo ${veiculo.numero}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (veiculo.tipoVeiculo != null)
+                                Text('Tipo: ${veiculo.tipoVeiculo!.label}'),
+                              if (veiculo.placa != null)
+                                Text('Placa: ${veiculo.placa}'),
+                              if (veiculo.cor != null)
+                                Text('Cor: ${veiculo.cor}'),
+                              if (veiculo.relacao != null)
+                                Text('Relação: ${veiculo.relacao!.label}'),
+                            ],
+                          ),
+                          isThreeLine: true,
+                          trailing: PopupMenuButton(
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'editar',
+                                child: Text('Editar'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'excluir',
+                                child: Text('Excluir'),
+                              ),
+                            ],
+                            onSelected: (value) {
+                              if (value == 'editar') {
+                                _editarVeiculo(veiculo);
+                              } else if (value == 'excluir') {
+                                _excluirVeiculo(veiculo);
+                              }
+                            },
+                          ),
+                          onTap: () => _editarVeiculo(veiculo),
+                        ),
+                      );
+                    }).toList(),
+                  ),
 
             const SizedBox(height: 32),
 

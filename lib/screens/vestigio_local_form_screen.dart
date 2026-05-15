@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/laboratorio_model.dart';
+import '../models/metodo_posicionamento_model.dart';
 import '../models/unidade_model.dart';
 import '../models/vestigio_local_model.dart';
 import '../services/laboratorio_service.dart';
@@ -13,12 +15,19 @@ import '../services/ficha_service.dart';
 import '../services/perito_service.dart';
 import '../services/photo_backup_service.dart';
 import '../services/unidade_service.dart';
+import '../utils/coordinate_formatter.dart';
 import 'exames_complementares_screen.dart';
 
 /// Tela cheia para cadastrar ou editar um vestígio de local (mediato / imediato / relacionado).
 class VestigioLocalFormScreen extends StatefulWidget {
   final String fichaId;
   final VestigioLocalModel? vestigioExistente;
+  final List<String> ambientesDisponiveis;
+  final String? ambienteInicial;
+  final bool modoRapido;
+  final MetodoPosicionamentoVestigio metodoPosicionamentoPadrao;
+  final bool permitirOverrideMetodo;
+  final String? avisoContextoGps;
 
   /// Novo vestígio: após cada salvamento chama [onSalvo], limpa o formulário e permanece nesta tela
   /// até o usuário tocar em **Concluir** ou na seta voltar.
@@ -32,6 +41,12 @@ class VestigioLocalFormScreen extends StatefulWidget {
     super.key,
     required this.fichaId,
     this.vestigioExistente,
+    this.ambientesDisponiveis = const [],
+    this.ambienteInicial,
+    this.modoRapido = false,
+    this.metodoPosicionamentoPadrao = MetodoPosicionamentoVestigio.nenhum,
+    this.permitirOverrideMetodo = true,
+    this.avisoContextoGps,
     this.manterNaTelaAposSalvarNovo = false,
     this.onSalvo,
   }) : assert(
@@ -61,6 +76,8 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
   late final TextEditingController _coordenadaYCtrl;
   late final TextEditingController _alturaCtrl;
   late final TextEditingController _numeroLacreCtrl;
+  late final TextEditingController _latitudeCtrl;
+  late final TextEditingController _longitudeCtrl;
 
   final List<String> _fotosVinculadas = [];
 
@@ -72,6 +89,7 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
   String? _tipoManchaSangueSelecionada;
   String? _tipoElementoMunicaoSelecionado;
   String? _calibreSelecionado;
+  String? _ambienteSelecionado;
   final List<String> _opcoesElementoMunicao = [
     'estojo',
     'projétil de arma de fogo',
@@ -87,6 +105,11 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
   ];
   String? _erroMensagem;
   bool _salvando = false;
+  bool _capturandoGps = false;
+  bool _usarMetodoEspecifico = false;
+  MetodoPosicionamentoVestigio? _metodoOverride;
+  double? _precisaoGpsMetros;
+  DateTime? _gpsCapturadoEm;
   static const _opcoesManchaSangue = [
     'mancha por contato',
     'mancha por gotejamento',
@@ -106,11 +129,29 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     _coordenadaYCtrl = TextEditingController(text: e?.coordenadaY ?? '');
     _alturaCtrl = TextEditingController(text: e?.alturaRelacaoPiso ?? '');
     _numeroLacreCtrl = TextEditingController(text: e?.numeroLacre ?? '');
+    _latitudeCtrl = TextEditingController(
+      text: e?.latitude != null ? e!.latitude!.toStringAsFixed(6) : '',
+    );
+    _longitudeCtrl = TextEditingController(
+      text: e?.longitude != null ? e!.longitude!.toStringAsFixed(6) : '',
+    );
     _fotosVinculadas.addAll(e?.fotosVinculadasPaths ?? const <String>[]);
+    _ambienteSelecionado = e?.ambiente ?? widget.ambienteInicial;
+    if (_ambienteSelecionado != null &&
+        !widget.ambientesDisponiveis.contains(_ambienteSelecionado)) {
+      _ambienteSelecionado = widget.ambienteInicial;
+    }
     _tipoAcaoSelecionado = e?.tipoAcao;
     _tipoDestinoSelecionado = e?.tipoDestino;
     _destinoIdSelecionado = e?.destinoId;
     _isSangueHumano = e?.isSangueHumano ?? false;
+    _metodoOverride = e?.metodoPosicionamentoOverride;
+    _usarMetodoEspecifico = _metodoOverride != null;
+    _precisaoGpsMetros = e?.precisaoGpsMetros;
+    _gpsCapturadoEm = e?.gpsCapturadoEm;
+    if (widget.modoRapido && _tipoAcaoSelecionado == null) {
+      _tipoAcaoSelecionado = TipoAcaoVestigio.registrado;
+    }
   }
 
   @override
@@ -122,6 +163,8 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     _coordenadaYCtrl.dispose();
     _alturaCtrl.dispose();
     _numeroLacreCtrl.dispose();
+    _latitudeCtrl.dispose();
+    _longitudeCtrl.dispose();
     super.dispose();
   }
 
@@ -133,9 +176,13 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     _coordenadaYCtrl.clear();
     _alturaCtrl.clear();
     _numeroLacreCtrl.clear();
+    _latitudeCtrl.clear();
+    _longitudeCtrl.clear();
     _fotosVinculadas.clear();
     setState(() {
-      _tipoAcaoSelecionado = null;
+      _tipoAcaoSelecionado = widget.modoRapido
+          ? TipoAcaoVestigio.registrado
+          : null;
       _tipoDestinoSelecionado = null;
       _destinoIdSelecionado = null;
       _isSangueHumano = false;
@@ -143,6 +190,11 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       _tipoManchaSangueSelecionada = null;
       _tipoElementoMunicaoSelecionado = null;
       _calibreSelecionado = null;
+      _ambienteSelecionado = widget.ambienteInicial;
+      _usarMetodoEspecifico = false;
+      _metodoOverride = null;
+      _precisaoGpsMetros = null;
+      _gpsCapturadoEm = null;
       _erroMensagem = null;
     });
     if (_scrollController.hasClients) {
@@ -154,6 +206,22 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     final idx = path.lastIndexOf(Platform.pathSeparator);
     return idx >= 0 ? path.substring(idx + 1) : path;
   }
+
+  String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1);
+  }
+
+  MetodoPosicionamentoVestigio get _metodoPosicionamentoEfetivo =>
+      _usarMetodoEspecifico && _metodoOverride != null
+      ? _metodoOverride!
+      : widget.metodoPosicionamentoPadrao;
+
+  bool get _usaMarcoZero =>
+      _metodoPosicionamentoEfetivo == MetodoPosicionamentoVestigio.marcoZero;
+
+  bool get _usaGps =>
+      _metodoPosicionamentoEfetivo == MetodoPosicionamentoVestigio.gps;
 
   Future<String?> _persistirFotoVestigio(XFile arquivo) async {
     try {
@@ -179,16 +247,62 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     }
   }
 
+  Future<void> _capturarCoordenadasGps() async {
+    setState(() => _erroMensagem = null);
+    try {
+      setState(() => _capturandoGps = true);
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        setState(() {
+          _erroMensagem =
+              'Permissão de localização não concedida. Não foi possível capturar as coordenadas.';
+        });
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _latitudeCtrl.text = pos.latitude.toStringAsFixed(6);
+        _longitudeCtrl.text = pos.longitude.toStringAsFixed(6);
+        _precisaoGpsMetros = pos.accuracy;
+        _gpsCapturadoEm = DateTime.now();
+      });
+    } catch (e) {
+      setState(() {
+        _erroMensagem = 'Erro ao capturar coordenadas GPS: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _capturandoGps = false);
+      }
+    }
+  }
+
   Future<void> _salvar() async {
     setState(() {
       _erroMensagem = null;
     });
 
-    if (_descricaoCtrl.text.trim().isEmpty ||
-        _coordenadaXCtrl.text.trim().isEmpty ||
-        _coordenadaYCtrl.text.trim().isEmpty) {
+    if (_descricaoCtrl.text.trim().isEmpty) {
       setState(() {
-        _erroMensagem = 'Preencha descrição e coordenadas X e Y';
+        _erroMensagem = 'Preencha a descrição do vestígio';
+      });
+      return;
+    }
+
+    if (widget.ambientesDisponiveis.isNotEmpty &&
+        _ambienteSelecionado == null) {
+      setState(() {
+        _erroMensagem = 'Selecione o ambiente relacionado ao vestígio';
       });
       return;
     }
@@ -201,7 +315,35 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       return;
     }
 
-    if (_tipoAcaoSelecionado == TipoAcaoVestigio.coletado) {
+    if (_usaMarcoZero) {
+      if (_coordenadaXCtrl.text.trim().isEmpty ||
+          _coordenadaYCtrl.text.trim().isEmpty) {
+        setState(() {
+          _erroMensagem =
+              'Informe as coordenadas X e Y do vestígio em relação ao marco zero.';
+        });
+        return;
+      }
+    }
+
+    if (_usaGps) {
+      final latitude = double.tryParse(
+        _latitudeCtrl.text.trim().replaceAll(',', '.'),
+      );
+      final longitude = double.tryParse(
+        _longitudeCtrl.text.trim().replaceAll(',', '.'),
+      );
+      if (latitude == null || longitude == null) {
+        setState(() {
+          _erroMensagem =
+              'Capture ou informe coordenadas GPS válidas para este vestígio.';
+        });
+        return;
+      }
+    }
+
+    if (!widget.modoRapido &&
+        _tipoAcaoSelecionado == TipoAcaoVestigio.coletado) {
       if (_tipoDestinoSelecionado == null) {
         setState(() {
           _erroMensagem =
@@ -255,12 +397,30 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
             VestigioLocalFormScreen.gerarIdVestigio(),
         nome: _nomeCtrl.text.trim().isEmpty ? null : _nomeCtrl.text.trim(),
         descricao: _descricaoCtrl.text.trim(),
-        coordenadaX: _coordenadaXCtrl.text.trim(),
-        coordenadaY: _coordenadaYCtrl.text.trim(),
-        alturaRelacaoPiso: _alturaCtrl.text.trim().isEmpty
+        ambiente: _ambienteSelecionado,
+        coordenadaX: !_usaMarcoZero || _coordenadaXCtrl.text.trim().isEmpty
+            ? null
+            : _coordenadaXCtrl.text.trim(),
+        coordenadaY: !_usaMarcoZero || _coordenadaYCtrl.text.trim().isEmpty
+            ? null
+            : _coordenadaYCtrl.text.trim(),
+        alturaRelacaoPiso: !_usaMarcoZero || _alturaCtrl.text.trim().isEmpty
             ? null
             : _alturaCtrl.text.trim(),
-        tipoAcao: _tipoAcaoSelecionado,
+        latitude: _usaGps
+            ? double.tryParse(_latitudeCtrl.text.trim().replaceAll(',', '.'))
+            : null,
+        longitude: _usaGps
+            ? double.tryParse(_longitudeCtrl.text.trim().replaceAll(',', '.'))
+            : null,
+        precisaoGpsMetros: _usaGps ? _precisaoGpsMetros : null,
+        gpsCapturadoEm: _usaGps ? _gpsCapturadoEm : null,
+        metodoPosicionamentoOverride: _usarMetodoEspecifico
+            ? _metodoOverride
+            : null,
+        tipoAcao: widget.modoRapido
+            ? TipoAcaoVestigio.registrado
+            : _tipoAcaoSelecionado,
         tipoDestino: _tipoDestinoSelecionado,
         destinoId: _destinoIdSelecionado,
         coletadoPor: coletadoPor,
@@ -381,6 +541,209 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
     if (onAdicionada != null) onAdicionada(valor);
   }
 
+  Widget _buildPosicionamentoSection() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final coordsGpsFormatadas = CoordinateFormatter.formatPair(
+      latitude: CoordinateFormatter.formatLatitude(
+        double.tryParse(_latitudeCtrl.text.trim().replaceAll(',', '.')),
+      ),
+      longitude: CoordinateFormatter.formatLongitude(
+        double.tryParse(_longitudeCtrl.text.trim().replaceAll(',', '.')),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        const Divider(),
+        const SizedBox(height: 8),
+        const Text(
+          'Posicionamento do vestígio',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Método deste escopo: ${widget.metodoPosicionamentoPadrao.label}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                if (widget.permitirOverrideMetodo) ...[
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Alterar método somente deste vestígio'),
+                    value: _usarMetodoEspecifico,
+                    onChanged: (value) {
+                      setState(() {
+                        _usarMetodoEspecifico = value;
+                        if (!value) {
+                          _metodoOverride = null;
+                        } else {
+                          _metodoOverride = widget.metodoPosicionamentoPadrao;
+                        }
+                      });
+                    },
+                  ),
+                ],
+                if (_usarMetodoEspecifico) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<MetodoPosicionamentoVestigio>(
+                    initialValue:
+                        _metodoOverride ?? widget.metodoPosicionamentoPadrao,
+                    decoration: const InputDecoration(
+                      labelText: 'Método deste vestígio',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: MetodoPosicionamentoVestigio.values
+                        .map(
+                          (metodo) => DropdownMenuItem(
+                            value: metodo,
+                            child: Text(metodo.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _metodoOverride = value);
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_metodoPosicionamentoEfetivo == MetodoPosicionamentoVestigio.nenhum)
+          Text(
+            'Este vestígio será registrado sem posicionamento técnico.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+        if (_usaMarcoZero) ...[
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _coordenadaXCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Coordenada X *',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: true,
+                    decimal: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _coordenadaYCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Coordenada Y *',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: true,
+                    decimal: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!widget.modoRapido) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _alturaCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Altura em relação ao piso (opcional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ],
+        if (_usaGps) ...[
+          if (widget.avisoContextoGps != null) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                border: Border.all(color: Colors.amber.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                widget.avisoContextoGps!,
+                style: TextStyle(color: Colors.amber.shade900, fontSize: 12),
+              ),
+            ),
+          ],
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _capturandoGps ? null : _capturarCoordenadasGps,
+                icon: const Icon(Icons.my_location),
+                label: Text(_capturandoGps ? 'Capturando...' : 'Capturar GPS'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _latitudeCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Latitude *',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(
+              signed: true,
+              decimal: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _longitudeCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Longitude *',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(
+              signed: true,
+              decimal: true,
+            ),
+          ),
+          if (coordsGpsFormatadas != null) ...[
+            const SizedBox(height: 8),
+            Text('Coordenadas formatadas: $coordsGpsFormatadas'),
+          ],
+          if (_precisaoGpsMetros != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Precisão estimada: ${_precisaoGpsMetros!.toStringAsFixed(1)} m',
+              style: TextStyle(
+                color: _precisaoGpsMetros! > 10
+                    ? Colors.orange.shade900
+                    : Colors.grey.shade700,
+              ),
+            ),
+            if (_precisaoGpsMetros! > 10)
+              Text(
+                'Precisão estimada ruim. Recomenda-se cautela na utilização deste posicionamento.',
+                style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+              ),
+          ],
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final existente = widget.vestigioExistente;
@@ -438,50 +801,79 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
             ),
           ],
           TextFormField(
-            controller: _nomeCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Nome do vestígio (opcional)',
-              hintText: 'Ex.: EV01: fragmento 01 (ou FGT01)',
-              border: OutlineInputBorder(),
-            ),
-            textInputAction: TextInputAction.next,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
             controller: _descricaoCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Descrição do vestígio *',
-              hintText:
-                  'Ex.: fragmentos de impressões papilares.',
+            decoration: InputDecoration(
+              labelText: widget.modoRapido
+                  ? 'Legenda do vestígio *'
+                  : 'Descrição do vestígio *',
+              hintText: widget.modoRapido
+                  ? 'Ex.: Mancha hemática próxima ao sofá.'
+                  : 'Ex.: fragmentos de impressões papilares.',
               border: OutlineInputBorder(),
             ),
             maxLines: null,
             textInputAction: TextInputAction.newline,
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Classificação rápida do vestígio',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Sangue humano'),
-            value: _isSangueHumano,
-            onChanged: (value) {
-              setState(() {
-                final ativo = value ?? false;
-                _isSangueHumano = ativo;
-                if (ativo) {
-                  _isElementoMunicao = false;
-                  _tipoElementoMunicaoSelecionado = null;
-                  _calibreSelecionado = null;
-                } else {
-                  _tipoManchaSangueSelecionada = null;
-                }
-              });
-            },
-          ),
-          if (_isSangueHumano) ...[
+          if (!widget.modoRapido) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _nomeCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Nome do vestígio (opcional)',
+                hintText: 'Ex.: EV01: fragmento 01 (ou FGT01)',
+                border: OutlineInputBorder(),
+              ),
+              textInputAction: TextInputAction.next,
+            ),
+          ],
+          if (widget.ambientesDisponiveis.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _ambienteSelecionado,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Ambiente do vestígio *',
+                border: OutlineInputBorder(),
+              ),
+              items: widget.ambientesDisponiveis
+                  .map(
+                    (ambiente) => DropdownMenuItem<String>(
+                      value: ambiente,
+                      child: Text(_capitalize(ambiente)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() => _ambienteSelecionado = value);
+              },
+            ),
+          ],
+          if (!widget.modoRapido) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Classificação rápida do vestígio',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Sangue humano'),
+              value: _isSangueHumano,
+              onChanged: (value) {
+                setState(() {
+                  final ativo = value ?? false;
+                  _isSangueHumano = ativo;
+                  if (ativo) {
+                    _isElementoMunicao = false;
+                    _tipoElementoMunicaoSelecionado = null;
+                    _calibreSelecionado = null;
+                  } else {
+                    _tipoManchaSangueSelecionada = null;
+                  }
+                });
+              },
+            ),
+          ],
+          if (!widget.modoRapido && _isSangueHumano) ...[
             const SizedBox(height: 4),
             Text(
               'Selecione um tipo de mancha para preencher a descrição e complemente se necessário.',
@@ -507,26 +899,28 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
                   .toList(),
             ),
           ],
-          const SizedBox(height: 6),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Elemento de munição'),
-            value: _isElementoMunicao,
-            onChanged: (value) {
-              setState(() {
-                final ativo = value ?? false;
-                _isElementoMunicao = ativo;
-                if (ativo) {
-                  _isSangueHumano = false;
-                  _tipoManchaSangueSelecionada = null;
-                } else {
-                  _tipoElementoMunicaoSelecionado = null;
-                  _calibreSelecionado = null;
-                }
-              });
-            },
-          ),
-          if (_isElementoMunicao) ...[
+          if (!widget.modoRapido) ...[
+            const SizedBox(height: 6),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Elemento de munição'),
+              value: _isElementoMunicao,
+              onChanged: (value) {
+                setState(() {
+                  final ativo = value ?? false;
+                  _isElementoMunicao = ativo;
+                  if (ativo) {
+                    _isSangueHumano = false;
+                    _tipoManchaSangueSelecionada = null;
+                  } else {
+                    _tipoElementoMunicaoSelecionado = null;
+                    _calibreSelecionado = null;
+                  }
+                });
+              },
+            ),
+          ],
+          if (!widget.modoRapido && _isElementoMunicao) ...[
             const SizedBox(height: 4),
             Row(
               children: [
@@ -623,6 +1017,13 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
             'Fotografias do vestígio *',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
+          if (widget.modoRapido) ...[
+            const SizedBox(height: 4),
+            Text(
+              'A legenda será usada na lista de vestígios. A numeração da fotografia será preenchida automaticamente no laudo.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -632,7 +1033,9 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
                 onPressed: () async {
                   final foto = await _imagePicker.pickImage(
                     source: ImageSource.camera,
-                    imageQuality: 90,
+                    imageQuality: 75,
+                    maxWidth: 2048,
+                    maxHeight: 2048,
                   );
                   if (foto == null) return;
                   final path = await _persistirFotoVestigio(foto);
@@ -645,7 +1048,9 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
               OutlinedButton.icon(
                 onPressed: () async {
                   final fotos = await _imagePicker.pickMultiImage(
-                    imageQuality: 90,
+                    imageQuality: 75,
+                    maxWidth: 2048,
+                    maxHeight: 2048,
                   );
                   if (fotos.isEmpty) return;
                   for (final foto in fotos) {
@@ -685,98 +1090,59 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _coordenadaXCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Coordenada X *',
-                    border: OutlineInputBorder(),
-                    hintText: 'Ex: -23,5 ou -23.5',
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                    decimal: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _coordenadaYCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Coordenada Y *',
-                    border: OutlineInputBorder(),
-                    hintText: 'Ex: -46,6 ou -46.6',
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                    decimal: true,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _alturaCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Altura em relação ao piso (opcional)',
-              border: OutlineInputBorder(),
+          _buildPosicionamentoSection(),
+          if (!widget.modoRapido) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              'O vestígio será coletado ou apenas registrado?',
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
-            keyboardType: TextInputType.text,
-          ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 8),
-          const Text(
-            'O vestígio será coletado ou apenas registrado?',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          RadioGroup<TipoAcaoVestigio>(
-            groupValue: _tipoAcaoSelecionado,
-            onChanged: (value) {
-              setState(() {
-                _tipoAcaoSelecionado = value;
-                if (value != TipoAcaoVestigio.coletado) {
-                  _tipoDestinoSelecionado = null;
-                  _destinoIdSelecionado = null;
-                }
-              });
-            },
-            child: Column(
-              children: [
-                ListTile(
-                  leading: Radio<TipoAcaoVestigio>(
-                    value: TipoAcaoVestigio.registrado,
+            const SizedBox(height: 8),
+            RadioGroup<TipoAcaoVestigio>(
+              groupValue: _tipoAcaoSelecionado,
+              onChanged: (value) {
+                setState(() {
+                  _tipoAcaoSelecionado = value;
+                  if (value != TipoAcaoVestigio.coletado) {
+                    _tipoDestinoSelecionado = null;
+                    _destinoIdSelecionado = null;
+                  }
+                });
+              },
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Radio<TipoAcaoVestigio>(
+                      value: TipoAcaoVestigio.registrado,
+                    ),
+                    title: const Text('Apenas Registrado'),
+                    onTap: () {
+                      setState(() {
+                        _tipoAcaoSelecionado = TipoAcaoVestigio.registrado;
+                        _tipoDestinoSelecionado = null;
+                        _destinoIdSelecionado = null;
+                      });
+                    },
                   ),
-                  title: const Text('Apenas Registrado'),
-                  onTap: () {
-                    setState(() {
-                      _tipoAcaoSelecionado = TipoAcaoVestigio.registrado;
-                      _tipoDestinoSelecionado = null;
-                      _destinoIdSelecionado = null;
-                    });
-                  },
-                ),
-                ListTile(
-                  leading: Radio<TipoAcaoVestigio>(
-                    value: TipoAcaoVestigio.coletado,
+                  ListTile(
+                    leading: Radio<TipoAcaoVestigio>(
+                      value: TipoAcaoVestigio.coletado,
+                    ),
+                    title: const Text('Coletado'),
+                    onTap: () {
+                      setState(() {
+                        _tipoAcaoSelecionado = TipoAcaoVestigio.coletado;
+                      });
+                    },
                   ),
-                  title: const Text('Coletado'),
-                  onTap: () {
-                    setState(() {
-                      _tipoAcaoSelecionado = TipoAcaoVestigio.coletado;
-                    });
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (_tipoAcaoSelecionado == TipoAcaoVestigio.coletado) ...[
+          ],
+          if (!widget.modoRapido &&
+              _tipoAcaoSelecionado == TipoAcaoVestigio.coletado) ...[
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),

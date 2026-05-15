@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import '../utils/coordinate_formatter.dart';
+import 'metodo_posicionamento_model.dart';
+
 /// Tipo de ação com o vestígio
 enum TipoAcaoVestigioVeiculo {
   registrado('Apenas Registrado'),
@@ -26,9 +29,23 @@ class VestigioVeiculoModel {
   final String? nome;
 
   final String? descricao;
-  
+
   // Localização no veículo (texto livre, sem coordenadas)
   final String? localizacao;
+
+  // Posicionamento relativo ao veículo
+  final String? coordenadaX;
+  final String? coordenadaY;
+  final String? alturaRelacaoPiso;
+
+  // Posicionamento geográfico opcional
+  final double? latitude;
+  final double? longitude;
+  final double? precisaoGpsMetros;
+  final DateTime? gpsCapturadoEm;
+
+  // Permite exceção ao método de posicionamento definido no veículo.
+  final MetodoPosicionamentoVestigio? metodoPosicionamentoOverride;
 
   // Tipo de ação
   final TipoAcaoVestigioVeiculo? tipoAcao; // registrado ou coletado
@@ -56,6 +73,14 @@ class VestigioVeiculoModel {
     this.nome,
     this.descricao,
     this.localizacao,
+    this.coordenadaX,
+    this.coordenadaY,
+    this.alturaRelacaoPiso,
+    this.latitude,
+    this.longitude,
+    this.precisaoGpsMetros,
+    this.gpsCapturadoEm,
+    this.metodoPosicionamentoOverride,
     this.tipoAcao,
     this.tipoDestino,
     this.destinoId,
@@ -96,20 +121,39 @@ class VestigioVeiculoModel {
     return '$r. Localização no veículo: $l';
   }
 
+  String? get latitudeFormatada => CoordinateFormatter.formatLatitude(latitude);
+
+  String? get longitudeFormatada =>
+      CoordinateFormatter.formatLongitude(longitude);
+
+  String? get coordenadasGpsFormatadas => CoordinateFormatter.formatPair(
+    latitude: latitudeFormatada,
+    longitude: longitudeFormatada,
+  );
+
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'nome': nome,
-        'descricao': descricao,
-        'localizacao': localizacao,
-        'tipoAcao': tipoAcao?.name,
-        'tipoDestino': tipoDestino?.name,
-        'destinoId': destinoId,
-        'coletadoPor': coletadoPor,
-        'dataHoraColeta': dataHoraColeta,
-        'numeroLacre': numeroLacre,
-        'isSangueHumano': isSangueHumano,
-        'fotosPaths': fotosPaths,
-      };
+    'id': id,
+    'nome': nome,
+    'descricao': descricao,
+    'localizacao': localizacao,
+    'coordenadaX': coordenadaX,
+    'coordenadaY': coordenadaY,
+    'alturaRelacaoPiso': alturaRelacaoPiso,
+    'latitude': latitude,
+    'longitude': longitude,
+    'precisaoGpsMetros': precisaoGpsMetros,
+    'gpsCapturadoEm': gpsCapturadoEm?.toIso8601String(),
+    'metodoPosicionamentoOverride': metodoPosicionamentoOverride?.name,
+    'tipoAcao': tipoAcao?.name,
+    'tipoDestino': tipoDestino?.name,
+    'destinoId': destinoId,
+    'coletadoPor': coletadoPor,
+    'dataHoraColeta': dataHoraColeta,
+    'numeroLacre': numeroLacre,
+    'isSangueHumano': isSangueHumano,
+    'fotosPaths': fotosPaths,
+    'numerosFotografias': numerosFotografias,
+  };
 
   factory VestigioVeiculoModel.fromJson(Map<String, dynamic> json) {
     TipoAcaoVestigioVeiculo? tipoAcao;
@@ -133,6 +177,18 @@ class VestigioVeiculoModel {
       nome: json['nome'] as String?,
       descricao: json['descricao'] as String?,
       localizacao: json['localizacao'] as String?,
+      coordenadaX: json['coordenadaX'] as String?,
+      coordenadaY: json['coordenadaY'] as String?,
+      alturaRelacaoPiso: json['alturaRelacaoPiso'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      precisaoGpsMetros: (json['precisaoGpsMetros'] as num?)?.toDouble(),
+      gpsCapturadoEm: json['gpsCapturadoEm'] != null
+          ? DateTime.tryParse(json['gpsCapturadoEm'] as String)
+          : null,
+      metodoPosicionamentoOverride: MetodoPosicionamentoVestigio.fromName(
+        json['metodoPosicionamentoOverride'] as String?,
+      ),
       tipoAcao: tipoAcao,
       tipoDestino: tipoDestino,
       destinoId: json['destinoId'] as String?,
@@ -140,10 +196,15 @@ class VestigioVeiculoModel {
       dataHoraColeta: json['dataHoraColeta'] as String?,
       numeroLacre: json['numeroLacre'] as String?,
       isSangueHumano: json['isSangueHumano'] as bool? ?? false,
-      fotosPaths: (json['fotosPaths'] as List<dynamic>?)
+      fotosPaths:
+          (json['fotosPaths'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      numerosFotografias: (json['numerosFotografias'] as List<dynamic>?)
+          ?.map((e) => int.tryParse(e.toString()))
+          .whereType<int>()
+          .toList(),
     );
   }
 
@@ -152,6 +213,14 @@ class VestigioVeiculoModel {
     String? nome,
     String? descricao,
     String? localizacao,
+    String? coordenadaX,
+    String? coordenadaY,
+    String? alturaRelacaoPiso,
+    double? latitude,
+    double? longitude,
+    double? precisaoGpsMetros,
+    DateTime? gpsCapturadoEm,
+    MetodoPosicionamentoVestigio? metodoPosicionamentoOverride,
     TipoAcaoVestigioVeiculo? tipoAcao,
     TipoDestinoVestigioVeiculo? tipoDestino,
     String? destinoId,
@@ -167,6 +236,15 @@ class VestigioVeiculoModel {
       nome: nome ?? this.nome,
       descricao: descricao ?? this.descricao,
       localizacao: localizacao ?? this.localizacao,
+      coordenadaX: coordenadaX ?? this.coordenadaX,
+      coordenadaY: coordenadaY ?? this.coordenadaY,
+      alturaRelacaoPiso: alturaRelacaoPiso ?? this.alturaRelacaoPiso,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      precisaoGpsMetros: precisaoGpsMetros ?? this.precisaoGpsMetros,
+      gpsCapturadoEm: gpsCapturadoEm ?? this.gpsCapturadoEm,
+      metodoPosicionamentoOverride:
+          metodoPosicionamentoOverride ?? this.metodoPosicionamentoOverride,
       tipoAcao: tipoAcao ?? this.tipoAcao,
       tipoDestino: tipoDestino ?? this.tipoDestino,
       destinoId: destinoId ?? this.destinoId,

@@ -218,9 +218,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
             Container(
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade300),
-                borderRadius: const BorderRadius.all(
-                  Radius.circular(8),
-                ),
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

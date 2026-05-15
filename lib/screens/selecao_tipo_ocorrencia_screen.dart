@@ -28,7 +28,9 @@ class SelecaoTipoOcorrenciaScreen extends StatelessWidget {
   }
 
   Future<void> _escolherComoIniciar(
-      BuildContext context, TipoOcorrencia tipo) async {
+    BuildContext context,
+    TipoOcorrencia tipo,
+  ) async {
     final escolha = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -59,10 +61,7 @@ class SelecaoTipoOcorrenciaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nova Ocorrência'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Nova Ocorrência'), centerTitle: true),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -71,10 +70,7 @@ class SelecaoTipoOcorrenciaScreen extends StatelessWidget {
             const SizedBox(height: 24),
             const Text(
               'Selecione o tipo de ocorrência:',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
             Expanded(
@@ -118,4 +114,3 @@ class SelecaoTipoOcorrenciaScreen extends StatelessWidget {
     );
   }
 }
-

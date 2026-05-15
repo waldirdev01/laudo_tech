@@ -7,16 +7,15 @@ import 'cadastro_membro_equipe_policial_screen.dart';
 class CadastroEquipePolicialScreen extends StatefulWidget {
   final EquipePolicialFichaModel? equipeExistente;
 
-  const CadastroEquipePolicialScreen({
-    super.key,
-    this.equipeExistente,
-  });
+  const CadastroEquipePolicialScreen({super.key, this.equipeExistente});
 
   @override
-  State<CadastroEquipePolicialScreen> createState() => _CadastroEquipePolicialScreenState();
+  State<CadastroEquipePolicialScreen> createState() =>
+      _CadastroEquipePolicialScreenState();
 }
 
-class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScreen> {
+class _CadastroEquipePolicialScreenState
+    extends State<CadastroEquipePolicialScreen> {
   TipoEquipePolicial? _tipoSelecionado;
   final _outrosTipoController = TextEditingController();
   final _viaturaController = TextEditingController();
@@ -43,9 +42,8 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
   Future<void> _adicionarMembro() async {
     final resultado = await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => CadastroMembroEquipePolicialScreen(
-          tipoEquipe: _tipoSelecionado!,
-        ),
+        builder: (context) =>
+            CadastroMembroEquipePolicialScreen(tipoEquipe: _tipoSelecionado!),
       ),
     );
 
@@ -108,7 +106,9 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
           ? _outrosTipoController.text.trim()
           : null,
       viaturaNumero: _tipoSelecionado == TipoEquipePolicial.policiaMilitar
-          ? (_viaturaController.text.trim().isEmpty ? null : _viaturaController.text.trim())
+          ? (_viaturaController.text.trim().isEmpty
+                ? null
+                : _viaturaController.text.trim())
           : null,
       membros: _membros,
     );
@@ -120,7 +120,9 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.equipeExistente != null ? 'Editar Equipe' : 'Adicionar Equipe'),
+        title: Text(
+          widget.equipeExistente != null ? 'Editar Equipe' : 'Adicionar Equipe',
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -132,9 +134,9 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
             // Tipo de Equipe
             Text(
               'Tipo de Equipe *',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Container(
@@ -198,8 +200,8 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
                 Text(
                   'Membros',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 if (_tipoSelecionado != null)
                   TextButton.icon(
@@ -220,8 +222,8 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
                 child: Text(
                   'Nenhum membro adicionado. Clique em "Adicionar" para incluir membros.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               )
@@ -237,7 +239,7 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (membro.postoGraduacao != null)
-                          Text('Posto/Graduação: ${membro.postoGraduacao}'),
+                          Text('Qualificação: ${membro.postoGraduacao}'),
                         Text('Matrícula: ${membro.matricula}'),
                       ],
                     ),
@@ -249,7 +251,11 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
                           onPressed: () => _editarMembro(index),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                          icon: const Icon(
+                            Icons.delete,
+                            size: 20,
+                            color: Colors.red,
+                          ),
                           onPressed: () => _removerMembro(index),
                         ),
                       ],
@@ -260,10 +266,12 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
             const SizedBox(height: 32),
             FilledButton(
               onPressed: _salvarEquipe,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.all(16),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
+              child: Text(
+                widget.equipeExistente != null
+                    ? 'Salvar Alterações'
+                    : 'Adicionar Equipe',
               ),
-              child: Text(widget.equipeExistente != null ? 'Salvar Alterações' : 'Adicionar Equipe'),
             ),
           ],
         ),
@@ -271,4 +279,3 @@ class _CadastroEquipePolicialScreenState extends State<CadastroEquipePolicialScr
     );
   }
 }
-

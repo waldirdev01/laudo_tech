@@ -28,11 +28,11 @@ class _ExamesComplementaresScreenState
   @override
   void initState() {
     super.initState();
-    _ficha = widget.ficha;
     _inicializar();
   }
 
   Future<void> _inicializar() async {
+    _ficha = await _fichaService.obterFicha(widget.ficha.id) ?? widget.ficha;
     _montarExamesIniciais();
     if (!mounted) return;
     setState(() => _carregando = false);
@@ -182,11 +182,14 @@ class _ExamesComplementaresScreenState
   Future<void> _salvar() async {
     setState(() => _salvando = true);
     try {
-      final fichaAtualizada = _ficha.copyWith(
+      final fichaBaseAtual =
+          await _fichaService.obterFicha(widget.ficha.id) ?? _ficha;
+      final fichaAtualizada = fichaBaseAtual.copyWith(
         examesComplementares: List<ExameComplementarModel>.from(_exames),
         dataUltimaAtualizacao: DateTime.now(),
       );
       await _fichaService.salvarFicha(fichaAtualizada);
+      _ficha = fichaAtualizada;
       if (!mounted) return;
       Navigator.of(context).pop(fichaAtualizada);
     } finally {

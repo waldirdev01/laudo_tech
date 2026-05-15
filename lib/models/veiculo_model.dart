@@ -1,6 +1,7 @@
 /// Modelo para dados de veículo em CVLI
 library;
 
+import 'metodo_posicionamento_model.dart';
 import 'vestigio_veiculo_model.dart';
 
 T? _enumFromName<T extends Enum>(Iterable<T> values, String? name) {
@@ -162,6 +163,8 @@ class VeiculoModel {
   /// Fotos do veículo no ambiente (obrigatório ao menos uma para o laudo).
   final List<String> fotosVistaVeiculoAmbiente;
 
+  final MetodoPosicionamentoVestigio? metodoPosicionamentoVestigios;
+
   // Vestígios/Evidências (novo sistema)
   final List<VestigioVeiculoModel>? vestigios;
 
@@ -222,6 +225,7 @@ class VeiculoModel {
     this.bicicletaElementosSinalizacao,
     this.bicicletaPossuiCampainha,
     this.fotosVistaVeiculoAmbiente = const [],
+    this.metodoPosicionamentoVestigios,
     this.vestigios,
     this.presencaSangue,
     this.localizacaoSangue,
@@ -280,6 +284,7 @@ class VeiculoModel {
     'bicicletaElementosSinalizacao': bicicletaElementosSinalizacao,
     'bicicletaPossuiCampainha': bicicletaPossuiCampainha,
     'fotosVistaVeiculoAmbiente': fotosVistaVeiculoAmbiente,
+    'metodoPosicionamentoVestigios': metodoPosicionamentoVestigios?.name,
     'vestigios': vestigios?.map((v) => v.toJson()).toList(),
     'presencaSangue': presencaSangue,
     'localizacaoSangue': localizacaoSangue,
@@ -406,6 +411,9 @@ class VeiculoModel {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      metodoPosicionamentoVestigios: MetodoPosicionamentoVestigio.fromName(
+        json['metodoPosicionamentoVestigios'] as String?,
+      ),
       vestigios: vestigios,
       presencaSangue: json['presencaSangue'] as bool?,
       localizacaoSangue: json['localizacaoSangue'] as String?,
@@ -462,6 +470,7 @@ class VeiculoModel {
     String? bicicletaElementosSinalizacao,
     bool? bicicletaPossuiCampainha,
     List<String>? fotosVistaVeiculoAmbiente,
+    MetodoPosicionamentoVestigio? metodoPosicionamentoVestigios,
     List<VestigioVeiculoModel>? vestigios,
     bool? presencaSangue,
     String? localizacaoSangue,
@@ -520,6 +529,8 @@ class VeiculoModel {
           bicicletaPossuiCampainha ?? this.bicicletaPossuiCampainha,
       fotosVistaVeiculoAmbiente:
           fotosVistaVeiculoAmbiente ?? this.fotosVistaVeiculoAmbiente,
+      metodoPosicionamentoVestigios:
+          metodoPosicionamentoVestigios ?? this.metodoPosicionamentoVestigios,
       vestigios: vestigios ?? this.vestigios,
       presencaSangue: presencaSangue ?? this.presencaSangue,
       localizacaoSangue: localizacaoSangue ?? this.localizacaoSangue,

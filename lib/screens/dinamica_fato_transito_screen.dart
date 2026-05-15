@@ -17,17 +17,15 @@ import '../widgets/ai_suggestion_button.dart';
 class DinamicaFatoTransitoScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
 
-  const DinamicaFatoTransitoScreen({
-    super.key,
-    required this.ficha,
-  });
+  const DinamicaFatoTransitoScreen({super.key, required this.ficha});
 
   @override
   State<DinamicaFatoTransitoScreen> createState() =>
       _DinamicaFatoTransitoScreenState();
 }
 
-class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen> {
+class _DinamicaFatoTransitoScreenState
+    extends State<DinamicaFatoTransitoScreen> {
   final _fichaService = FichaService();
   final _complementoCtrl = TextEditingController();
   final Set<String> _causasSelecionadas = {};
@@ -148,7 +146,8 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
       final causasIds = _causasSelecionadas.isEmpty
           ? null
           : _causasSelecionadas.toList();
-      final naturezaAtualizada = natureza?.copyWith(
+      final naturezaAtualizada =
+          natureza?.copyWith(
             complementoDinamicaFato: _complementoCtrl.text.trim().isEmpty
                 ? null
                 : _complementoCtrl.text.trim(),
@@ -163,8 +162,7 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
 
       String? dataHoraTermino = widget.ficha.dataHoraTermino;
       if (dataHoraTermino == null || dataHoraTermino.trim().isEmpty) {
-        dataHoraTermino =
-            DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+        dataHoraTermino = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
       }
 
       final fichaAtualizada = widget.ficha.copyWith(
@@ -205,17 +203,15 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
     final tipoStr = natureza?.tipo == CrimeTransitoNaturezaTipo.simples
         ? 'Simples (1 unidade)'
         : natureza?.tipo == CrimeTransitoNaturezaTipo.composta
-            ? 'Composta (2 ou mais unidades)'
-            : null;
+        ? 'Composta (2 ou mais unidades)'
+        : null;
     final formas = natureza?.formasInteracao ?? [];
-    final formasLabel =
-        formas.isEmpty ? 'Não informado' : formas.map(_labelForma).join(', ');
+    final formasLabel = formas.isEmpty
+        ? 'Não informado'
+        : formas.map(_labelForma).join(', ');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dinâmica do Fato'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Dinâmica do Fato'), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -230,9 +226,9 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
                     Text(
                       'DINÂMICA DO FATO',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                     const Divider(),
                     const SizedBox(height: 12),
@@ -276,9 +272,9 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
             if (_dinamicaPrincipal != null) ...[
               Text(
                 'Modelos de causa (SDT / IC-PCDF)',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 6),
               Text(
@@ -286,11 +282,13 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
                 'marque as linhas do documento de referência que melhor descrevem o caso. '
                 'Você pode marcar mais de uma.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 12),
-              ...CausasDeterminantesCatalogo.opcoesPara(_dinamicaPrincipal!).map(
+              ...CausasDeterminantesCatalogo.opcoesPara(
+                _dinamicaPrincipal!,
+              ).map(
                 (c) => CheckboxListTile(
                   value: _causasSelecionadas.contains(c.id),
                   onChanged: (v) {
@@ -365,8 +363,8 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
                   Text(
                     'Cálculo de velocidade',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -386,7 +384,9 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.check),
-              label: Text(_salvando ? 'Finalizando...' : 'Concluir e finalizar ficha'),
+              label: Text(
+                _salvando ? 'Finalizando...' : 'Concluir e finalizar ficha',
+              ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
@@ -404,14 +404,11 @@ class _DinamicaFatoTransitoScreenState extends State<DinamicaFatoTransitoScreen>
         Text(
           label,
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
+        Text(value, style: Theme.of(context).textTheme.bodyLarge),
       ],
     );
   }

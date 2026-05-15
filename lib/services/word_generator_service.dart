@@ -12,6 +12,7 @@ import '../models/evidencia_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/marco_zero_local_model.dart';
 import '../models/membro_equipe_model.dart';
+import '../models/metodo_posicionamento_model.dart';
 import '../models/perito_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../models/veiculo_model.dart';
@@ -21,6 +22,7 @@ import '../services/equipe_service.dart';
 import '../services/laboratorio_service.dart';
 import '../services/perito_service.dart';
 import '../services/unidade_service.dart';
+import '../utils/equipe_hierarchy.dart';
 
 /// Serviço para gerar documentos Word a partir de templates
 /// Preserva cabeçalho/rodapé do template e gera o conteúdo programaticamente
@@ -201,6 +203,66 @@ class WordGeneratorService {
         .replaceAll('/', '-');
     final nomeArquivo =
         'Ficha_${raiNumeroSaneado}_${DateTime.now().millisecondsSinceEpoch}.docx';
+    final arquivoFinal = File('${diretorio.path}/$nomeArquivo');
+    await arquivoFinal.writeAsBytes(novoBytes);
+
+    return arquivoFinal;
+  }
+
+  Future<File> gerarQuadroPosicionamentoVestigios(
+    FichaCompletaModel ficha,
+  ) async {
+    final perito = await _peritoService.obterPerito();
+    if (perito == null || perito.caminhoTemplate == null) {
+      throw Exception(
+        'Perito não cadastrado ou template não encontrado. Vá em Configurações > Editar Perito e selecione o template novamente.',
+      );
+    }
+
+    final templateFile = File(perito.caminhoTemplate!);
+    if (!await templateFile.exists()) {
+      throw Exception(
+        'O arquivo template não foi encontrado. Por favor, vá em Configurações > Editar Perito e selecione o template novamente.',
+      );
+    }
+
+    final templateBytes = await templateFile.readAsBytes();
+    final archive = ZipDecoder().decodeBytes(templateBytes);
+    final conteudoXml = await _gerarConteudoQuadroPosicionamento(ficha, perito);
+
+    final novoArchive = Archive();
+    for (final arquivo in archive) {
+      dynamic conteudo = arquivo.content;
+      if (arquivo.name == 'word/document.xml') {
+        final xmlOriginal = conteudo is List<int>
+            ? utf8.decode(conteudo)
+            : conteudo.toString();
+        final sectPr = _extrairSectPr(xmlOriginal);
+        final novoXml = _montarDocumentoCompleto(conteudoXml, sectPr);
+        conteudo = Uint8List.fromList(utf8.encode(novoXml));
+      }
+
+      if (conteudo is List<int>) {
+        novoArchive.addFile(
+          ArchiveFile(
+            arquivo.name,
+            conteudo.length,
+            Uint8List.fromList(conteudo),
+          ),
+        );
+      } else {
+        final data = Uint8List.fromList(utf8.encode(conteudo.toString()));
+        novoArchive.addFile(ArchiveFile(arquivo.name, data.length, data));
+      }
+    }
+
+    final novoBytes = ZipEncoder().encode(novoArchive);
+
+    final diretorio = await getApplicationDocumentsDirectory();
+    final raiNumeroSaneado = (ficha.dadosSolicitacao.raiNumero ?? ficha.id)
+        .replaceAll('/', '-');
+    final nomeArquivo =
+        'Quadro_Posicionamento_${raiNumeroSaneado}_${DateTime.now().millisecondsSinceEpoch}.docx';
     final arquivoFinal = File('${diretorio.path}/$nomeArquivo');
     await arquivoFinal.writeAsBytes(novoBytes);
 
@@ -522,6 +584,154 @@ $conteudo
     );
   }
 
+  Future<String> _gerarConteudoQuadroPosicionamento(
+    FichaCompletaModel ficha,
+    PeritoModel perito,
+  ) async {
+    final buffer = StringBuffer();
+    buffer.writeln(_gerarTitulo('QUADRO DE POSICIONAMENTO DOS VESTÍGIOS'));
+    buffer.writeln(_gerarParagrafoVazio());
+    buffer.writeln(
+      _gerarTabela(
+        cabecalho: 'IDENTIFICAÇÃO',
+        linhas: [
+          ['RAI', ficha.dadosSolicitacao.raiNumero ?? ''],
+          [
+            'Número da ocorrência',
+            ficha.dadosSolicitacao.numeroOcorrencia ?? '',
+          ],
+          [
+            'Natureza da ocorrência',
+            ficha.dadosSolicitacao.naturezaOcorrencia ?? '',
+          ],
+          ['Perito criminal', perito.nome],
+        ],
+      ),
+    );
+    buffer.writeln(_gerarParagrafoVazio());
+
+    var adicionouQuadro = false;
+    final localFurto = ficha.localFurto;
+    if (localFurto != null) {
+      final mediatoLinhas = _linhasQuadroVestigiosLocal(
+        localFurto.vestigiosMediato ?? const [],
+      );
+      if (mediatoLinhas.isNotEmpty) {
+        adicionouQuadro = true;
+        buffer.writeln(
+          _gerarTabela(cabecalho: 'LOCAL MEDIATO', linhas: mediatoLinhas),
+        );
+        buffer.writeln(_gerarParagrafoVazio());
+      }
+
+      final ambientes = localFurto.ambientesImediato ?? const <String>[];
+      for (final ambiente in ambientes) {
+        final linhas = _linhasQuadroVestigiosLocal(
+          (localFurto.vestigiosImediato ?? const [])
+              .where((v) => v.ambiente == ambiente)
+              .toList(),
+        );
+        if (linhas.isEmpty) continue;
+        adicionouQuadro = true;
+        buffer.writeln(
+          _gerarTabela(
+            cabecalho: 'LOCAL IMEDIATO - ${ambiente.toUpperCase()}',
+            linhas: linhas,
+          ),
+        );
+        buffer.writeln(_gerarParagrafoVazio());
+      }
+
+      final relacionadosLinhas = _linhasQuadroVestigiosLocal(
+        localFurto.vestigiosRelacionado ?? const [],
+      );
+      if (relacionadosLinhas.isNotEmpty) {
+        adicionouQuadro = true;
+        buffer.writeln(
+          _gerarTabela(
+            cabecalho: 'LOCAL RELACIONADO',
+            linhas: relacionadosLinhas,
+          ),
+        );
+        buffer.writeln(_gerarParagrafoVazio());
+      }
+    }
+
+    for (final veiculo in ficha.veiculos ?? const <VeiculoModel>[]) {
+      final linhas = _linhasQuadroVestigiosVeiculo(veiculo);
+      if (linhas.isEmpty) continue;
+      adicionouQuadro = true;
+      final descricaoVeiculo = veiculo.placa?.trim().isNotEmpty == true
+          ? ' - ${veiculo.placa!.trim()}'
+          : '';
+      buffer.writeln(
+        _gerarTabela(
+          cabecalho: 'VEÍCULO ${veiculo.numero}$descricaoVeiculo',
+          linhas: linhas,
+        ),
+      );
+      buffer.writeln(_gerarParagrafoVazio());
+    }
+
+    if (!adicionouQuadro) {
+      buffer.writeln(
+        _gerarTabela(
+          cabecalho: 'REGISTRO',
+          linhas: [
+            [
+              'Situação',
+              'Não há vestígios com posicionamento registrados nesta ficha.',
+            ],
+          ],
+        ),
+      );
+    }
+
+    return buffer.toString();
+  }
+
+  List<List<String>> _linhasQuadroVestigiosLocal(
+    List<VestigioLocalModel> vestigios,
+  ) {
+    final linhas = <List<String>>[];
+    for (var i = 0; i < vestigios.length; i++) {
+      final v = vestigios[i];
+      final descricao = v.rotuloNomeDescricao.trim().isEmpty
+          ? 'Vestígio registrado'
+          : v.rotuloNomeDescricao.trim();
+      final detalhe = <String>[
+        'Legenda/Nome: $descricao',
+        'Método: ${_metodoPosicionamentoVestigioLocal(v).label}',
+        'Posicionamento: ${_textoPosicionamentoVestigioLocal(v)}',
+      ];
+      if ((v.ambiente ?? '').trim().isNotEmpty) {
+        detalhe.insert(1, 'Ambiente: ${v.ambiente!.trim()}');
+      }
+      linhas.add(['Ponto ${i + 1}', detalhe.join('\n')]);
+    }
+    return linhas;
+  }
+
+  List<List<String>> _linhasQuadroVestigiosVeiculo(VeiculoModel veiculo) {
+    final vestigios = veiculo.vestigios ?? const <VestigioVeiculoModel>[];
+    final linhas = <List<String>>[];
+    for (var i = 0; i < vestigios.length; i++) {
+      final v = vestigios[i];
+      final descricao = v.rotuloNomeDescricao.trim().isEmpty
+          ? 'Vestígio registrado'
+          : v.rotuloNomeDescricao.trim();
+      final detalhe = <String>[
+        'Legenda/Nome: $descricao',
+        if ((v.localizacao ?? '').trim().isNotEmpty)
+          'Localização no veículo: ${v.localizacao!.trim()}',
+        'Método: ${_metodoPosicionamentoVestigioVeiculo(v, veiculo).label}',
+        'Posicionamento: ${_textoPosicionamentoVestigioVeiculo(v, veiculo)}',
+      ];
+      linhas.add(['Ponto ${i + 1}', detalhe.join('\n')]);
+    }
+    return linhas;
+  }
+
   Future<String> _gerarTabelaEquipePericia(
     FichaCompletaModel ficha,
     PeritoModel perito,
@@ -593,12 +803,27 @@ $conteudo
               equipe.viaturaNumero!.trim().isNotEmpty) {
             tipoNome += ' - Viatura n. ${equipe.viaturaNumero}';
           }
-          final membrosTexto = equipe.membros
+          final membrosOrdenados = [...equipe.membros]
+            ..sort(
+              (a, b) =>
+                  EquipeHierarchy.ordemQualificacaoPolicial(
+                    equipe.tipo,
+                    a.postoGraduacao,
+                  ).compareTo(
+                    EquipeHierarchy.ordemQualificacaoPolicial(
+                      equipe.tipo,
+                      b.postoGraduacao,
+                    ),
+                  ),
+            );
+          final membrosTexto = membrosOrdenados
               .map((m) {
-                final posto = m.postoGraduacao != null
-                    ? ' (${m.postoGraduacao})'
+                final qualificacao = m.postoGraduacao?.trim();
+                final prefixo =
+                    (qualificacao != null && qualificacao.isNotEmpty)
+                    ? '$qualificacao '
                     : '';
-                return '${m.nome}$posto - ${m.matricula}';
+                return '$prefixo${m.nome} - ${m.matricula}';
               })
               .join('\n');
 
@@ -612,7 +837,20 @@ $conteudo
           final tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
 
           // Formatar membros com cargo, nome, CRM e matrícula
-          final membrosTexto = equipe.membros
+          final membrosOrdenados = [...equipe.membros]
+            ..sort(
+              (a, b) =>
+                  EquipeHierarchy.ordemQualificacaoResgate(
+                    equipe.tipo,
+                    a.cargo,
+                  ).compareTo(
+                    EquipeHierarchy.ordemQualificacaoResgate(
+                      equipe.tipo,
+                      b.cargo,
+                    ),
+                  ),
+            );
+          final membrosTexto = membrosOrdenados
               .map((m) {
                 final partes = <String>[];
                 if (m.cargo != null && m.cargo!.isNotEmpty) {
@@ -884,6 +1122,7 @@ $conteudo
           vestigios: lf.vestigiosImediato ?? [],
           semVestigios: lf.semVestigiosImediato ?? false,
           marcoZero: lf.marcoZeroImediato,
+          marcosZeroAmbientes: lf.marcosZeroAmbientesImediato,
         ),
       );
       buffer.writeln(_gerarParagrafoVazio());
@@ -926,6 +1165,7 @@ $conteudo
     required List<VestigioLocalModel> vestigios,
     required bool semVestigios,
     MarcoZeroLocalModel? marcoZero,
+    Map<String, MarcoZeroLocalModel>? marcosZeroAmbientes,
   }) {
     final buffer = StringBuffer();
     final linhas = <List<String>>[];
@@ -970,6 +1210,23 @@ $conteudo
       }
       if (marcoZeroTexto.isNotEmpty) {
         linhas.add(['Marco Zero', marcoZeroTexto.join(', ')]);
+      }
+    }
+
+    if (marcosZeroAmbientes != null && marcosZeroAmbientes.isNotEmpty) {
+      for (final entry in marcosZeroAmbientes.entries) {
+        final marcoZeroTexto = <String>[];
+        final descricao = entry.value.descricao;
+        final x = entry.value.coordenadaX;
+        final y = entry.value.coordenadaY;
+        if (descricao != null && descricao.isNotEmpty) {
+          marcoZeroTexto.add('Descrição: $descricao');
+        }
+        if (x != null && x.isNotEmpty) marcoZeroTexto.add('X: $x');
+        if (y != null && y.isNotEmpty) marcoZeroTexto.add('Y: $y');
+        if (marcoZeroTexto.isNotEmpty) {
+          linhas.add(['Marco Zero - ${entry.key}', marcoZeroTexto.join(', ')]);
+        }
       }
     }
 
@@ -1080,8 +1337,8 @@ $conteudo
       'Descrição\n(tamanho, cor, recenticidade, sentido de produção, área)',
       bold: true,
     );
-    _adicionarCelulaTabela(buffer, 'Coord. 1', bold: true);
-    _adicionarCelulaTabela(buffer, 'Coord. 2', bold: true);
+    _adicionarCelulaTabela(buffer, 'Método', bold: true);
+    _adicionarCelulaTabela(buffer, 'Posicionamento', bold: true);
     _adicionarCelulaTabela(buffer, 'Recolhido', bold: true);
     buffer.writeln('      </w:tr>');
 
@@ -1118,6 +1375,10 @@ $conteudo
 
         // Descrição (inclui nome opcional)
         String descricao = vestigio.rotuloNomeDescricao;
+        if (vestigio.ambiente != null && vestigio.ambiente!.trim().isNotEmpty) {
+          descricao =
+              '${descricao.isNotEmpty ? '$descricao - ' : ''}Ambiente: ${vestigio.ambiente}';
+        }
         if (vestigio.isSangueHumano) {
           descricao =
               '${descricao.isNotEmpty ? '$descricao - ' : ''}Sangue humano';
@@ -1129,11 +1390,14 @@ $conteudo
         }
         _adicionarCelulaTabela(buffer, descricao);
 
-        // Coord. 1 (X)
-        _adicionarCelulaTabela(buffer, vestigio.coordenadaX ?? '');
-
-        // Coord. 2 (Y)
-        _adicionarCelulaTabela(buffer, vestigio.coordenadaY ?? '');
+        _adicionarCelulaTabela(
+          buffer,
+          _metodoPosicionamentoVestigioLocal(vestigio).label,
+        );
+        _adicionarCelulaTabela(
+          buffer,
+          _textoPosicionamentoVestigioLocal(vestigio),
+        );
 
         // Recolhido (Sim/Não)
         final recolhido = vestigio.tipoAcao == TipoAcaoVestigio.coletado
@@ -1147,6 +1411,49 @@ $conteudo
 
     buffer.writeln('    </w:tbl>');
     return buffer.toString();
+  }
+
+  MetodoPosicionamentoVestigio _metodoPosicionamentoVestigioLocal(
+    VestigioLocalModel vestigio,
+  ) {
+    return vestigio.metodoPosicionamentoOverride ??
+        (vestigio.latitude != null && vestigio.longitude != null
+            ? MetodoPosicionamentoVestigio.gps
+            : ((vestigio.coordenadaX ?? '').trim().isNotEmpty ||
+                      (vestigio.coordenadaY ?? '').trim().isNotEmpty
+                  ? MetodoPosicionamentoVestigio.marcoZero
+                  : MetodoPosicionamentoVestigio.nenhum));
+  }
+
+  String _textoPosicionamentoVestigioLocal(VestigioLocalModel vestigio) {
+    final metodo = _metodoPosicionamentoVestigioLocal(vestigio);
+    switch (metodo) {
+      case MetodoPosicionamentoVestigio.marcoZero:
+        final partes = <String>[];
+        if ((vestigio.coordenadaX ?? '').trim().isNotEmpty) {
+          partes.add('X=${vestigio.coordenadaX}');
+        }
+        if ((vestigio.coordenadaY ?? '').trim().isNotEmpty) {
+          partes.add('Y=${vestigio.coordenadaY}');
+        }
+        if ((vestigio.alturaRelacaoPiso ?? '').trim().isNotEmpty) {
+          partes.add('altura ${vestigio.alturaRelacaoPiso}');
+        }
+        return partes.join(', ');
+      case MetodoPosicionamentoVestigio.gps:
+        final partes = <String>[];
+        if ((vestigio.coordenadasGpsFormatadas ?? '').trim().isNotEmpty) {
+          partes.add(vestigio.coordenadasGpsFormatadas!);
+        }
+        if (vestigio.precisaoGpsMetros != null) {
+          partes.add(
+            'Precisão ${vestigio.precisaoGpsMetros!.toStringAsFixed(1)} m',
+          );
+        }
+        return partes.join(' | ');
+      case MetodoPosicionamentoVestigio.nenhum:
+        return '';
+    }
   }
 
   void _adicionarCelulaTabela(
@@ -1664,6 +1971,7 @@ $conteudo
         buffer.writeln(
           _gerarTabelaVestigiosVeiculo(
             cabecalho: 'EVIDÊNCIAS - VEÍCULO ${veiculo.numero}',
+            veiculo: veiculo,
             vestigios: veiculo.vestigios!,
           ),
         );
@@ -2040,6 +2348,7 @@ $conteudo
 
   String _gerarTabelaVestigiosVeiculo({
     required String cabecalho,
+    required VeiculoModel veiculo,
     required List<VestigioVeiculoModel> vestigios,
   }) {
     final buffer = StringBuffer();
@@ -2114,7 +2423,7 @@ $conteudo
     _adicionarCelulaTabelaVestigioVeiculo(buffer, 'Descrição', bold: true);
     _adicionarCelulaTabelaVestigioVeiculo(
       buffer,
-      'Localização no Veículo',
+      'Localização / Posicionamento',
       bold: true,
     );
     _adicionarCelulaTabelaVestigioVeiculo(buffer, 'Recolhido', bold: true);
@@ -2137,7 +2446,13 @@ $conteudo
       }
       _adicionarCelulaTabelaVestigioVeiculo(buffer, descricao);
 
-      _adicionarCelulaTabelaVestigioVeiculo(buffer, vestigio.localizacao ?? '');
+      final localizacaoPosicionamento = [
+        if ((vestigio.localizacao ?? '').trim().isNotEmpty)
+          'Local: ${vestigio.localizacao}',
+        if (_textoPosicionamentoVestigioVeiculo(vestigio, veiculo).isNotEmpty)
+          'Posicionamento: ${_textoPosicionamentoVestigioVeiculo(vestigio, veiculo)}',
+      ].join('\n');
+      _adicionarCelulaTabelaVestigioVeiculo(buffer, localizacaoPosicionamento);
 
       // Recolhido (Sim/Não)
       final recolhido = vestigio.tipoAcao == TipoAcaoVestigioVeiculo.coletado
@@ -2150,6 +2465,54 @@ $conteudo
 
     buffer.writeln('    </w:tbl>');
     return buffer.toString();
+  }
+
+  MetodoPosicionamentoVestigio _metodoPosicionamentoVestigioVeiculo(
+    VestigioVeiculoModel vestigio,
+    VeiculoModel veiculo,
+  ) {
+    return vestigio.metodoPosicionamentoOverride ??
+        veiculo.metodoPosicionamentoVestigios ??
+        (vestigio.latitude != null && vestigio.longitude != null
+            ? MetodoPosicionamentoVestigio.gps
+            : ((vestigio.coordenadaX ?? '').trim().isNotEmpty ||
+                      (vestigio.coordenadaY ?? '').trim().isNotEmpty
+                  ? MetodoPosicionamentoVestigio.marcoZero
+                  : MetodoPosicionamentoVestigio.nenhum));
+  }
+
+  String _textoPosicionamentoVestigioVeiculo(
+    VestigioVeiculoModel vestigio,
+    VeiculoModel veiculo,
+  ) {
+    final metodo = _metodoPosicionamentoVestigioVeiculo(vestigio, veiculo);
+    switch (metodo) {
+      case MetodoPosicionamentoVestigio.marcoZero:
+        final partes = <String>[];
+        if ((vestigio.coordenadaX ?? '').trim().isNotEmpty) {
+          partes.add('X=${vestigio.coordenadaX}');
+        }
+        if ((vestigio.coordenadaY ?? '').trim().isNotEmpty) {
+          partes.add('Y=${vestigio.coordenadaY}');
+        }
+        if ((vestigio.alturaRelacaoPiso ?? '').trim().isNotEmpty) {
+          partes.add('altura ${vestigio.alturaRelacaoPiso}');
+        }
+        return partes.join(', ');
+      case MetodoPosicionamentoVestigio.gps:
+        final partes = <String>[];
+        if ((vestigio.coordenadasGpsFormatadas ?? '').trim().isNotEmpty) {
+          partes.add(vestigio.coordenadasGpsFormatadas!);
+        }
+        if (vestigio.precisaoGpsMetros != null) {
+          partes.add(
+            'Precisão ${vestigio.precisaoGpsMetros!.toStringAsFixed(1)} m',
+          );
+        }
+        return partes.join(' | ');
+      case MetodoPosicionamentoVestigio.nenhum:
+        return '';
+    }
   }
 
   void _adicionarCelulaTabelaVestigioVeiculo(

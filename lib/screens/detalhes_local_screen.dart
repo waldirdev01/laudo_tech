@@ -9,6 +9,7 @@ import '../models/detatlhes_local.dart';
 import '../models/ficha_completa_model.dart';
 import '../models/laboratorio_model.dart';
 import '../models/marco_zero_local_model.dart';
+import '../models/metodo_posicionamento_model.dart';
 import '../models/tipo_ocorrencia.dart';
 import '../models/unidade_model.dart';
 import '../models/vestigio_local_model.dart';
@@ -43,20 +44,26 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   final _descricaoImediatoController = TextEditingController();
   final _descricaoRelacionadoController = TextEditingController();
   final _demaisObservacoesController = TextEditingController();
+  final _scrollController = ScrollController();
   bool _salvando = false;
+  bool _modoRapido = false;
   int _etapaLocalAtual = 0; // 0=mediato, 1=imediato, 2=relacionado
   bool? _temVestigiosMediato;
+  MetodoPosicionamentoVestigio _metodoPosicionamentoMediato =
+      MetodoPosicionamentoVestigio.nenhum;
+  MetodoPosicionamentoVestigio _metodoPosicionamentoRelacionado =
+      MetodoPosicionamentoVestigio.nenhum;
 
   // Marco Zero por local
   final _marcoZeroDescricaoMediatoController = TextEditingController();
-  final _marcoZeroXMediatoController = TextEditingController(text: '0');
-  final _marcoZeroYMediatoController = TextEditingController(text: '0');
+  final _marcoZeroXMediatoController = TextEditingController();
+  final _marcoZeroYMediatoController = TextEditingController();
   final _marcoZeroDescricaoImediatoController = TextEditingController();
-  final _marcoZeroXImediatoController = TextEditingController(text: '0');
-  final _marcoZeroYImediatoController = TextEditingController(text: '0');
+  final _marcoZeroXImediatoController = TextEditingController();
+  final _marcoZeroYImediatoController = TextEditingController();
   final _marcoZeroDescricaoRelacionadoController = TextEditingController();
-  final _marcoZeroXRelacionadoController = TextEditingController(text: '0');
-  final _marcoZeroYRelacionadoController = TextEditingController(text: '0');
+  final _marcoZeroXRelacionadoController = TextEditingController();
+  final _marcoZeroYRelacionadoController = TextEditingController();
 
   // Estados dos checkboxes
   bool? _classificacaoMediato;
@@ -104,7 +111,16 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   // Descrição assistida – Imediato
   String? _abrangenciaImediato;
   final Set<String> _ambientesImediato = {};
+  String? _ambienteDestaqueImediato;
   final Map<String, Set<String>> _acessosPorAmbienteImediato = {};
+  final Map<String, Set<String>> _comunicacaoAmbientesImediato = {};
+  final Map<String, bool> _acessoExternoPorAmbienteImediato = {};
+  final Map<String, TextEditingController> _marcoAmbienteDescricaoCtrls = {};
+  final Map<String, TextEditingController> _marcoAmbienteXCtrls = {};
+  final Map<String, TextEditingController> _marcoAmbienteYCtrls = {};
+  final Map<String, TextEditingController> _consideracoesAmbienteCtrls = {};
+  final Map<String, MetodoPosicionamentoVestigio>
+  _metodosPosicionamentoAmbientesImediato = {};
   String? _ambienteAcessoSelecionado;
   String? _estadoConservacaoImediato;
   final _observacaoImediatoController = TextEditingController();
@@ -113,23 +129,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     'único ambiente',
     'múltiplos ambientes',
   ];
-  static const _opcoesAmbiente = [
+  static const _tiposRapidosAmbienteImediato = [
     'sala',
     'quarto',
-    'cozinha',
     'banheiro',
-    'garagem',
-    'quintal',
+    'cozinha',
     'varanda',
     'corredor',
-    'escritório',
-    'depósito',
-    'área de serviço',
-    'loja (interior)',
-    'recepção',
-    'estacionamento',
-    'área comum',
-    'outro',
   ];
   static const _opcoesEstadoConservacao = [
     'bom estado de conservação',
@@ -192,10 +198,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     'porta interna de vidro',
     'porta metálica',
     'janela',
-    'corredor interno',
     'escada interna',
     'acesso livre (sem porta interna)',
   ];
+  static const _opcoesComunicacaoEspecial = ['corredor'];
 
   // Vestígios por local
   List<VestigioLocalModel> _vestigiosMediato = [];
@@ -206,6 +212,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   bool _semVestigiosRelacionado = false;
   final List<String> _fotosVistaAmplaPaths = [];
   final List<String> _fotosVistaAmplaImediatoPaths = [];
+  final Map<String, List<String>> _fotosVistaAmplaAmbientesImediato = {};
+  final List<String> _fotosSinaisArrombamentoPaths = [];
 
   /// true = via pública / área aberta; false = imóvel; null = não definido
   bool? _localEmViaPublica;
@@ -257,25 +265,84 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _descricaoImediatoController.text = dados.descricaoLocalImediato ?? '';
       _descricaoRelacionadoController.text =
           dados.descricaoLocalRelacionado ?? '';
-      _observacaoImediatoController.text = '';
+      _abrangenciaImediato = dados.abrangenciaImediato;
+      _ambientesImediato
+        ..clear()
+        ..addAll(dados.ambientesImediato ?? const []);
+      _ambienteDestaqueImediato = dados.ambienteDestaqueImediato;
+      _estadoConservacaoImediato = dados.estadoConservacaoImediato;
+      _observacaoImediatoController.text = dados.observacaoImediato ?? '';
+      _acessosPorAmbienteImediato
+        ..clear()
+        ..addAll(
+          (dados.acessosPorAmbienteImediato ?? const {}).map(
+            (key, value) => MapEntry(key, value.toSet()),
+          ),
+        );
+      _comunicacaoAmbientesImediato
+        ..clear()
+        ..addAll(
+          (dados.comunicacaoAmbientesImediato ?? const {}).map(
+            (key, value) => MapEntry(key, value.toSet()),
+          ),
+        );
+      _acessoExternoPorAmbienteImediato
+        ..clear()
+        ..addAll(dados.acessoExternoPorAmbienteImediato ?? const {});
+      _metodoPosicionamentoMediato =
+          dados.metodoPosicionamentoMediato ??
+          _inferirMetodoPosicionamentoVestigios(
+            dados.vestigiosMediato ?? const [],
+            marcoZero: dados.marcoZeroMediato,
+          );
+      _metodoPosicionamentoRelacionado =
+          dados.metodoPosicionamentoRelacionado ??
+          _inferirMetodoPosicionamentoVestigios(
+            dados.vestigiosRelacionado ?? const [],
+            marcoZero: dados.marcoZeroRelacionado,
+          );
+      _metodosPosicionamentoAmbientesImediato
+        ..clear()
+        ..addAll(dados.metodosPosicionamentoAmbientesImediato ?? const {});
+      _limparMarcoAmbienteControllers();
+      for (final entry
+          in (dados.marcosZeroAmbientesImediato ?? const {}).entries) {
+        _marcoAmbienteDescricaoCtrls[entry.key] = TextEditingController(
+          text: entry.value.descricao ?? '',
+        );
+        _marcoAmbienteXCtrls[entry.key] = TextEditingController(
+          text: entry.value.coordenadaX ?? '0,0',
+        );
+        _marcoAmbienteYCtrls[entry.key] = TextEditingController(
+          text: entry.value.coordenadaY ?? '0,0',
+        );
+      }
+      _limparConsideracoesAmbienteControllers();
+      for (final entry
+          in (dados.consideracoesTecnicasAmbientesImediato ?? const {})
+              .entries) {
+        _consideracoesAmbienteCtrls[entry.key] = TextEditingController(
+          text: entry.value,
+        );
+      }
       _marcoZeroDescricaoMediatoController.text =
           dados.marcoZeroMediato?.descricao ?? '';
       _marcoZeroXMediatoController.text =
-          dados.marcoZeroMediato?.coordenadaX ?? '0';
+          dados.marcoZeroMediato?.coordenadaX ?? '';
       _marcoZeroYMediatoController.text =
-          dados.marcoZeroMediato?.coordenadaY ?? '0';
+          dados.marcoZeroMediato?.coordenadaY ?? '';
       _marcoZeroDescricaoImediatoController.text =
           dados.marcoZeroImediato?.descricao ?? '';
       _marcoZeroXImediatoController.text =
-          dados.marcoZeroImediato?.coordenadaX ?? '0';
+          dados.marcoZeroImediato?.coordenadaX ?? '';
       _marcoZeroYImediatoController.text =
-          dados.marcoZeroImediato?.coordenadaY ?? '0';
+          dados.marcoZeroImediato?.coordenadaY ?? '';
       _marcoZeroDescricaoRelacionadoController.text =
           dados.marcoZeroRelacionado?.descricao ?? '';
       _marcoZeroXRelacionadoController.text =
-          dados.marcoZeroRelacionado?.coordenadaX ?? '0';
+          dados.marcoZeroRelacionado?.coordenadaX ?? '';
       _marcoZeroYRelacionadoController.text =
-          dados.marcoZeroRelacionado?.coordenadaY ?? '0';
+          dados.marcoZeroRelacionado?.coordenadaY ?? '';
       _vestigiosMediato = List<VestigioLocalModel>.from(
         dados.vestigiosMediato ?? [],
       );
@@ -299,11 +366,54 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       _fotosVistaAmplaImediatoPaths.addAll(
         dados.fotosVistaAmplaImediatoPaths ?? const [],
       );
+      _fotosVistaAmplaAmbientesImediato
+        ..clear()
+        ..addAll(
+          (dados.fotosVistaAmplaAmbientesImediato ?? const {}).map(
+            (key, value) => MapEntry(key, List<String>.from(value)),
+          ),
+        );
+      _fotosSinaisArrombamentoPaths.clear();
+      _fotosSinaisArrombamentoPaths.addAll(
+        dados.fotosSinaisArrombamentoPaths ?? const [],
+      );
+      for (final ambiente in _ambientesImediato) {
+        _metodosPosicionamentoAmbientesImediato.putIfAbsent(
+          ambiente,
+          () => _inferirMetodoPosicionamentoVestigios(
+            _vestigiosImediato.where((v) => v.ambiente == ambiente).toList(),
+            marcoZero:
+                (dados.marcosZeroAmbientesImediato ?? const {})[ambiente],
+          ),
+        );
+      }
+      _sincronizarAcessosPorAmbienteImediato();
     } else if (widget.ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer) {
       // Pré-popular vestígios padrão para Morte a Esclarecer (apenas na primeira abertura)
       _classificacaoImediato = true;
       _vestigiosImediato = _vestigiosPadraoMorteEsclarecer();
     }
+  }
+
+  MetodoPosicionamentoVestigio _inferirMetodoPosicionamentoVestigios(
+    List<VestigioLocalModel> vestigios, {
+    MarcoZeroLocalModel? marcoZero,
+  }) {
+    if (vestigios.any((v) => v.latitude != null && v.longitude != null)) {
+      return MetodoPosicionamentoVestigio.gps;
+    }
+    final marcoInformado =
+        (marcoZero?.coordenadaX ?? '').trim().isNotEmpty ||
+        (marcoZero?.coordenadaY ?? '').trim().isNotEmpty;
+    if (marcoInformado ||
+        vestigios.any(
+          (v) =>
+              (v.coordenadaX ?? '').trim().isNotEmpty ||
+              (v.coordenadaY ?? '').trim().isNotEmpty,
+        )) {
+      return MetodoPosicionamentoVestigio.marcoZero;
+    }
+    return MetodoPosicionamentoVestigio.nenhum;
   }
 
   String get _tituloEtapaLocal {
@@ -324,6 +434,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         _classificacaoImediato = true;
         _etapaLocalAtual = 1;
       });
+      _rolarParaInicio();
       return;
     }
 
@@ -351,6 +462,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           _classificacaoRelacionado = true;
           _etapaLocalAtual = 2;
         });
+        _rolarParaInicio();
         return;
       }
 
@@ -362,6 +474,17 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     }
 
     await _salvarLocalFurto();
+  }
+
+  void _rolarParaInicio() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   List<VestigioLocalModel> _vestigiosPadraoMorteEsclarecer() {
@@ -415,7 +538,32 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     _marcoZeroDescricaoRelacionadoController.dispose();
     _marcoZeroXRelacionadoController.dispose();
     _marcoZeroYRelacionadoController.dispose();
+    _scrollController.dispose();
+    _limparMarcoAmbienteControllers();
+    _limparConsideracoesAmbienteControllers();
     super.dispose();
+  }
+
+  void _limparMarcoAmbienteControllers() {
+    for (final controller in _marcoAmbienteDescricaoCtrls.values) {
+      controller.dispose();
+    }
+    for (final controller in _marcoAmbienteXCtrls.values) {
+      controller.dispose();
+    }
+    for (final controller in _marcoAmbienteYCtrls.values) {
+      controller.dispose();
+    }
+    _marcoAmbienteDescricaoCtrls.clear();
+    _marcoAmbienteXCtrls.clear();
+    _marcoAmbienteYCtrls.clear();
+  }
+
+  void _limparConsideracoesAmbienteControllers() {
+    for (final controller in _consideracoesAmbienteCtrls.values) {
+      controller.dispose();
+    }
+    _consideracoesAmbienteCtrls.clear();
   }
 
   void _onPisoChanged(bool? value, String tipo, String local) {
@@ -598,6 +746,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             _sinaisArrombamentoSim = false;
             _sinaisArrombamentoNaoSeAplica = false;
             _sinaisArrombamentoController.clear();
+            _fotosSinaisArrombamentoPaths.clear();
           }
           break;
         case 'naoSeAplica':
@@ -606,6 +755,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             _sinaisArrombamentoSim = false;
             _sinaisArrombamentoNao = false;
             _sinaisArrombamentoController.clear();
+            _fotosSinaisArrombamentoPaths.clear();
           }
           break;
       }
@@ -639,6 +789,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   Future<void> _adicionarOuEditarVestigio(
     String secao, {
     VestigioLocalModel? existente,
+    String? ambienteInicial,
   }) async {
     final inclusaoContinua = existente == null;
 
@@ -647,6 +798,19 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         builder: (ctx) => VestigioLocalFormScreen(
           fichaId: widget.ficha.id,
           vestigioExistente: existente,
+          ambientesDisponiveis: secao == 'imediato'
+              ? _ambientesImediato.toList()
+              : const [],
+          ambienteInicial: secao == 'imediato' ? ambienteInicial : null,
+          modoRapido: _modoRapido,
+          metodoPosicionamentoPadrao: _metodoPosicionamentoVestigio(
+            secao,
+            ambiente: ambienteInicial ?? existente?.ambiente,
+          ),
+          avisoContextoGps: _avisoGpsVestigio(
+            secao,
+            ambiente: ambienteInicial ?? existente?.ambiente,
+          ),
           manterNaTelaAposSalvarNovo: inclusaoContinua,
           onSalvo: inclusaoContinua
               ? (VestigioLocalModel v) {
@@ -703,6 +867,42 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         alvo.add(resultado);
       }
     });
+  }
+
+  MetodoPosicionamentoVestigio _metodoPosicionamentoVestigio(
+    String secao, {
+    String? ambiente,
+  }) {
+    switch (secao) {
+      case 'mediato':
+        return _metodoPosicionamentoMediato;
+      case 'relacionado':
+        return _metodoPosicionamentoRelacionado;
+      case 'imediato':
+        if (ambiente == null) {
+          return MetodoPosicionamentoVestigio.nenhum;
+        }
+        return _metodosPosicionamentoAmbientesImediato[ambiente] ??
+            MetodoPosicionamentoVestigio.nenhum;
+      default:
+        return MetodoPosicionamentoVestigio.nenhum;
+    }
+  }
+
+  String? _avisoGpsVestigio(String secao, {String? ambiente}) {
+    final metodo = _metodoPosicionamentoVestigio(secao, ambiente: ambiente);
+    if (metodo != MetodoPosicionamentoVestigio.gps) return null;
+    if (_localEmViaPublica == false &&
+        (secao == 'mediato' || secao == 'relacionado')) {
+      return 'Ambiente interno ou imóvel fechado. O uso de GPS pode apresentar baixa confiabilidade neste contexto.';
+    }
+    if (_localEmViaPublica == false && secao == 'imediato') {
+      final nome = (ambiente ?? '').trim().toLowerCase();
+      if (nome.isNotEmpty && nome != 'varanda') {
+        return 'Ambiente interno. O uso de GPS pode apresentar baixa confiabilidade neste contexto.';
+      }
+    }
+    return null;
   }
 
   void _removerVestigio(String secao, String id) {
@@ -776,6 +976,44 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         posicoesAcessoMediato: _posicoesAcessoMediato.isEmpty
             ? null
             : _posicoesAcessoMediato.toList(),
+        abrangenciaImediato: _abrangenciaImediato,
+        ambientesImediato: _ambientesImediato.isEmpty
+            ? null
+            : _ambientesImediato.toList(),
+        ambienteDestaqueImediato:
+            _ambienteDestaqueImediato == null ||
+                !_ambientesImediato.contains(_ambienteDestaqueImediato)
+            ? null
+            : _ambienteDestaqueImediato,
+        estadoConservacaoImediato: _estadoConservacaoImediato,
+        observacaoImediato: _observacaoImediatoController.text.trim().isEmpty
+            ? null
+            : _observacaoImediatoController.text.trim(),
+        acessosPorAmbienteImediato: _acessosPorAmbienteImediato.isEmpty
+            ? null
+            : _acessosPorAmbienteImediato.map(
+                (key, value) => MapEntry(key, value.toList()),
+              ),
+        comunicacaoAmbientesImediato: _comunicacaoAmbientesImediato.isEmpty
+            ? null
+            : _comunicacaoAmbientesImediato.map(
+                (key, value) => MapEntry(key, value.toList()),
+              ),
+        acessoExternoPorAmbienteImediato:
+            _acessoExternoPorAmbienteImediato.isEmpty
+            ? null
+            : Map<String, bool>.from(_acessoExternoPorAmbienteImediato),
+        marcosZeroAmbientesImediato: _buildMarcosZeroAmbientesImediato(),
+        metodoPosicionamentoMediato: _metodoPosicionamentoMediato,
+        metodoPosicionamentoRelacionado: _metodoPosicionamentoRelacionado,
+        metodosPosicionamentoAmbientesImediato:
+            _metodosPosicionamentoAmbientesImediato.isEmpty
+            ? null
+            : Map<String, MetodoPosicionamentoVestigio>.from(
+                _metodosPosicionamentoAmbientesImediato,
+              ),
+        consideracoesTecnicasAmbientesImediato:
+            _buildConsideracoesTecnicasAmbientesImediato(),
         sinaisArrombamentoDescricao:
             (_sinaisArrombamentoSim == true &&
                 _sinaisArrombamentoController.text.trim().isNotEmpty)
@@ -795,49 +1033,25 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             _descricaoRelacionadoController.text.trim().isEmpty
             ? null
             : _descricaoRelacionadoController.text.trim(),
-        marcoZeroMediato:
-            (_classificacaoMediato == true && _temVestigiosMediato == true)
-            ? MarcoZeroLocalModel(
-                descricao:
-                    _marcoZeroDescricaoMediatoController.text.trim().isEmpty
-                    ? null
-                    : _marcoZeroDescricaoMediatoController.text.trim(),
-                coordenadaX: _marcoZeroXMediatoController.text.trim().isEmpty
-                    ? '0'
-                    : _marcoZeroXMediatoController.text.trim(),
-                coordenadaY: _marcoZeroYMediatoController.text.trim().isEmpty
-                    ? '0'
-                    : _marcoZeroYMediatoController.text.trim(),
+        marcoZeroMediato: (_classificacaoMediato == true)
+            ? _buildMarcoZero(
+                _marcoZeroDescricaoMediatoController,
+                _marcoZeroXMediatoController,
+                _marcoZeroYMediatoController,
               )
             : null,
         marcoZeroImediato: (_classificacaoImediato == true)
-            ? MarcoZeroLocalModel(
-                descricao:
-                    _marcoZeroDescricaoImediatoController.text.trim().isEmpty
-                    ? null
-                    : _marcoZeroDescricaoImediatoController.text.trim(),
-                coordenadaX: _marcoZeroXImediatoController.text.trim().isEmpty
-                    ? '0'
-                    : _marcoZeroXImediatoController.text.trim(),
-                coordenadaY: _marcoZeroYImediatoController.text.trim().isEmpty
-                    ? '0'
-                    : _marcoZeroYImediatoController.text.trim(),
+            ? _buildMarcoZero(
+                _marcoZeroDescricaoImediatoController,
+                _marcoZeroXImediatoController,
+                _marcoZeroYImediatoController,
               )
             : null,
         marcoZeroRelacionado: (_classificacaoRelacionado == true)
-            ? MarcoZeroLocalModel(
-                descricao:
-                    _marcoZeroDescricaoRelacionadoController.text.trim().isEmpty
-                    ? null
-                    : _marcoZeroDescricaoRelacionadoController.text.trim(),
-                coordenadaX:
-                    _marcoZeroXRelacionadoController.text.trim().isEmpty
-                    ? '0'
-                    : _marcoZeroXRelacionadoController.text.trim(),
-                coordenadaY:
-                    _marcoZeroYRelacionadoController.text.trim().isEmpty
-                    ? '0'
-                    : _marcoZeroYRelacionadoController.text.trim(),
+            ? _buildMarcoZero(
+                _marcoZeroDescricaoRelacionadoController,
+                _marcoZeroXRelacionadoController,
+                _marcoZeroYRelacionadoController,
               )
             : null,
         vestigiosMediato: (_temVestigiosMediato == true)
@@ -862,6 +1076,13 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         fotosVistaAmplaImediatoPaths: _fotosVistaAmplaImediatoPaths.isEmpty
             ? null
             : _fotosVistaAmplaImediatoPaths,
+        fotosVistaAmplaAmbientesImediato:
+            _buildFotosVistaAmplaAmbientesImediato(),
+        fotosSinaisArrombamentoPaths: _sinaisArrombamentoSim == true
+            ? (_fotosSinaisArrombamentoPaths.isEmpty
+                  ? null
+                  : _fotosSinaisArrombamentoPaths)
+            : null,
         localEmViaPublica: _localEmViaPublica,
       );
 
@@ -947,21 +1168,23 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.draw, size: 48, color: Colors.orange),
         title: const Text('Lembrete: Croqui'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Não esqueça de fazer o croqui do local!',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'O croqui deve relacionar os principais vestígios encontrados, '
-              'indicando suas posições em relação ao marco zero definido.',
-              textAlign: TextAlign.center,
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'Não esqueça de fazer o croqui do local!',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'O croqui deve relacionar os principais vestígios encontrados, '
+                'indicando suas posições em relação ao marco zero definido.',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
         actions: [
           FilledButton(
@@ -1087,9 +1310,27 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       partes.add(frase);
     }
 
+    if (_ambienteDestaqueImediato != null &&
+        _ambientesImediato.contains(_ambienteDestaqueImediato)) {
+      partes.add(
+        'Foi indicado como ambiente de maior relevância na cena: $_ambienteDestaqueImediato.',
+      );
+    }
+
     final descricaoAcessos = _gerarDescricaoAcessosInternosImediato();
     if (descricaoAcessos.isNotEmpty) {
       partes.add(descricaoAcessos);
+    }
+
+    final consideracoes = _consideracoesAmbienteCtrls.entries
+        .map((entry) => MapEntry(entry.key, entry.value.text.trim()))
+        .where((entry) => entry.value.isNotEmpty)
+        .map((entry) => '${_capitalize(entry.key)}: ${entry.value}')
+        .toList();
+    if (consideracoes.isNotEmpty) {
+      partes.add(
+        'Foram registradas as seguintes considerações técnicas por ambiente: ${_listarItens(consideracoes)}.',
+      );
     }
 
     final obsImediato = _observacaoImediatoController.text.trim();
@@ -1103,22 +1344,96 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   String _gerarDescricaoAcessosInternosImediato() {
     final descricoes = <String>[];
     for (final ambiente in _ambientesImediato) {
-      final acessos = _acessosPorAmbienteImediato[ambiente];
-      if (acessos == null || acessos.isEmpty) continue;
-      descricoes.add(
-        'no ambiente ${_capitalize(ambiente)} havia ${_listarItens(acessos.toList())}',
-      );
+      final acessos = _acessosPorAmbienteImediato[ambiente] ?? const <String>{};
+      final comunicacoes =
+          _comunicacaoAmbientesImediato[ambiente] ?? const <String>{};
+      final possuiAcessoExterno =
+          _acessoExternoPorAmbienteImediato[ambiente] == true;
+      final partes = <String>[];
+      if (possuiAcessoExterno) {
+        partes.add('possuía acesso externo');
+      }
+      if (comunicacoes.isNotEmpty) {
+        partes.add('comunicava-se com ${_listarItens(comunicacoes.toList())}');
+      }
+      final acessosValidos = acessos
+          .where((acesso) => acesso != 'corredor interno')
+          .toList();
+      if (acessosValidos.isNotEmpty) {
+        partes.add('por meio de ${_listarItens(acessosValidos)}');
+      }
+      if (partes.isEmpty) continue;
+      descricoes.add('${_capitalize(ambiente)}: ${partes.join(', ')}');
     }
     if (descricoes.isEmpty) return '';
-    return 'Quanto aos acessos internos, ${_listarItens(descricoes)}.';
+    return 'Quanto aos acessos dos ambientes, ${_listarItens(descricoes)}.';
   }
 
   void _sincronizarAcessosPorAmbienteImediato() {
+    final comunicacoesPermitidas = {
+      ..._ambientesImediato,
+      ..._opcoesComunicacaoEspecial,
+    };
     _acessosPorAmbienteImediato.removeWhere(
       (ambiente, _) => !_ambientesImediato.contains(ambiente),
     );
+    _comunicacaoAmbientesImediato.removeWhere(
+      (ambiente, _) => !_ambientesImediato.contains(ambiente),
+    );
+    _acessoExternoPorAmbienteImediato.removeWhere(
+      (ambiente, _) => !_ambientesImediato.contains(ambiente),
+    );
+    _metodosPosicionamentoAmbientesImediato.removeWhere(
+      (ambiente, _) => !_ambientesImediato.contains(ambiente),
+    );
+    for (final ambiente in _consideracoesAmbienteCtrls.keys.toList()) {
+      if (_ambientesImediato.contains(ambiente)) continue;
+      _consideracoesAmbienteCtrls.remove(ambiente)?.dispose();
+    }
+    _fotosVistaAmplaAmbientesImediato.removeWhere(
+      (ambiente, _) => !_ambientesImediato.contains(ambiente),
+    );
+    for (final ambiente in _marcoAmbienteDescricaoCtrls.keys.toList()) {
+      if (_ambientesImediato.contains(ambiente)) continue;
+      _marcoAmbienteDescricaoCtrls.remove(ambiente)?.dispose();
+      _marcoAmbienteXCtrls.remove(ambiente)?.dispose();
+      _marcoAmbienteYCtrls.remove(ambiente)?.dispose();
+    }
     for (final ambiente in _ambientesImediato) {
       _acessosPorAmbienteImediato.putIfAbsent(ambiente, () => <String>{});
+      _comunicacaoAmbientesImediato.putIfAbsent(ambiente, () => <String>{});
+      _acessoExternoPorAmbienteImediato.putIfAbsent(ambiente, () => false);
+      if (_acessosPorAmbienteImediato[ambiente]!.remove('corredor interno')) {
+        _comunicacaoAmbientesImediato[ambiente]!.add('corredor');
+      }
+      _marcoAmbienteDescricaoCtrls.putIfAbsent(
+        ambiente,
+        () => TextEditingController(),
+      );
+      _marcoAmbienteXCtrls.putIfAbsent(
+        ambiente,
+        () => TextEditingController(text: '0,0'),
+      );
+      _marcoAmbienteYCtrls.putIfAbsent(
+        ambiente,
+        () => TextEditingController(text: '0,0'),
+      );
+      _consideracoesAmbienteCtrls.putIfAbsent(
+        ambiente,
+        () => TextEditingController(),
+      );
+      _metodosPosicionamentoAmbientesImediato.putIfAbsent(
+        ambiente,
+        () => MetodoPosicionamentoVestigio.nenhum,
+      );
+      _fotosVistaAmplaAmbientesImediato.putIfAbsent(ambiente, () => <String>[]);
+      _comunicacaoAmbientesImediato[ambiente]!.removeWhere(
+        (outro) => !comunicacoesPermitidas.contains(outro) || outro == ambiente,
+      );
+    }
+    if (_ambienteDestaqueImediato != null &&
+        !_ambientesImediato.contains(_ambienteDestaqueImediato)) {
+      _ambienteDestaqueImediato = null;
     }
     if (_ambienteAcessoSelecionado != null &&
         !_ambientesImediato.contains(_ambienteAcessoSelecionado)) {
@@ -1127,6 +1442,89 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     _ambienteAcessoSelecionado ??= _ambientesImediato.isEmpty
         ? null
         : _ambientesImediato.first;
+  }
+
+  List<String> _opcoesComunicacaoParaAmbiente(String ambienteAtual) {
+    final opcoes = <String>[
+      ..._ambientesImediato.where((ambiente) => ambiente != ambienteAtual),
+    ];
+    for (final especial in _opcoesComunicacaoEspecial) {
+      if (especial != ambienteAtual && !opcoes.contains(especial)) {
+        opcoes.add(especial);
+      }
+    }
+    return opcoes;
+  }
+
+  List<VestigioLocalModel> _vestigiosOrdenadosPorAmbiente(
+    String local,
+    List<VestigioLocalModel> vestigios,
+  ) {
+    if (local != 'imediato') return vestigios;
+    final ordenados = [...vestigios];
+    ordenados.sort((a, b) => (a.ambiente ?? '').compareTo(b.ambiente ?? ''));
+    return ordenados;
+  }
+
+  Map<String, MarcoZeroLocalModel>? _buildMarcosZeroAmbientesImediato() {
+    final marcos = <String, MarcoZeroLocalModel>{};
+    for (final ambiente in _ambientesImediato) {
+      final marco = _buildMarcoZeroAmbiente(ambiente);
+      if (marco == null) continue;
+      marcos[ambiente] = marco;
+    }
+    return marcos.isEmpty ? null : marcos;
+  }
+
+  MarcoZeroLocalModel? _buildMarcoZeroAmbiente(String ambiente) {
+    final descricao = _marcoAmbienteDescricaoCtrls[ambiente]?.text.trim() ?? '';
+    final x = _marcoAmbienteXCtrls[ambiente]?.text.trim() ?? '';
+    final y = _marcoAmbienteYCtrls[ambiente]?.text.trim() ?? '';
+    final xPadrao = x.isEmpty || x == '0,0';
+    final yPadrao = y.isEmpty || y == '0,0';
+    if (descricao.isEmpty && xPadrao && yPadrao) return null;
+    return MarcoZeroLocalModel(
+      descricao: descricao.isEmpty ? null : descricao,
+      coordenadaX: xPadrao ? '0,0' : x,
+      coordenadaY: yPadrao ? '0,0' : y,
+    );
+  }
+
+  Map<String, List<String>>? _buildFotosVistaAmplaAmbientesImediato() {
+    final fotos = <String, List<String>>{};
+    for (final entry in _fotosVistaAmplaAmbientesImediato.entries) {
+      if (entry.value.isEmpty) continue;
+      fotos[entry.key] = List<String>.from(entry.value);
+    }
+    return fotos.isEmpty ? null : fotos;
+  }
+
+  Map<String, String>? _buildConsideracoesTecnicasAmbientesImediato() {
+    final consideracoes = <String, String>{};
+    for (final entry in _consideracoesAmbienteCtrls.entries) {
+      final texto = entry.value.text.trim();
+      if (texto.isEmpty) continue;
+      consideracoes[entry.key] = texto;
+    }
+    return consideracoes.isEmpty ? null : consideracoes;
+  }
+
+  MarcoZeroLocalModel? _buildMarcoZero(
+    TextEditingController descricaoController,
+    TextEditingController xController,
+    TextEditingController yController,
+  ) {
+    final descricao = descricaoController.text.trim();
+    final x = xController.text.trim();
+    final y = yController.text.trim();
+    if (descricao.isEmpty && x.isEmpty && y.isEmpty) {
+      return null;
+    }
+    return MarcoZeroLocalModel(
+      descricao: descricao.isEmpty ? null : descricao,
+      coordenadaX: x.isEmpty ? null : x,
+      coordenadaY: y.isEmpty ? null : y,
+    );
   }
 
   String _gerarDescricaoViasAcessoMediato() {
@@ -1190,10 +1588,231 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     }
   }
 
+  Widget _buildMetodoPosicionamentoCard({
+    required String titulo,
+    required MetodoPosicionamentoVestigio valor,
+    required ValueChanged<MetodoPosicionamentoVestigio?> onChanged,
+    String? avisoGps,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 12),
+        Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<MetodoPosicionamentoVestigio>(
+          initialValue: valor,
+          decoration: const InputDecoration(
+            labelText: 'Método de posicionamento',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: MetodoPosicionamentoVestigio.values
+              .map(
+                (metodo) =>
+                    DropdownMenuItem(value: metodo, child: Text(metodo.label)),
+              )
+              .toList(),
+          onChanged: onChanged,
+        ),
+        if (avisoGps != null && valor == MetodoPosicionamentoVestigio.gps) ...[
+          const SizedBox(height: 8),
+          Text(
+            avisoGps,
+            style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _resumoPosicionamentoVestigio(VestigioLocalModel vestigio) {
+    final ambiente = vestigio.ambiente;
+    final metodo =
+        vestigio.metodoPosicionamentoOverride ??
+        (ambiente != null
+            ? _metodosPosicionamentoAmbientesImediato[ambiente]
+            : null) ??
+        _inferirMetodoPosicionamentoVestigios([vestigio]);
+    switch (metodo) {
+      case MetodoPosicionamentoVestigio.marcoZero:
+        final partes = <String>[];
+        if ((vestigio.coordenadaX ?? '').trim().isNotEmpty) {
+          partes.add('X=${vestigio.coordenadaX}');
+        }
+        if ((vestigio.coordenadaY ?? '').trim().isNotEmpty) {
+          partes.add('Y=${vestigio.coordenadaY}');
+        }
+        if ((vestigio.alturaRelacaoPiso ?? '').trim().isNotEmpty) {
+          partes.add('altura ${vestigio.alturaRelacaoPiso}');
+        }
+        return partes.isEmpty
+            ? 'Posicionamento: marco zero'
+            : 'Posicionamento: ${partes.join(', ')}';
+      case MetodoPosicionamentoVestigio.gps:
+        final partes = <String>[];
+        if ((vestigio.coordenadasGpsFormatadas ?? '').trim().isNotEmpty) {
+          partes.add(vestigio.coordenadasGpsFormatadas!);
+        }
+        if (vestigio.precisaoGpsMetros != null) {
+          partes.add(
+            'precisão ${vestigio.precisaoGpsMetros!.toStringAsFixed(1)} m',
+          );
+        }
+        return partes.isEmpty
+            ? 'Posicionamento: GPS'
+            : 'Posicionamento: ${partes.join(' | ')}';
+      case MetodoPosicionamentoVestigio.nenhum:
+        return 'Posicionamento: não registrado';
+    }
+  }
+
   void _atualizarTextoImediato() {
     final texto = _gerarTextoDescricaoImediato();
     if (texto.isNotEmpty) {
       _descricaoImediatoController.text = texto;
+    }
+  }
+
+  void _adicionarAmbienteImediato(String tipoBase) {
+    final tipo = tipoBase.trim().toLowerCase();
+    if (tipo.isEmpty) return;
+    final nome = _proximoNomeAmbienteImediato(tipo);
+    setState(() {
+      if (_abrangenciaImediato == 'único ambiente') {
+        _ambientesImediato
+          ..clear()
+          ..add(nome);
+      } else {
+        _ambientesImediato.add(nome);
+      }
+      _ambienteAcessoSelecionado = nome;
+      _sincronizarAcessosPorAmbienteImediato();
+      _atualizarTextoImediato();
+    });
+  }
+
+  String _proximoNomeAmbienteImediato(String tipoBase) {
+    final exigeNumero = tipoBase == 'quarto' || tipoBase == 'banheiro';
+    if (!exigeNumero && !_ambientesImediato.contains(tipoBase)) {
+      return tipoBase;
+    }
+
+    var numero = 1;
+    while (_ambientesImediato.contains('$tipoBase $numero') ||
+        (!exigeNumero &&
+            numero == 1 &&
+            _ambientesImediato.contains(tipoBase))) {
+      numero++;
+    }
+    return '$tipoBase $numero';
+  }
+
+  Future<void> _mostrarDialogAdicionarAmbientePersonalizado() async {
+    final controller = TextEditingController();
+    final tipo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Novo tipo de ambiente'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nome do ambiente',
+            hintText: 'Ex.: despensa, suíte, área gourmet',
+          ),
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (tipo == null || tipo.trim().isEmpty) return;
+    _adicionarAmbienteImediato(tipo);
+  }
+
+  void _removerAmbienteImediato(String ambiente) {
+    final possuiVestigios = _vestigiosImediato.any(
+      (v) => v.ambiente == ambiente,
+    );
+    if (possuiVestigios) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Este ambiente possui vestígios. Edite ou remova os vestígios antes de excluir o ambiente.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _ambientesImediato.remove(ambiente);
+      if (_ambienteDestaqueImediato == ambiente) {
+        _ambienteDestaqueImediato = null;
+      }
+      if (_ambienteAcessoSelecionado == ambiente) {
+        _ambienteAcessoSelecionado = null;
+      }
+      _acessosPorAmbienteImediato.remove(ambiente);
+      _comunicacaoAmbientesImediato.remove(ambiente);
+      _acessoExternoPorAmbienteImediato.remove(ambiente);
+      _fotosVistaAmplaAmbientesImediato.remove(ambiente);
+      _marcoAmbienteDescricaoCtrls.remove(ambiente)?.dispose();
+      _marcoAmbienteXCtrls.remove(ambiente)?.dispose();
+      _marcoAmbienteYCtrls.remove(ambiente)?.dispose();
+      _consideracoesAmbienteCtrls.remove(ambiente)?.dispose();
+      _sincronizarAcessosPorAmbienteImediato();
+      _atualizarTextoImediato();
+    });
+  }
+
+  Future<void> _adicionarFotoVistaAmbienteImediatoCamera(
+    String ambiente,
+  ) async {
+    final foto = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 75,
+      maxWidth: 2048,
+      maxHeight: 2048,
+    );
+    if (foto == null || !mounted) return;
+    final path = await _persistirFotoVestigio(foto);
+    if (path == null || !mounted) return;
+    setState(() {
+      _fotosVistaAmplaAmbientesImediato
+          .putIfAbsent(ambiente, () => <String>[])
+          .add(path);
+    });
+  }
+
+  Future<void> _adicionarFotosVistaAmbienteImediatoGaleria(
+    String ambiente,
+  ) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: true,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+    for (final f in result.files) {
+      if (f.path == null) continue;
+      final path = await _persistirFotoVestigio(XFile(f.path!));
+      if (path == null || !mounted) continue;
+      setState(() {
+        _fotosVistaAmplaAmbientesImediato
+            .putIfAbsent(ambiente, () => <String>[])
+            .add(path);
+      });
     }
   }
 
@@ -1422,183 +2041,585 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     );
   }
 
-  Widget _buildDescricaoAssistidaImediato() {
+  Widget _buildFotosVistaAmbienteImediato(String ambiente) {
+    final fotos =
+        _fotosVistaAmplaAmbientesImediato[ambiente] ?? const <String>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Assistente de descrição',
+          'Foto(s) de vista ampla deste ambiente (opcional)',
           style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Use para registrar a vista ampla do ambiente selecionado sem alterar a ordem de preenchimento.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _adicionarFotoVistaAmbienteImediatoCamera(ambiente),
+              icon: const Icon(Icons.photo_camera),
+              label: const Text('Câmera'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _adicionarFotosVistaAmbienteImediatoGaleria(ambiente),
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Galeria'),
+            ),
+          ],
+        ),
+        if (fotos.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: fotos.asMap().entries.map((e) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      File(e.value),
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade800,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black54,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.all(4),
+                      ),
+                      onPressed: () => setState(() {
+                        _fotosVistaAmplaAmbientesImediato[ambiente]?.removeAt(
+                          e.key,
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBotaoAdicionarAmbiente(String tipo) {
+    return ActionChip(
+      avatar: const Icon(Icons.add, size: 18),
+      label: Text(_capitalize(tipo)),
+      onPressed: () => _adicionarAmbienteImediato(tipo),
+    );
+  }
+
+  Widget _buildCardAmbienteImediato(String ambiente) {
+    final selecionado = _ambienteAcessoSelecionado == ambiente;
+    final vestigios = _vestigiosImediato
+        .where((v) => v.ambiente == ambiente)
+        .toList();
+    final fotos = _fotosVistaAmplaAmbientesImediato[ambiente]?.length ?? 0;
+    final consideracaoController = _consideracoesAmbienteCtrls.putIfAbsent(
+      ambiente,
+      () => TextEditingController(),
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(top: 10),
+      child: Column(
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              child: Text(
+                '${_ambientesImediato.toList().indexOf(ambiente) + 1}',
+              ),
+            ),
+            title: Text(_capitalize(ambiente)),
+            subtitle: Text(
+              [
+                if (_ambienteDestaqueImediato == ambiente)
+                  'ambiente de maior relevância',
+                '${vestigios.length} ${vestigios.length == 1 ? 'vestígio' : 'vestígios'}',
+                '$fotos foto(s) ampla(s)',
+                if (_marcoAmbienteInformado(ambiente)) 'marco zero',
+              ].join(' • '),
+            ),
+            trailing: Icon(
+              selecionado ? Icons.expand_less : Icons.chevron_right,
+            ),
+            onTap: () => setState(() {
+              _ambienteAcessoSelecionado = selecionado ? null : ambiente;
+            }),
+          ),
+          if (selecionado)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      FilterChip(
+                        label: const Text('Ambiente de maior relevância'),
+                        selected: _ambienteDestaqueImediato == ambiente,
+                        onSelected: (value) => setState(() {
+                          _ambienteDestaqueImediato = value ? ambiente : null;
+                          _atualizarTextoImediato();
+                        }),
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Remover ambiente'),
+                        onPressed: () => _removerAmbienteImediato(ambiente),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFotosVistaAmbienteImediato(ambiente),
+                  if (!_modoRapido) ...[
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Possui acesso externo'),
+                      value:
+                          _acessoExternoPorAmbienteImediato[ambiente] ?? false,
+                      onChanged: (value) => setState(() {
+                        _acessoExternoPorAmbienteImediato[ambiente] = value;
+                        _atualizarTextoImediato();
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Comunicação com outros ambientes',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 0,
+                      children: _opcoesComunicacaoParaAmbiente(ambiente)
+                          .map(
+                            (opcao) => FilterChip(
+                              label: Text(_capitalize(opcao)),
+                              selected:
+                                  (_comunicacaoAmbientesImediato[ambiente] ??
+                                          const <String>{})
+                                      .contains(opcao),
+                              onSelected: (_) => setState(() {
+                                final comunicacoes =
+                                    _comunicacaoAmbientesImediato.putIfAbsent(
+                                      ambiente,
+                                      () => <String>{},
+                                    );
+                                comunicacoes.contains(opcao)
+                                    ? comunicacoes.remove(opcao)
+                                    : comunicacoes.add(opcao);
+                                _atualizarTextoImediato();
+                              }),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Tipo de acesso/comunicação',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 0,
+                      children: _opcoesAcessosInternos
+                          .map(
+                            (opcao) => FilterChip(
+                              label: Text(_capitalize(opcao)),
+                              selected:
+                                  (_acessosPorAmbienteImediato[ambiente] ??
+                                          const <String>{})
+                                      .contains(opcao),
+                              onSelected: (_) => setState(() {
+                                final acessos = _acessosPorAmbienteImediato
+                                    .putIfAbsent(ambiente, () => <String>{});
+                                acessos.contains(opcao)
+                                    ? acessos.remove(opcao)
+                                    : acessos.add(opcao);
+                                _atualizarTextoImediato();
+                              }),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  _buildMetodoPosicionamentoCard(
+                    titulo: 'Posicionamento dos vestígios deste ambiente',
+                    valor:
+                        _metodosPosicionamentoAmbientesImediato[ambiente] ??
+                        MetodoPosicionamentoVestigio.nenhum,
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _metodosPosicionamentoAmbientesImediato[ambiente] =
+                            value;
+                      });
+                    },
+                    avisoGps: _avisoGpsVestigio('imediato', ambiente: ambiente),
+                  ),
+                  const SizedBox(height: 8),
+                  if ((_metodosPosicionamentoAmbientesImediato[ambiente] ??
+                          MetodoPosicionamentoVestigio.nenhum) ==
+                      MetodoPosicionamentoVestigio.marcoZero) ...[
+                    const Text(
+                      'Marco zero do ambiente (opcional)',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _marcoAmbienteDescricaoCtrls[ambiente],
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição do marco zero',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      minLines: 1,
+                      maxLines: null,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _marcoAmbienteXCtrls[ambiente],
+                            decoration: const InputDecoration(
+                              labelText: 'Coordenada X (opcional)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _marcoAmbienteYCtrls[ambiente],
+                            decoration: const InputDecoration(
+                              labelText: 'Coordenada Y (opcional)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              signed: true,
+                              decimal: true,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Vestígios deste ambiente',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _adicionarOuEditarVestigio(
+                          'imediato',
+                          ambienteInicial: ambiente,
+                        ),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Adicionar'),
+                      ),
+                    ],
+                  ),
+                  if (vestigios.isEmpty)
+                    Text(
+                      'Nenhum vestígio cadastrado neste ambiente.',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    )
+                  else
+                    ...vestigios.map(
+                      (v) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          v.nome?.trim().isNotEmpty == true
+                              ? v.nome!.trim()
+                              : ((v.descricao ?? '').trim().isNotEmpty
+                                    ? v.descricao!.trim()
+                                    : 'Vestígio'),
+                        ),
+                        subtitle: Text(
+                          [
+                            if ((v.descricao ?? '').trim().isNotEmpty)
+                              'Legenda: ${v.descricao!.trim()}',
+                            if (v.numerosFotografias.isNotEmpty)
+                              'Fotografia(s): ${v.numerosFotografias.map((n) => n.toString().padLeft(2, '0')).join(', ')}',
+                            _resumoPosicionamentoVestigio(v),
+                          ].join('\n'),
+                        ),
+                        trailing: Wrap(
+                          spacing: 0,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _adicionarOuEditarVestigio(
+                                'imediato',
+                                existente: v,
+                                ambienteInicial: ambiente,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () =>
+                                  _removerVestigio('imediato', v.id),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (_podeAnalisarManchasSangue) ...[
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () =>
+                          _abrirAnaliseManchasSangue(ambiente: ambiente),
+                      icon: const Icon(Icons.bloodtype_outlined),
+                      label: const Text('Análise de manchas de sangue'),
+                    ),
+                  ],
+                  if (!_modoRapido) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Considerações técnicas do ambiente (opcional)',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: consideracaoController,
+                      decoration: const InputDecoration(
+                        hintText:
+                            'Registre observações técnicas específicas deste ambiente.',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      minLines: 3,
+                      maxLines: null,
+                      onChanged: (_) => _atualizarTextoImediato(),
+                    ),
+                    const SizedBox(height: 8),
+                    AiSuggestionButton(
+                      fieldLabel:
+                          'Considerações técnicas do ambiente ${_capitalize(ambiente)}',
+                      currentText: consideracaoController.text,
+                      currentTextBuilder: () => consideracaoController.text,
+                      contextTextBuilder: () =>
+                          _buildContextoAmbienteImediato(ambiente),
+                      imagePathsBuilder: () => [
+                        ...?_fotosVistaAmplaAmbientesImediato[ambiente],
+                        ...vestigios.expand((v) => v.fotosVinculadasPaths),
+                      ],
+                      profile: AiSuggestionProfile.furtoDanoExameLocal,
+                      onReplace: (text) {
+                        _replaceControllerText(consideracaoController, text);
+                        _atualizarTextoImediato();
+                      },
+                      onAppend: (text) {
+                        _appendControllerText(consideracaoController, text);
+                        _atualizarTextoImediato();
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton.icon(
+                      onPressed: () => setState(() {
+                        _ambienteAcessoSelecionado = null;
+                        _atualizarTextoImediato();
+                      }),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Salvar ambiente e voltar à lista'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescricaoAssistidaImediato() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _modoRapido ? 'Ambientes do local imediato' : 'Descrição por área',
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
         Text(
-          'Descreva o(s) ambiente(s) onde ocorreu o fato.',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          _modoRapido
+              ? 'Adicione um ambiente e toque nele para registrar foto ampla, marco zero opcional e vestígios.'
+              : 'Selecione a abrangência e adicione os ambientes conforme for examinando. Toque em um ambiente da lista para registrar fotos, marco zero, vestígios, comunicação, manchas de sangue e considerações técnicas.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          isExpanded: true,
-          initialValue: _abrangenciaImediato,
-          decoration: const InputDecoration(
-            labelText: 'Abrangência do local imediato',
-            border: OutlineInputBorder(),
-            isDense: true,
+        if (!_modoRapido) ...[
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: _abrangenciaImediato,
+            decoration: const InputDecoration(
+              labelText: 'Abrangência do local imediato',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: _opcoesAbrangenciaImediato
+                .map(
+                  (r) =>
+                      DropdownMenuItem(value: r, child: Text(_capitalize(r))),
+                )
+                .toList(),
+            onChanged: (v) => setState(() {
+              _abrangenciaImediato = v;
+              if (v == 'único ambiente' && _ambientesImediato.length > 1) {
+                final primeiro = _ambientesImediato.first;
+                _ambientesImediato
+                  ..clear()
+                  ..add(primeiro);
+                _ambienteAcessoSelecionado = primeiro;
+              }
+              _sincronizarAcessosPorAmbienteImediato();
+              _atualizarTextoImediato();
+            }),
           ),
-          items: _opcoesAbrangenciaImediato
-              .map(
-                (r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))),
-              )
-              .toList(),
-          onChanged: (v) => setState(() {
-            _abrangenciaImediato = v;
-            if (v == 'único ambiente' && _ambientesImediato.length > 1) {
-              final primeiro = _ambientesImediato.first;
-              _ambientesImediato
-                ..clear()
-                ..add(primeiro);
-            }
-            _sincronizarAcessosPorAmbienteImediato();
-            _atualizarTextoImediato();
-          }),
+          const SizedBox(height: 12),
+        ],
+        const Text(
+          'Adicionar ambiente',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
-        const Text('Ambiente(s) do fato'),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Wrap(
           spacing: 6,
-          runSpacing: 0,
-          children: _opcoesAmbiente
-              .map(
-                (op) => FilterChip(
-                  label: Text(_capitalize(op)),
-                  selected: _ambientesImediato.contains(op),
-                  onSelected: (_) => setState(() {
-                    _ambientesImediato.contains(op)
-                        ? _ambientesImediato.remove(op)
-                        : _ambientesImediato.add(op);
-                    if (_abrangenciaImediato == 'único ambiente' &&
-                        _ambientesImediato.length > 1) {
-                      _ambientesImediato
-                        ..clear()
-                        ..add(op);
-                    }
-                    _sincronizarAcessosPorAmbienteImediato();
-                    _atualizarTextoImediato();
-                  }),
-                ),
-              )
-              .toList(),
+          runSpacing: 6,
+          children: [
+            ..._tiposRapidosAmbienteImediato.map(_buildBotaoAdicionarAmbiente),
+            ActionChip(
+              avatar: const Icon(Icons.add, size: 18),
+              label: const Text('Outro tipo'),
+              onPressed: _mostrarDialogAdicionarAmbientePersonalizado,
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          isExpanded: true,
-          initialValue: _estadoConservacaoImediato,
-          decoration: const InputDecoration(
-            labelText: 'Estado de conservação',
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          items: _opcoesEstadoConservacao
-              .map(
-                (r) => DropdownMenuItem(value: r, child: Text(_capitalize(r))),
-              )
-              .toList(),
-          onChanged: (v) => setState(() {
-            _estadoConservacaoImediato = v;
-            _atualizarTextoImediato();
-          }),
-        ),
-        const SizedBox(height: 12),
-        const Text('Acessos internos por ambiente'),
-        const SizedBox(height: 4),
         if (_ambientesImediato.isEmpty)
-          Text(
-            'Selecione pelo menos um ambiente para informar os acessos internos.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Text(
+              'Nenhum ambiente adicionado. Use os botões acima para montar a lista do local imediato.',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
           )
         else ...[
+          const Text(
+            'Ambientes selecionados',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
           Text(
-            'Ambiente selecionado',
+            'Toque em um ambiente para abrir o cadastro específico dele.',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 0,
-            children: _ambientesImediato
-                .map(
-                  (ambiente) => ChoiceChip(
-                    label: Text(_capitalize(ambiente)),
-                    selected: _ambienteAcessoSelecionado == ambiente,
-                    onSelected: (_) => setState(() {
-                      _ambienteAcessoSelecionado = ambiente;
-                    }),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 0,
-            children: _opcoesAcessosInternos
-                .map(
-                  (op) => FilterChip(
-                    label: Text(_capitalize(op)),
-                    selected:
-                        _ambienteAcessoSelecionado != null &&
-                        (_acessosPorAmbienteImediato[_ambienteAcessoSelecionado!]
-                                ?.contains(op) ??
-                            false),
-                    onSelected: _ambienteAcessoSelecionado == null
-                        ? null
-                        : (_) => setState(() {
-                            final ambiente = _ambienteAcessoSelecionado!;
-                            final acessos = _acessosPorAmbienteImediato
-                                .putIfAbsent(ambiente, () => <String>{});
-                            if (acessos.contains(op)) {
-                              acessos.remove(op);
-                            } else {
-                              acessos.add(op);
-                            }
-                            _atualizarTextoImediato();
-                          }),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          ..._ambientesImediato
-              .where(
-                (ambiente) =>
-                    (_acessosPorAmbienteImediato[ambiente] ?? const <String>{})
-                        .isNotEmpty,
-              )
-              .map(
-                (ambiente) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    '• ${_capitalize(ambiente)}: ${_listarItens((_acessosPorAmbienteImediato[ambiente] ?? const <String>{}).toList())}.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                ),
-              ),
+          const SizedBox(height: 4),
+          ..._ambientesImediato.map(_buildCardAmbienteImediato),
         ],
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _observacaoImediatoController,
-          decoration: const InputDecoration(
-            labelText: 'Observação (opcional)',
-            hintText: 'Descreva algum ponto relevante do local imediato...',
-            border: OutlineInputBorder(),
-            isDense: true,
+        if (!_modoRapido) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            initialValue: _estadoConservacaoImediato,
+            decoration: const InputDecoration(
+              labelText: 'Estado de conservação geral do local imediato',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: _opcoesEstadoConservacao
+                .map(
+                  (r) =>
+                      DropdownMenuItem(value: r, child: Text(_capitalize(r))),
+                )
+                .toList(),
+            onChanged: (v) => setState(() {
+              _estadoConservacaoImediato = v;
+              _atualizarTextoImediato();
+            }),
           ),
-          maxLines: 3,
-          onChanged: (_) => _atualizarTextoImediato(),
-        ),
-        const SizedBox(height: 16),
-        const Divider(),
-        const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _observacaoImediatoController,
+            decoration: const InputDecoration(
+              labelText: 'Observação geral do local imediato (opcional)',
+              hintText: 'Descreva algum ponto relevante do local imediato...',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            maxLines: 3,
+            onChanged: (_) => _atualizarTextoImediato(),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+        ],
       ],
     );
   }
@@ -1606,6 +2627,15 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   String _capitalize(String s) {
     if (s.isEmpty) return s;
     return s[0].toUpperCase() + s.substring(1);
+  }
+
+  bool _marcoAmbienteInformado(String ambiente) {
+    final descricao = _marcoAmbienteDescricaoCtrls[ambiente]?.text.trim() ?? '';
+    final x = _marcoAmbienteXCtrls[ambiente]?.text.trim() ?? '';
+    final y = _marcoAmbienteYCtrls[ambiente]?.text.trim() ?? '';
+    return descricao.isNotEmpty ||
+        (x.isNotEmpty && x != '0,0') ||
+        (y.isNotEmpty && y != '0,0');
   }
 
   String _buildAiContextLocal({
@@ -1663,6 +2693,22 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       if (_ambientesImediato.isNotEmpty) {
         partes.add('Ambientes: ${_listarItens(_ambientesImediato.toList())}.');
       }
+      if (_ambienteDestaqueImediato != null) {
+        partes.add('Ambiente de maior relevância: $_ambienteDestaqueImediato.');
+      }
+      final consideracoes = _consideracoesAmbienteCtrls.entries
+          .where((entry) => entry.value.text.trim().isNotEmpty)
+          .map((entry) => '${entry.key}: ${entry.value.text.trim()}')
+          .toList();
+      if (consideracoes.isNotEmpty) {
+        partes.add(
+          'Considerações por ambiente: ${_listarItens(consideracoes)}.',
+        );
+      }
+      final descricaoAcessos = _gerarDescricaoAcessosInternosImediato();
+      if (descricaoAcessos.isNotEmpty) {
+        partes.add(descricaoAcessos);
+      }
       if (_estadoConservacaoImediato != null) {
         partes.add('Conservação: $_estadoConservacaoImediato.');
       }
@@ -1706,15 +2752,61 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     });
   }
 
+  String _buildContextoAmbienteImediato(String ambiente) {
+    final partes = <String>['Ambiente: $ambiente.'];
+    final comunicacoes = _comunicacaoAmbientesImediato[ambiente];
+    if (comunicacoes != null && comunicacoes.isNotEmpty) {
+      partes.add('Comunicação: ${_listarItens(comunicacoes.toList())}.');
+    }
+    final acessos = _acessosPorAmbienteImediato[ambiente];
+    if (acessos != null && acessos.isNotEmpty) {
+      partes.add(
+        'Tipo de acesso/comunicação: ${_listarItens(acessos.toList())}.',
+      );
+    }
+    final marco = _buildMarcoZeroAmbiente(ambiente);
+    if (marco != null) {
+      final textoMarco = [
+        if ((marco.descricao ?? '').trim().isNotEmpty)
+          'descrição: ${marco.descricao}',
+        if ((marco.coordenadaX ?? '').trim().isNotEmpty)
+          'X=${marco.coordenadaX}',
+        if ((marco.coordenadaY ?? '').trim().isNotEmpty)
+          'Y=${marco.coordenadaY}',
+      ].join(', ');
+      if (textoMarco.isNotEmpty) partes.add('Marco zero: $textoMarco.');
+    }
+    final vestigios = _vestigiosImediato
+        .where((v) => v.ambiente == ambiente)
+        .map((v) => v.descricao?.trim())
+        .whereType<String>()
+        .where((texto) => texto.isNotEmpty)
+        .toList();
+    if (vestigios.isNotEmpty) {
+      partes.add('Vestígios no ambiente: ${_listarItens(vestigios)}.');
+    }
+    final consideracoes = _consideracoesAmbienteCtrls[ambiente]?.text.trim();
+    if (consideracoes != null && consideracoes.isNotEmpty) {
+      partes.add('Considerações técnicas já registradas: $consideracoes.');
+    }
+    return partes.join('\n');
+  }
+
   bool get _podeAnalisarManchasSangue =>
       widget.ficha.tipoOcorrencia == TipoOcorrencia.cvli ||
       widget.ficha.tipoOcorrencia == TipoOcorrencia.morteEsclarecer;
 
-  Future<void> _abrirAnaliseManchasSangue() async {
-    final initialContext = _buildAiContextLocal(
+  Future<void> _abrirAnaliseManchasSangue({String? ambiente}) async {
+    final vestigios = ambiente == null
+        ? _vestigiosImediato
+        : _vestigiosImediato.where((v) => v.ambiente == ambiente).toList();
+    final contextoAmbiente = ambiente == null
+        ? ''
+        : _buildContextoAmbienteImediato(ambiente);
+    final contextoGeral = _buildAiContextLocal(
       titulo: 'Local Imediato',
       local: 'imediato',
-      vestigios: _vestigiosImediato,
+      vestigios: vestigios,
       pisoSeco: _pisoSecoImediato,
       pisoUmido: _pisoUmidoImediato,
       pisoMolhado: _pisoMolhadoImediato,
@@ -1722,10 +2814,16 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       iluminacaoNatural: _iluminacaoNaturalImediato,
       iluminacaoAusente: _iluminacaoAusenteImediato,
     );
+    final initialContext = [
+      if (ambiente != null) 'Ambiente analisado: $ambiente.',
+      if (contextoAmbiente.isNotEmpty) contextoAmbiente,
+      contextoGeral,
+    ].where((texto) => texto.trim().isNotEmpty).join('\n');
 
     final overviewImages = <String>[
-      ..._fotosVistaAmplaPaths,
-      ..._fotosVistaAmplaImediatoPaths,
+      if (ambiente == null) ..._fotosVistaAmplaPaths,
+      if (ambiente == null) ..._fotosVistaAmplaImediatoPaths,
+      if (ambiente != null) ...?_fotosVistaAmplaAmbientesImediato[ambiente],
     ];
 
     await Navigator.of(context).push(
@@ -1734,6 +2832,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
           fichaId: widget.ficha.id,
           initialContextText: initialContext,
           initialOverviewImagePaths: overviewImages,
+          ambiente: ambiente,
         ),
       ),
     );
@@ -1764,6 +2863,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
     bool usarFluxoVestigioMediato = false,
     bool exibirSinaisArrombamento = false,
   }) {
+    final exibirVestigiosDaSecao =
+        local != 'imediato' ||
+        (local == 'imediato' && _ambientesImediato.isEmpty);
     return Container(
       margin: const EdgeInsets.only(top: 16),
       decoration: BoxDecoration(
@@ -1795,55 +2897,76 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (_localEmViaPublica != true && local == 'mediato')
+                if (!_modoRapido &&
+                    _localEmViaPublica != true &&
+                    local == 'mediato')
                   _buildDescricaoAssistidaMediato(),
-                if (_localEmViaPublica != true && local == 'imediato')
-                  _buildDescricaoAssistidaImediato(),
-                const Text('Descrição (do geral para o particular)'),
-                const SizedBox(height: 4),
-                Text(
-                  _localEmViaPublica != true &&
-                          (local == 'mediato' || local == 'imediato')
-                      ? 'Texto gerado automaticamente. Edite à vontade.'
-                      : 'Descreva o local...',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: descricaoController,
-                  decoration: const InputDecoration(
-                    hintText: 'Descreva o local...',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+                if (local == 'imediato') _buildDescricaoAssistidaImediato(),
+                if (!_modoRapido) ...[
+                  const Text('Descrição (do geral para o particular)'),
+                  const SizedBox(height: 4),
+                  Text(
+                    _localEmViaPublica != true &&
+                            (local == 'mediato' || local == 'imediato')
+                        ? 'Texto gerado automaticamente. Edite à vontade.'
+                        : 'Descreva o local...',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
-                  maxLines: null,
-                  minLines: 4,
-                  textInputAction: TextInputAction.newline,
-                ),
-                const SizedBox(height: 8),
-                AiSuggestionButton(
-                  fieldLabel: 'Descrição do $titulo',
-                  currentText: descricaoController.text,
-                  currentTextBuilder: () => descricaoController.text,
-                  profile: AiSuggestionProfile.furtoDanoExameLocal,
-                  contextTextBuilder: () => _buildAiContextLocal(
-                    titulo: titulo,
-                    local: local,
-                    vestigios: vestigios,
-                    pisoSeco: pisoSeco,
-                    pisoUmido: pisoUmido,
-                    pisoMolhado: pisoMolhado,
-                    iluminacaoArtificial: iluminacaoArtificial,
-                    iluminacaoNatural: iluminacaoNatural,
-                    iluminacaoAusente: iluminacaoAusente,
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: descricaoController,
+                    decoration: const InputDecoration(
+                      hintText: 'Descreva o local...',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    maxLines: null,
+                    minLines: 4,
+                    textInputAction: TextInputAction.newline,
                   ),
-                  imagePathsBuilder: () => _imagePathsForLocal(local),
-                  onReplace: (text) =>
-                      _replaceControllerText(descricaoController, text),
-                  onAppend: (text) =>
-                      _appendControllerText(descricaoController, text),
-                ),
-                if (exibirSinaisArrombamento) ...[
+                  const SizedBox(height: 8),
+                  AiSuggestionButton(
+                    fieldLabel: 'Descrição do $titulo',
+                    currentText: descricaoController.text,
+                    currentTextBuilder: () => descricaoController.text,
+                    profile: AiSuggestionProfile.furtoDanoExameLocal,
+                    contextTextBuilder: () => _buildAiContextLocal(
+                      titulo: titulo,
+                      local: local,
+                      vestigios: vestigios,
+                      pisoSeco: pisoSeco,
+                      pisoUmido: pisoUmido,
+                      pisoMolhado: pisoMolhado,
+                      iluminacaoArtificial: iluminacaoArtificial,
+                      iluminacaoNatural: iluminacaoNatural,
+                      iluminacaoAusente: iluminacaoAusente,
+                    ),
+                    imagePathsBuilder: () => _imagePathsForLocal(local),
+                    onReplace: (text) =>
+                        _replaceControllerText(descricaoController, text),
+                    onAppend: (text) =>
+                        _appendControllerText(descricaoController, text),
+                  ),
+                ],
+                if (local != 'imediato')
+                  _buildMetodoPosicionamentoCard(
+                    titulo: 'Posicionamento dos vestígios deste local',
+                    valor: local == 'mediato'
+                        ? _metodoPosicionamentoMediato
+                        : _metodoPosicionamentoRelacionado,
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        if (local == 'mediato') {
+                          _metodoPosicionamentoMediato = value;
+                        } else {
+                          _metodoPosicionamentoRelacionado = value;
+                        }
+                      });
+                    },
+                    avisoGps: _avisoGpsVestigio(local),
+                  ),
+                if (exibirSinaisArrombamento && !_modoRapido) ...[
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 12),
@@ -1889,15 +3012,118 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                         ),
                         maxLines: 3,
                       ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Fotografia(s) dos sinais de arrombamento',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final foto = await _imagePicker.pickImage(
+                                source: ImageSource.camera,
+                                imageQuality: 75,
+                                maxWidth: 2048,
+                                maxHeight: 2048,
+                              );
+                              if (foto == null || !mounted) return;
+                              final path = await _persistirFotoVestigio(foto);
+                              if (path == null) return;
+                              setState(() {
+                                _fotosSinaisArrombamentoPaths.add(path);
+                              });
+                            },
+                            icon: const Icon(Icons.photo_camera),
+                            label: const Text('Câmera'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final result = await FilePicker.platform
+                                  .pickFiles(
+                                    type: FileType.image,
+                                    allowMultiple: true,
+                                  );
+                              if (result == null ||
+                                  result.files.isEmpty ||
+                                  !mounted) {
+                                return;
+                              }
+                              for (final f in result.files) {
+                                if (f.path == null) continue;
+                                final path = await _persistirFotoVestigio(
+                                  XFile(f.path!),
+                                );
+                                if (path == null) continue;
+                                setState(() {
+                                  _fotosSinaisArrombamentoPaths.add(path);
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.photo_library),
+                            label: const Text('Galeria'),
+                          ),
+                        ],
+                      ),
+                      if (_fotosSinaisArrombamentoPaths.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _fotosSinaisArrombamentoPaths
+                              .asMap()
+                              .entries
+                              .map(
+                                (e) => Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        File(e.value),
+                                        width: 72,
+                                        height: 72,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      right: 4,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.close, size: 20),
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: Colors.black54,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.all(4),
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _fotosSinaisArrombamentoPaths
+                                                .removeAt(e.key);
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
                     ],
                   ],
                 ],
-                if (!usarFluxoVestigioMediato && showMarcoZero) ...[
+                if (!usarFluxoVestigioMediato &&
+                    showMarcoZero &&
+                    _metodoPosicionamentoVestigio(local) ==
+                        MetodoPosicionamentoVestigio.marcoZero) ...[
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 12),
                   const Text(
-                    'Marco Zero',
+                    'Marco Zero (opcional)',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
@@ -1949,98 +3175,101 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     ],
                   ),
                 ],
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-                const Text(
-                  'Condições do Piso',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 8,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: pisoSeco ?? false,
-                          onChanged: (value) => onPisoChanged(value, 'seco'),
-                        ),
-                        const Text('Seco'),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: pisoUmido ?? false,
-                          onChanged: (value) => onPisoChanged(value, 'umido'),
-                        ),
-                        const Text('Úmido'),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: pisoMolhado ?? false,
-                          onChanged: (value) => onPisoChanged(value, 'molhado'),
-                        ),
-                        const Text('Molhado'),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 12),
-                const Text(
-                  'Iluminação',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 8,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: iluminacaoArtificial ?? false,
-                          onChanged: (value) =>
-                              onIluminacaoChanged(value, 'artificial'),
-                        ),
-                        const Text('Artificial'),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: iluminacaoNatural ?? false,
-                          onChanged: (value) =>
-                              onIluminacaoChanged(value, 'natural'),
-                        ),
-                        const Text('Natural'),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: iluminacaoAusente ?? false,
-                          onChanged: (value) =>
-                              onIluminacaoChanged(value, 'ausente'),
-                        ),
-                        const Text('Ausente'),
-                      ],
-                    ),
-                  ],
-                ),
-                if (usarFluxoVestigioMediato) ...[
+                if (!_modoRapido) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Condições do Piso',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: pisoSeco ?? false,
+                            onChanged: (value) => onPisoChanged(value, 'seco'),
+                          ),
+                          const Text('Seco'),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: pisoUmido ?? false,
+                            onChanged: (value) => onPisoChanged(value, 'umido'),
+                          ),
+                          const Text('Úmido'),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: pisoMolhado ?? false,
+                            onChanged: (value) =>
+                                onPisoChanged(value, 'molhado'),
+                          ),
+                          const Text('Molhado'),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Iluminação',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: iluminacaoArtificial ?? false,
+                            onChanged: (value) =>
+                                onIluminacaoChanged(value, 'artificial'),
+                          ),
+                          const Text('Artificial'),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: iluminacaoNatural ?? false,
+                            onChanged: (value) =>
+                                onIluminacaoChanged(value, 'natural'),
+                          ),
+                          const Text('Natural'),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: iluminacaoAusente ?? false,
+                            onChanged: (value) =>
+                                onIluminacaoChanged(value, 'ausente'),
+                          ),
+                          const Text('Ausente'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+                if (exibirVestigiosDaSecao && usarFluxoVestigioMediato) ...[
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 12),
@@ -2059,8 +3288,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                         if (!value) {
                           _vestigiosMediato.clear();
                           marcoZeroDescricaoController.clear();
-                          marcoZeroXController.text = '0';
-                          marcoZeroYController.text = '0';
+                          marcoZeroXController.clear();
+                          marcoZeroYController.clear();
                         }
                       });
                     },
@@ -2072,7 +3301,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                       ],
                     ),
                   ),
-                  if (_temVestigiosMediato == true && showMarcoZero) ...[
+                  if (_temVestigiosMediato == true &&
+                      showMarcoZero &&
+                      _metodoPosicionamentoMediato ==
+                          MetodoPosicionamentoVestigio.marcoZero) ...[
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 12),
@@ -2137,7 +3369,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                       ],
                     ),
                   ],
-                ] else ...[
+                ] else if (exibirVestigiosDaSecao) ...[
                   const SizedBox(height: 16),
                   const Divider(),
                   const SizedBox(height: 12),
@@ -2150,9 +3382,10 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     },
                   ),
                 ],
-                if ((usarFluxoVestigioMediato &&
-                        _temVestigiosMediato == true) ||
-                    (!usarFluxoVestigioMediato && !semVestigios)) ...[
+                if (exibirVestigiosDaSecao &&
+                    ((usarFluxoVestigioMediato &&
+                            _temVestigiosMediato == true) ||
+                        (!usarFluxoVestigioMediato && !semVestigios))) ...[
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -2169,7 +3402,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                         style: TextStyle(color: Colors.grey),
                       ),
                     ),
-                  ...vestigios.map(
+                  ..._vestigiosOrdenadosPorAmbiente(local, vestigios).map(
                     (v) => Card(
                       margin: const EdgeInsets.only(top: 8),
                       child: Padding(
@@ -2213,28 +3446,32 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             if (v.descricao != null && v.descricao!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
-                                child: Text('Descrição: ${v.descricao}'),
+                                child: Text('Legenda: ${v.descricao}'),
                               ),
-                            if (v.coordenadaX != null && v.coordenadaY != null)
+                            if (v.numerosFotografias.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
-                                  'Coordenadas: X=${v.coordenadaX}, Y=${v.coordenadaY}',
+                                  'Fotografia(s): ${v.numerosFotografias.map((n) => n.toString().padLeft(2, '0')).join(', ')}',
                                 ),
                               ),
-                            if (v.alturaRelacaoPiso != null &&
-                                v.alturaRelacaoPiso!.isNotEmpty)
+                            if (v.ambiente != null &&
+                                v.ambiente!.trim().isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
-                                  'Altura em relação ao piso: ${v.alturaRelacaoPiso}',
+                                  'Ambiente: ${_capitalize(v.ambiente!)}',
                                 ),
                               ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(_resumoPosicionamentoVestigio(v)),
+                            ),
                             if (v.fotosVinculadasPaths.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
-                                  'Fotografias vinculadas: ${v.fotosVinculadasPaths.length}',
+                                  'Fotos vinculadas: ${v.fotosVinculadasPaths.length}',
                                 ),
                               ),
                             if (v.tipoAcao != null)
@@ -2408,6 +3645,23 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: Icon(_modoRapido ? Icons.speed : Icons.speed_outlined),
+            style: IconButton.styleFrom(
+              backgroundColor: _modoRapido
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : null,
+              foregroundColor: _modoRapido
+                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                  : null,
+            ),
+            onPressed: () => setState(() {
+              _modoRapido = !_modoRapido;
+            }),
+            tooltip: _modoRapido
+                ? 'Desativar modo rápido'
+                : 'Ativar modo rápido',
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: _mostrarInstrucoes,
             tooltip: 'Instruções de uso',
@@ -2415,6 +3669,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
         ],
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2440,7 +3695,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
               ),
             ),
             // Tipo de local (apenas no mediato)
-            if (_etapaLocalAtual == 0)
+            if (_etapaLocalAtual == 0 && !_modoRapido)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(12),
@@ -2504,8 +3759,8 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                   ],
                 ),
               ),
-            // Foto(s) vista ampla por etapa (mediato/imediato)
-            if (_etapaLocalAtual == 0 || _etapaLocalAtual == 1)
+            // Foto(s) vista ampla do mediato. No imediato, as fotos ficam em cada ambiente.
+            if (_etapaLocalAtual == 0)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(12),
@@ -2526,10 +3781,12 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     const SizedBox(height: 4),
                     Text(
                       _etapaLocalAtual == 0
-                          ? (_localEmViaPublica == true
+                          ? (_modoRapido
+                                ? 'Foto geral do local mediato.'
+                                : _localEmViaPublica == true
                                 ? 'Vista geral do local mediato (ex.: trecho da via, ponto do fato).'
                                 : 'Ex.: fachada ou porção anterior do imóvel (local mediato).')
-                          : 'Registre a vista ampla específica do local imediato.',
+                          : 'Registre uma vista geral do local imediato. As vistas por ambiente podem ser vinculadas acima, no ambiente selecionado.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -2542,7 +3799,9 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                           onPressed: () async {
                             final foto = await _imagePicker.pickImage(
                               source: ImageSource.camera,
-                              imageQuality: 90,
+                              imageQuality: 75,
+                              maxWidth: 2048,
+                              maxHeight: 2048,
                             );
                             if (foto != null && mounted) {
                               final path = await _persistirFotoVestigio(foto);
@@ -2720,20 +3979,22 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'Descrição por Área:',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Descreva os Locais Mediato, Imediato e Relacionado do geral para o particular. Registre aqui vestígios observados durante a descrição física de cada área.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                        if (!_modoRapido) ...[
+                          const Text(
+                            'Descrição por Área:',
+                            style: TextStyle(fontWeight: FontWeight.w500),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Descreva os Locais Mediato, Imediato e Relacionado do geral para o particular. Registre aqui vestígios observados durante a descrição física de cada área.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                         Text(
                           _tituloEtapaLocal,
                           style: const TextStyle(fontWeight: FontWeight.w600),
@@ -2778,9 +4039,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
                             titulo: 'Local Imediato',
                             local: 'imediato',
                             exibirSinaisArrombamento: true,
-                            showMarcoZero:
-                                widget.ficha.tipoOcorrencia !=
-                                TipoOcorrencia.morteEsclarecer,
+                            showMarcoZero: false,
                             descricaoController: _descricaoImediatoController,
                             marcoZeroDescricaoController:
                                 _marcoZeroDescricaoImediatoController,

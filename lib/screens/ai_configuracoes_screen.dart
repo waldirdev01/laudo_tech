@@ -91,8 +91,9 @@ class _AiConfiguracoesScreenState extends State<AiConfiguracoesScreen> {
     setState(() => _testing = true);
     try {
       await _save();
-      await AiSuggestionService(settingsService: _settingsService)
-          .testConnection();
+      await AiSuggestionService(
+        settingsService: _settingsService,
+      ).testConnection();
       if (!mounted) return;
       _showMessage(
         'Conexão com ${AiSettingsService.providerLabel(_provider)} validada.',

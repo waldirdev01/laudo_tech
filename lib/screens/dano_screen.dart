@@ -8,10 +8,7 @@ import '../main.dart';
 class DanoScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
 
-  const DanoScreen({
-    super.key,
-    required this.ficha,
-  });
+  const DanoScreen({super.key, required this.ficha});
 
   @override
   State<DanoScreen> createState() => _DanoScreenState();
@@ -57,15 +54,20 @@ class _DanoScreenState extends State<DanoScreen> {
   void _carregarDados() {
     final dados = widget.ficha.dano;
     if (dados != null) {
-      _substanciaInflamavelExplosivaSim = dados.substanciaInflamavelExplosivaSim;
-      _substanciaInflamavelExplosivaNao = dados.substanciaInflamavelExplosivaNao;
+      _substanciaInflamavelExplosivaSim =
+          dados.substanciaInflamavelExplosivaSim;
+      _substanciaInflamavelExplosivaNao =
+          dados.substanciaInflamavelExplosivaNao;
       _danoPatrimonioPublicoSim = dados.danoPatrimonioPublicoSim;
       _danoPatrimonioPublicoNao = dados.danoPatrimonioPublicoNao;
       _prejuizoConsideravelSim = dados.prejuizoConsideravelSim;
       _prejuizoConsideravelNao = dados.prejuizoConsideravelNao;
-      _identificarInstrumentoSubstanciaSim = dados.identificarInstrumentoSubstanciaSim;
-      _identificarInstrumentoSubstanciaNao = dados.identificarInstrumentoSubstanciaNao;
-      _qualInstrumentoSubstanciaController.text = dados.qualInstrumentoSubstancia ?? '';
+      _identificarInstrumentoSubstanciaSim =
+          dados.identificarInstrumentoSubstanciaSim;
+      _identificarInstrumentoSubstanciaNao =
+          dados.identificarInstrumentoSubstanciaNao;
+      _qualInstrumentoSubstanciaController.text =
+          dados.qualInstrumentoSubstancia ?? '';
       _identificacaoVestigioSim = dados.identificacaoVestigioSim;
       _identificacaoVestigioNao = dados.identificacaoVestigioNao;
       _qualVestigioController.text = dados.qualVestigio ?? '';
@@ -108,9 +110,12 @@ class _DanoScreenState extends State<DanoScreen> {
         danoPatrimonioPublicoNao: _danoPatrimonioPublicoNao,
         prejuizoConsideravelSim: _prejuizoConsideravelSim,
         prejuizoConsideravelNao: _prejuizoConsideravelNao,
-        identificarInstrumentoSubstanciaSim: _identificarInstrumentoSubstanciaSim,
-        identificarInstrumentoSubstanciaNao: _identificarInstrumentoSubstanciaNao,
-        qualInstrumentoSubstancia: _qualInstrumentoSubstanciaController.text.trim().isEmpty
+        identificarInstrumentoSubstanciaSim:
+            _identificarInstrumentoSubstanciaSim,
+        identificarInstrumentoSubstanciaNao:
+            _identificarInstrumentoSubstanciaNao,
+        qualInstrumentoSubstancia:
+            _qualInstrumentoSubstanciaController.text.trim().isEmpty
             ? null
             : _qualInstrumentoSubstanciaController.text.trim(),
         identificacaoVestigioSim: _identificacaoVestigioSim,
@@ -131,7 +136,8 @@ class _DanoScreenState extends State<DanoScreen> {
             : _numeroPessoasController.text.trim(),
         vestigiosAutoriaSim: _vestigiosAutoriaSim,
         vestigiosAutoriaNao: _vestigiosAutoriaNao,
-        quaisVestigiosAutoria: _quaisVestigiosAutoriaController.text.trim().isEmpty
+        quaisVestigiosAutoria:
+            _quaisVestigiosAutoriaController.text.trim().isEmpty
             ? null
             : _quaisVestigiosAutoriaController.text.trim(),
         identificarDinamicaSim: _identificarDinamicaSim,
@@ -144,7 +150,8 @@ class _DanoScreenState extends State<DanoScreen> {
       // Preencher data/hora de término ao finalizar APENAS se ainda não estiver preenchido
       // (pode ter sido editado manualmente na primeira tela)
       String? dataHoraTermino;
-      if (widget.ficha.dataHoraTermino == null || widget.ficha.dataHoraTermino!.isEmpty) {
+      if (widget.ficha.dataHoraTermino == null ||
+          widget.ficha.dataHoraTermino!.isEmpty) {
         final agora = DateTime.now();
         dataHoraTermino = DateFormat('dd/MM/yyyy HH:mm').format(agora);
       } else {
@@ -214,10 +221,7 @@ class _DanoScreenState extends State<DanoScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              pergunta,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
+            Text(pergunta, style: const TextStyle(fontWeight: FontWeight.w500)),
             const SizedBox(height: 8),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -231,7 +235,9 @@ class _DanoScreenState extends State<DanoScreen> {
                     }
                   },
                 ),
-                const Flexible(child: Text('Sim', style: TextStyle(fontSize: 12))),
+                const Flexible(
+                  child: Text('Sim', style: TextStyle(fontSize: 12)),
+                ),
                 const SizedBox(width: 16),
                 Checkbox(
                   value: naoValue ?? false,
@@ -242,7 +248,9 @@ class _DanoScreenState extends State<DanoScreen> {
                     }
                   },
                 ),
-                const Flexible(child: Text('Não', style: TextStyle(fontSize: 12))),
+                const Flexible(
+                  child: Text('Não', style: TextStyle(fontSize: 12)),
+                ),
               ],
             ),
             if (campoCondicional != null && (simValue ?? false)) ...[
@@ -301,7 +309,8 @@ class _DanoScreenState extends State<DanoScreen> {
                 children: [
                   // 1. Substância inflamável ou explosiva
                   _buildSimNaoRow(
-                    pergunta: 'Houve o emprego de substância inflamável ou explosiva?',
+                    pergunta:
+                        'Houve o emprego de substância inflamável ou explosiva?',
                     simValue: _substanciaInflamavelExplosivaSim,
                     naoValue: _substanciaInflamavelExplosivaNao,
                     onSimChanged: (value) {
@@ -324,7 +333,8 @@ class _DanoScreenState extends State<DanoScreen> {
 
                   // 2. Dano contra patrimônio público
                   _buildSimNaoRow(
-                    pergunta: 'O dano foi contra o patrimônio da União, Estado, Município, empresa concessionária de serviços públicos ou sociedade de economia mista?',
+                    pergunta:
+                        'O dano foi contra o patrimônio da União, Estado, Município, empresa concessionária de serviços públicos ou sociedade de economia mista?',
                     simValue: _danoPatrimonioPublicoSim,
                     naoValue: _danoPatrimonioPublicoNao,
                     onSimChanged: (value) {
@@ -370,7 +380,8 @@ class _DanoScreenState extends State<DanoScreen> {
 
                   // 4. Identificar instrumento/substância
                   _buildSimNaoRow(
-                    pergunta: 'É possível identificar o instrumento e/ou substância empregados no evento? Qual?',
+                    pergunta:
+                        'É possível identificar o instrumento e/ou substância empregados no evento? Qual?',
                     simValue: _identificarInstrumentoSubstanciaSim,
                     naoValue: _identificarInstrumentoSubstanciaNao,
                     onSimChanged: (value) {
@@ -402,7 +413,8 @@ class _DanoScreenState extends State<DanoScreen> {
 
                   // 5. Identificação de vestígio
                   _buildSimNaoRow(
-                    pergunta: 'O local examinado possibilitou a identificação de algum vestígio? Em caso positivo, qual?',
+                    pergunta:
+                        'O local examinado possibilitou a identificação de algum vestígio? Em caso positivo, qual?',
                     simValue: _identificacaoVestigioSim,
                     naoValue: _identificacaoVestigioNao,
                     onSimChanged: (value) {
@@ -472,7 +484,8 @@ class _DanoScreenState extends State<DanoScreen> {
 
                   // 7. Número de pessoas
                   _buildSimNaoRow(
-                    pergunta: 'É possível identificar o número de pessoas que participaram do evento?',
+                    pergunta:
+                        'É possível identificar o número de pessoas que participaram do evento?',
                     simValue: _identificarNumeroPessoasSim,
                     naoValue: _identificarNumeroPessoasNao,
                     onSimChanged: (value) {
@@ -504,7 +517,8 @@ class _DanoScreenState extends State<DanoScreen> {
 
                   // 8. Vestígios de autoria
                   _buildSimNaoRow(
-                    pergunta: 'Existem vestígios no local que possam indicar a autoria do delito? Caso positivo, quais?',
+                    pergunta:
+                        'Existem vestígios no local que possam indicar a autoria do delito? Caso positivo, quais?',
                     simValue: _vestigiosAutoriaSim,
                     naoValue: _vestigiosAutoriaNao,
                     onSimChanged: (value) {
@@ -536,7 +550,8 @@ class _DanoScreenState extends State<DanoScreen> {
 
                   // 9. Dinâmica do evento
                   _buildSimNaoRow(
-                    pergunta: 'É possível identificar como foi a dinâmica do evento?',
+                    pergunta:
+                        'É possível identificar como foi a dinâmica do evento?',
                     simValue: _identificarDinamicaSim,
                     naoValue: _identificarDinamicaNao,
                     onSimChanged: (value) {
@@ -571,9 +586,7 @@ class _DanoScreenState extends State<DanoScreen> {
             const SizedBox(height: 32),
             FilledButton(
               onPressed: _salvando ? null : _salvarDano,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.all(16),
-              ),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
               child: _salvando
                   ? const SizedBox(
                       height: 20,
@@ -585,11 +598,12 @@ class _DanoScreenState extends State<DanoScreen> {
                     )
                   : const Text('Salvar e Finalizar'),
             ),
-            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+            const SizedBox(
+              height: 80,
+            ), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),
     );
   }
 }
-

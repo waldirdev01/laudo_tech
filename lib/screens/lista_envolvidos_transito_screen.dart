@@ -46,15 +46,13 @@ class _ListaEnvolvidosTransitoScreenState
     final novo = CrimeTransitoEnvolvidoModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
     );
-    final resultado =
-        await Navigator.of(context).push<CrimeTransitoEnvolvidoModel>(
-      MaterialPageRoute(
-        builder: (context) => CadastroEnvolvidoTransitoScreen(
-          envolvido: novo,
-          ficha: _ficha,
-        ),
-      ),
-    );
+    final resultado = await Navigator.of(context)
+        .push<CrimeTransitoEnvolvidoModel>(
+          MaterialPageRoute(
+            builder: (context) =>
+                CadastroEnvolvidoTransitoScreen(envolvido: novo, ficha: _ficha),
+          ),
+        );
 
     if (resultado != null) {
       setState(() {
@@ -65,15 +63,15 @@ class _ListaEnvolvidosTransitoScreenState
   }
 
   Future<void> _editar(CrimeTransitoEnvolvidoModel envolvido) async {
-    final resultado =
-        await Navigator.of(context).push<CrimeTransitoEnvolvidoModel>(
-      MaterialPageRoute(
-        builder: (context) => CadastroEnvolvidoTransitoScreen(
-          envolvido: envolvido,
-          ficha: _ficha,
-        ),
-      ),
-    );
+    final resultado = await Navigator.of(context)
+        .push<CrimeTransitoEnvolvidoModel>(
+          MaterialPageRoute(
+            builder: (context) => CadastroEnvolvidoTransitoScreen(
+              envolvido: envolvido,
+              ficha: _ficha,
+            ),
+          ),
+        );
 
     if (resultado != null) {
       setState(() {
@@ -126,11 +124,13 @@ class _ListaEnvolvidosTransitoScreenState
   Future<void> _avancarParaCalculoVelocidade() async {
     await _salvar();
     if (!mounted) return;
-    final formas = _ficha.crimeTransitoLevantamento?.formasInteracao ??
+    final formas =
+        _ficha.crimeTransitoLevantamento?.formasInteracao ??
         _ficha.crimeTransitoNatureza?.formasInteracao ??
         [];
-    final temAtropelamento =
-        formas.contains(CrimeTransitoFormaInteracao.atropelamento);
+    final temAtropelamento = formas.contains(
+      CrimeTransitoFormaInteracao.atropelamento,
+    );
     final resultado = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (context) => temAtropelamento
@@ -152,8 +152,11 @@ class _ListaEnvolvidosTransitoScreenState
         actions: [
           IconButton(
             icon: const Icon(Icons.arrow_forward),
-            tooltip: 'Avançar para Natureza da ocorrência / Cálculo de velocidade',
-            onPressed: _envolvidos.isEmpty ? null : _avancarParaCalculoVelocidade,
+            tooltip:
+                'Avançar para Natureza da ocorrência / Cálculo de velocidade',
+            onPressed: _envolvidos.isEmpty
+                ? null
+                : _avancarParaCalculoVelocidade,
           ),
         ],
       ),
@@ -164,70 +167,59 @@ class _ListaEnvolvidosTransitoScreenState
       body: _carregando
           ? const Center(child: CircularProgressIndicator())
           : _envolvidos.isEmpty
-              ? const Center(
-                  child: Text('Nenhum envolvido cadastrado'),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _envolvidos.length,
-                  itemBuilder: (context, index) {
-                    final envolvido = _envolvidos[index];
-                    return Card(
-                      child: ListTile(
-                        title: Text(
-                          envolvido.nome?.isNotEmpty == true
-                              ? envolvido.nome!
-                              : 'Envolvido ${index + 1}',
+          ? const Center(child: Text('Nenhum envolvido cadastrado'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _envolvidos.length,
+              itemBuilder: (context, index) {
+                final envolvido = _envolvidos[index];
+                return Card(
+                  child: ListTile(
+                    title: Text(
+                      envolvido.nome?.isNotEmpty == true
+                          ? envolvido.nome!
+                          : 'Envolvido ${index + 1}',
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (envolvido.classificacao != null)
+                          Text(switch (envolvido.classificacao!) {
+                            CrimeTransitoClassificacaoEnvolvido.condutor =>
+                              'Condutor',
+                            CrimeTransitoClassificacaoEnvolvido.passageiro =>
+                              'Passageiro',
+                            CrimeTransitoClassificacaoEnvolvido.pedestre =>
+                              'Pedestre',
+                          }),
+                        if (envolvido.situacao != null)
+                          Text(switch (envolvido.situacao!) {
+                            CrimeTransitoSituacaoEnvolvido.semFerimentos =>
+                              'Sem ferimentos',
+                            CrimeTransitoSituacaoEnvolvido.feridoGrave =>
+                              'Ferido grave',
+                            CrimeTransitoSituacaoEnvolvido.obito => 'Óbito',
+                          }),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () => _editar(envolvido),
                         ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (envolvido.classificacao != null)
-                              Text(
-                                switch (envolvido.classificacao!) {
-                                  CrimeTransitoClassificacaoEnvolvido
-                                        .condutor =>
-                                    'Condutor',
-                                  CrimeTransitoClassificacaoEnvolvido
-                                        .passageiro =>
-                                    'Passageiro',
-                                  CrimeTransitoClassificacaoEnvolvido
-                                        .pedestre =>
-                                    'Pedestre',
-                                },
-                              ),
-                            if (envolvido.situacao != null)
-                              Text(
-                                switch (envolvido.situacao!) {
-                                  CrimeTransitoSituacaoEnvolvido
-                                        .semFerimentos =>
-                                    'Sem ferimentos',
-                                  CrimeTransitoSituacaoEnvolvido.feridoGrave =>
-                                    'Ferido grave',
-                                  CrimeTransitoSituacaoEnvolvido.obito =>
-                                    'Óbito',
-                                },
-                              ),
-                          ],
+                        IconButton(
+                          icon: const Icon(Icons.delete),
+                          color: Colors.red,
+                          onPressed: () => _remover(envolvido),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _editar(envolvido),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              color: Colors.red,
-                              onPressed: () => _remover(envolvido),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }

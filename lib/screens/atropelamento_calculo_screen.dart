@@ -30,7 +30,8 @@ class AtropelamentoCalculoScreen extends StatefulWidget {
       _AtropelamentoCalculoScreenState();
 }
 
-class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen> {
+class _AtropelamentoCalculoScreenState
+    extends State<AtropelamentoCalculoScreen> {
   final _fichaService = FichaService();
 
   final _sCtrl = TextEditingController();
@@ -59,8 +60,11 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
       _epManualCtrl.text = _str(d.epCustom);
       _presetMu = d.tipoPiso;
       _usarMuManual = d.muCustom != null;
-      _forwardProjection = d.useNorthwestern ??
-          (d.tipoVitima == null && d.frontalVeiculo == null && d.epCustom == null);
+      _forwardProjection =
+          d.useNorthwestern ??
+          (d.tipoVitima == null &&
+              d.frontalVeiculo == null &&
+              d.epCustom == null);
       if (d.epCustom != null) {
         _epPreset = EpPreset.manual;
       } else if (d.tipoVitima != null && d.frontalVeiculo != null) {
@@ -168,17 +172,17 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
     setState(() => _salvando = true);
     _fichaService
         .salvarFicha(
-      widget.ficha.copyWith(
-        atropelamentoCalculo: model,
-        dataUltimaAtualizacao: DateTime.now(),
-      ),
-    )
+          widget.ficha.copyWith(
+            atropelamentoCalculo: model,
+            dataUltimaAtualizacao: DateTime.now(),
+          ),
+        )
         .then((_) {
-      if (mounted) {
-        setState(() => _salvando = false);
-        Navigator.of(context).pop(true);
-      }
-    });
+          if (mounted) {
+            setState(() => _salvando = false);
+            Navigator.of(context).pop(true);
+          }
+        });
   }
 
   @override
@@ -189,7 +193,8 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
     final muMin = _parseDouble(_muMinCtrl.text);
     final muMax = _parseDouble(_muMaxCtrl.text);
 
-    final useRange = _muValido(muMin) && _muValido(muMax) && (muMin ?? 0) <= (muMax ?? 0);
+    final useRange =
+        _muValido(muMin) && _muValido(muMax) && (muMin ?? 0) <= (muMax ?? 0);
 
     final podeNorthwestern = _sValido && _muValido(mu);
     final resultadoNorthwestern = podeNorthwestern && s != null && mu != null
@@ -237,8 +242,8 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
                     Text(
                       'É projeção para frente (forward projection)?',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     RadioGroup<bool>(
@@ -293,7 +298,9 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
                     ? 'Informe s > 0'
                     : null,
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
               ],
@@ -345,13 +352,15 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
                 decoration: InputDecoration(
                   labelText: 'µ (0 < µ ≤ 1)',
                   border: const OutlineInputBorder(),
-                  errorText: _muCustomCtrl.text.trim().isNotEmpty &&
+                  errorText:
+                      _muCustomCtrl.text.trim().isNotEmpty &&
                           !_muValido(_parseDouble(_muCustomCtrl.text))
                       ? 'Use valor entre 0 e 1'
                       : null,
                 ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
                 ],
@@ -371,8 +380,9 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
                       labelText: 'µ mín',
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
                     ],
@@ -387,8 +397,9 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
                       labelText: 'µ máx',
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
                     ],
@@ -409,9 +420,7 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
               DropdownButtonFormField<EpPreset>(
                 initialValue: _epPreset,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(border: OutlineInputBorder()),
                 items: const [
                   DropdownMenuItem(
                     value: EpPreset.adultoFrenteBaixa,
@@ -444,13 +453,15 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
                   decoration: InputDecoration(
                     labelText: 'Ep (0 < Ep < 1)',
                     border: const OutlineInputBorder(),
-                    errorText: _epManualCtrl.text.trim().isNotEmpty &&
+                    errorText:
+                        _epManualCtrl.text.trim().isNotEmpty &&
                             !_epValido(_parseDouble(_epManualCtrl.text))
                         ? 'Use valor entre 0 e 1'
                         : null,
                   ),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
                   ],
@@ -487,8 +498,7 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
     );
   }
 
-  Widget _buildCardSearle(
-      BuildContext context, ResultadosAtropelamento r) {
+  Widget _buildCardSearle(BuildContext context, ResultadosAtropelamento r) {
     final vp = r.searleVp;
     final vc = r.searleVc;
     return Card(
@@ -499,31 +509,38 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
           children: [
             Text(
               'Resultado – Searle',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             if (vp.isIntervalo)
-              _row('Vp (min–max):',
-                  '${vp.vMinKmh?.toStringAsFixed(1)} – ${vp.vMaxKmh?.toStringAsFixed(1)} km/h')
+              _row(
+                'Vp (min–max):',
+                '${vp.vMinKmh?.toStringAsFixed(1)} – ${vp.vMaxKmh?.toStringAsFixed(1)} km/h',
+              )
             else
-              _row('Vp:',
-                  '${vp.vKmh?.toStringAsFixed(1)} km/h (${vp.vMs?.toStringAsFixed(2)} m/s)'),
+              _row(
+                'Vp:',
+                '${vp.vKmh?.toStringAsFixed(1)} km/h (${vp.vMs?.toStringAsFixed(2)} m/s)',
+              ),
             if (vc.isIntervalo)
-              _row('Vc (min–max):',
-                  '${vc.vMinKmh?.toStringAsFixed(1)} – ${vc.vMaxKmh?.toStringAsFixed(1)} km/h')
+              _row(
+                'Vc (min–max):',
+                '${vc.vMinKmh?.toStringAsFixed(1)} – ${vc.vMaxKmh?.toStringAsFixed(1)} km/h',
+              )
             else
-              _row('Vc:',
-                  '${vc.vKmh?.toStringAsFixed(1)} km/h (${vc.vMs?.toStringAsFixed(2)} m/s)'),
+              _row(
+                'Vc:',
+                '${vc.vKmh?.toStringAsFixed(1)} km/h (${vc.vMs?.toStringAsFixed(2)} m/s)',
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCardNorthwestern(
-      BuildContext context, ResultadoVelocidade vc) {
+  Widget _buildCardNorthwestern(BuildContext context, ResultadoVelocidade vc) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -532,23 +549,27 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
           children: [
             Text(
               'Resultado – Northwestern',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             if (vc.isIntervalo)
-              _row('Vc (min–max):',
-                  '${vc.vMinKmh?.toStringAsFixed(1)} – ${vc.vMaxKmh?.toStringAsFixed(1)} km/h')
+              _row(
+                'Vc (min–max):',
+                '${vc.vMinKmh?.toStringAsFixed(1)} – ${vc.vMaxKmh?.toStringAsFixed(1)} km/h',
+              )
             else
-              _row('Vc:',
-                  '${vc.vKmh?.toStringAsFixed(1)} km/h (${vc.vMs?.toStringAsFixed(2)} m/s)'),
+              _row(
+                'Vc:',
+                '${vc.vKmh?.toStringAsFixed(1)} km/h (${vc.vMs?.toStringAsFixed(2)} m/s)',
+              ),
             const SizedBox(height: 6),
             Text(
               'Válido para forward projection.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
             ),
           ],
         ),
@@ -562,10 +583,11 @@ class _AtropelamentoCalculoScreenState extends State<AtropelamentoCalculoScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Flexible(
-              child: Text(label, style: const TextStyle(fontSize: 13))),
-          Text(value,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Flexible(child: Text(label, style: const TextStyle(fontSize: 13))),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );

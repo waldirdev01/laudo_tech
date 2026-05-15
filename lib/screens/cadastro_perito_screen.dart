@@ -7,7 +7,7 @@ import '../services/perito_service.dart';
 
 class CadastroPeritoScreen extends StatefulWidget {
   final bool isEdicao;
-  
+
   const CadastroPeritoScreen({super.key, this.isEdicao = false});
 
   @override
@@ -20,7 +20,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
   final _matriculaController = TextEditingController();
   final _unidadeController = TextEditingController();
   final _cidadeController = TextEditingController();
-  
+
   String? _caminhoTemplate;
   bool _carregando = false;
   bool _carregandoDados = true;
@@ -75,7 +75,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
       if (result != null && result.files.single.path != null) {
         final caminhoOriginal = result.files.single.path!;
         final arquivoOriginal = File(caminhoOriginal);
-        
+
         if (!await arquivoOriginal.exists()) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -95,7 +95,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
         // Nome estável (evita acumular vários e facilita recuperar automaticamente)
         final nomeArquivo = 'template_laudo.docx';
         final arquivoDestino = File('${diretorioTemplates.path}/$nomeArquivo');
-        
+
         await arquivoOriginal.copy(arquivoDestino.path);
 
         setState(() {
@@ -124,7 +124,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
     // Fechar teclado agressivamente
     FocusScope.of(context).unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
-    
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -141,9 +141,7 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
     if (_caminhoTemplate == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor, selecione o template Word'),
-          ),
+          const SnackBar(content: Text('Por favor, selecione o template Word')),
         );
       }
       return;
@@ -161,7 +159,9 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Arquivo template não encontrado. Por favor, selecione novamente.'),
+                content: Text(
+                  'Arquivo template não encontrado. Por favor, selecione novamente.',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
@@ -186,20 +186,22 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.isEdicao 
-                ? 'Dados atualizados com sucesso!' 
-                : 'Perito cadastrado com sucesso!'),
+            content: Text(
+              widget.isEdicao
+                  ? 'Dados atualizados com sucesso!'
+                  : 'Perito cadastrado com sucesso!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Forçar fechamento do teclado antes de sair
         FocusScope.of(context).unfocus();
         FocusManager.instance.primaryFocus?.unfocus();
-        
+
         // Pequeno delay para garantir que o teclado recolha antes da transição
         await Future.delayed(const Duration(milliseconds: 100));
-        
+
         if (mounted) {
           // Voltar para tela inicial
           Navigator.of(context).pop(true);
@@ -227,13 +229,8 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
   Widget build(BuildContext context) {
     if (_carregandoDados) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Editar Perito'),
-          centerTitle: true,
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        appBar: AppBar(title: const Text('Editar Perito'), centerTitle: true),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -315,18 +312,12 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
                 const SizedBox(height: 24),
                 const Text(
                   'Template Word da Regional',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'Selecione o documento Word com cabeçalho e rodapé da sua regional',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -384,7 +375,11 @@ class _CadastroPeritoScreenState extends State<CadastroPeritoScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(widget.isEdicao ? 'Salvar Alterações' : 'Salvar Cadastro'),
+                      : Text(
+                          widget.isEdicao
+                              ? 'Salvar Alterações'
+                              : 'Salvar Cadastro',
+                        ),
                 ),
                 const SizedBox(height: 100),
               ],

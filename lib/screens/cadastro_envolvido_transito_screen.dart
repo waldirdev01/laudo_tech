@@ -136,7 +136,9 @@ class _CadastroEnvolvidoTransitoScreenState
                   onPressed: () async {
                     final foto = await _imagePicker.pickImage(
                       source: ImageSource.camera,
-                      imageQuality: 90,
+                      imageQuality: 75,
+                      maxWidth: 2048,
+                      maxHeight: 2048,
                     );
                     if (foto == null || !mounted) return;
                     final path = await _persistirFoto(foto, subpasta);
@@ -153,7 +155,9 @@ class _CadastroEnvolvidoTransitoScreenState
                 OutlinedButton.icon(
                   onPressed: () async {
                     final imgs = await _imagePicker.pickMultiImage(
-                      imageQuality: 90,
+                      imageQuality: 75,
+                      maxWidth: 2048,
+                      maxHeight: 2048,
                     );
                     if (imgs.isEmpty || !mounted) return;
                     for (final img in imgs) {

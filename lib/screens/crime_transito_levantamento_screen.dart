@@ -564,7 +564,9 @@ class _CrimeTransitoLevantamentoScreenState
                   onPressed: () async {
                     final foto = await _imagePicker.pickImage(
                       source: ImageSource.camera,
-                      imageQuality: 90,
+                      imageQuality: 75,
+                      maxWidth: 2048,
+                      maxHeight: 2048,
                     );
                     if (foto == null || !mounted) return;
                     final path = await _persistirFoto(foto, subpasta);
@@ -581,7 +583,9 @@ class _CrimeTransitoLevantamentoScreenState
                 OutlinedButton.icon(
                   onPressed: () async {
                     final imgs = await _imagePicker.pickMultiImage(
-                      imageQuality: 90,
+                      imageQuality: 75,
+                      maxWidth: 2048,
+                      maxHeight: 2048,
                     );
                     if (imgs.isEmpty || !mounted) return;
                     for (final img in imgs) {
@@ -974,7 +978,9 @@ class _CrimeTransitoLevantamentoScreenState
                           onPressed: () async {
                             final foto = await _imagePicker.pickImage(
                               source: ImageSource.camera,
-                              imageQuality: 90,
+                              imageQuality: 75,
+                              maxWidth: 2048,
+                              maxHeight: 2048,
                             );
                             if (foto == null || !mounted) return;
                             final path = await _persistirFoto(
@@ -1495,7 +1501,9 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                     onPressed: () async {
                       final foto = await widget.imagePicker.pickImage(
                         source: ImageSource.camera,
-                        imageQuality: 90,
+                        imageQuality: 75,
+                        maxWidth: 2048,
+                        maxHeight: 2048,
                       );
                       if (foto == null || !mounted) return;
                       final path = await _persistirFoto(foto);
@@ -1511,7 +1519,9 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                   OutlinedButton.icon(
                     onPressed: () async {
                       final imgs = await widget.imagePicker.pickMultiImage(
-                        imageQuality: 90,
+                        imageQuality: 75,
+                        maxWidth: 2048,
+                        maxHeight: 2048,
                       );
                       if (imgs.isEmpty || !mounted) return;
                       for (final img in imgs) {

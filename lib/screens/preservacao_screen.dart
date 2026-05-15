@@ -44,13 +44,18 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
       _preservacaoNao = dados.preservacaoNao;
       _preservacaoInidoneo = dados.preservacaoInidoneo;
       _preservacaoParcialmenteIdoneo = dados.preservacaoParcialmenteIdoneo;
-      _preservacaoCuriososNoPerimetro = dados.preservacaoCuriososNoPerimetro ?? false;
+      _preservacaoCuriososNoPerimetro =
+          dados.preservacaoCuriososNoPerimetro ?? false;
       final pessoasSalvas = dados.preservacaoPessoasAcessaram?.trim();
       _pessoasAcessaramController.text =
-          (pessoasSalvas == null || pessoasSalvas.isEmpty) ? _defaultPessoasAcessaram : pessoasSalvas;
+          (pessoasSalvas == null || pessoasSalvas.isEmpty)
+          ? _defaultPessoasAcessaram
+          : pessoasSalvas;
       final alteracoesSalvas = dados.preservacaoAlteracoesDetectadas?.trim();
       _alteracoesDetectadasController.text =
-          (alteracoesSalvas == null || alteracoesSalvas.isEmpty) ? _defaultAlteracoesObservadas : alteracoesSalvas;
+          (alteracoesSalvas == null || alteracoesSalvas.isEmpty)
+          ? _defaultAlteracoesObservadas
+          : alteracoesSalvas;
     } else {
       _pessoasAcessaramController.text = _defaultPessoasAcessaram;
       _alteracoesDetectadasController.text = _defaultAlteracoesObservadas;
@@ -71,42 +76,54 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
 
     try {
       // Preservar todos os dados existentes
-      final fichaBaseAtualizada = (widget.ficha.dadosFichaBase ?? FichaBaseModel()).copyWith(
-        // Preservar histórico e isolamento
-        historico: widget.ficha.dadosFichaBase?.historico,
-        isolamentoSim: widget.ficha.dadosFichaBase?.isolamentoSim,
-        isolamentoNao: widget.ficha.dadosFichaBase?.isolamentoNao,
-        isolamentoTotal: widget.ficha.dadosFichaBase?.isolamentoTotal,
-        isolamentoParcial: widget.ficha.dadosFichaBase?.isolamentoParcial,
-        isolamentoViatura: widget.ficha.dadosFichaBase?.isolamentoViatura,
-        isolamentoCones: widget.ficha.dadosFichaBase?.isolamentoCones,
-        isolamentoFitaZebrada: widget.ficha.dadosFichaBase?.isolamentoFitaZebrada,
-        isolamentoPresencaFisica: widget.ficha.dadosFichaBase?.isolamentoPresencaFisica,
-        isolamentoCuriososVoltaCorpo: widget.ficha.dadosFichaBase?.isolamentoCuriososVoltaCorpo,
-        isolamentoCorpoCobertoMovimentado: widget.ficha.dadosFichaBase?.isolamentoCorpoCobertoMovimentado,
-        isolamentoDocumentosManuseados: widget.ficha.dadosFichaBase?.isolamentoDocumentosManuseados,
-        isolamentoVestigiosRecolhidos: widget.ficha.dadosFichaBase?.isolamentoVestigiosRecolhidos,
-        isolamentoAmpliacaoPerimetro: widget.ficha.dadosFichaBase?.isolamentoAmpliacaoPerimetro,
-        isolamentoObservacoes: widget.ficha.dadosFichaBase?.isolamentoObservacoes,
-        // Dados de preservação
-        preservacaoSim: _preservacaoSim,
-        preservacaoNao: _preservacaoNao,
-        preservacaoInidoneo: _preservacaoInidoneo,
-        preservacaoParcialmenteIdoneo: _preservacaoParcialmenteIdoneo,
-        preservacaoCuriososNoPerimetro: _preservacaoCuriososNoPerimetro,
-        preservacaoPessoasAcessaram: _pessoasAcessaramController.text.trim().isEmpty
-            ? null
-            : _pessoasAcessaramController.text.trim(),
-        preservacaoAlteracoesDetectadas: _alteracoesDetectadasController.text.trim().isEmpty
-            ? null
-            : _alteracoesDetectadasController.text.trim(),
-        // Preservar condições meteorológicas e demais observações
-        condicoesEstavel: widget.ficha.dadosFichaBase?.condicoesEstavel,
-        condicoesNublado: widget.ficha.dadosFichaBase?.condicoesNublado,
-        condicoesParcialmenteNublado: widget.ficha.dadosFichaBase?.condicoesParcialmenteNublado,
-        condicoesChuvoso: widget.ficha.dadosFichaBase?.condicoesChuvoso,
-        demaisObservacoes: widget.ficha.dadosFichaBase?.demaisObservacoes,
-      );
+      final fichaBaseAtualizada =
+          (widget.ficha.dadosFichaBase ?? FichaBaseModel()).copyWith(
+            // Preservar histórico e isolamento
+            historico: widget.ficha.dadosFichaBase?.historico,
+            isolamentoSim: widget.ficha.dadosFichaBase?.isolamentoSim,
+            isolamentoNao: widget.ficha.dadosFichaBase?.isolamentoNao,
+            isolamentoTotal: widget.ficha.dadosFichaBase?.isolamentoTotal,
+            isolamentoParcial: widget.ficha.dadosFichaBase?.isolamentoParcial,
+            isolamentoViatura: widget.ficha.dadosFichaBase?.isolamentoViatura,
+            isolamentoCones: widget.ficha.dadosFichaBase?.isolamentoCones,
+            isolamentoFitaZebrada:
+                widget.ficha.dadosFichaBase?.isolamentoFitaZebrada,
+            isolamentoPresencaFisica:
+                widget.ficha.dadosFichaBase?.isolamentoPresencaFisica,
+            isolamentoCuriososVoltaCorpo:
+                widget.ficha.dadosFichaBase?.isolamentoCuriososVoltaCorpo,
+            isolamentoCorpoCobertoMovimentado:
+                widget.ficha.dadosFichaBase?.isolamentoCorpoCobertoMovimentado,
+            isolamentoDocumentosManuseados:
+                widget.ficha.dadosFichaBase?.isolamentoDocumentosManuseados,
+            isolamentoVestigiosRecolhidos:
+                widget.ficha.dadosFichaBase?.isolamentoVestigiosRecolhidos,
+            isolamentoAmpliacaoPerimetro:
+                widget.ficha.dadosFichaBase?.isolamentoAmpliacaoPerimetro,
+            isolamentoObservacoes:
+                widget.ficha.dadosFichaBase?.isolamentoObservacoes,
+            // Dados de preservação
+            preservacaoSim: _preservacaoSim,
+            preservacaoNao: _preservacaoNao,
+            preservacaoInidoneo: _preservacaoInidoneo,
+            preservacaoParcialmenteIdoneo: _preservacaoParcialmenteIdoneo,
+            preservacaoCuriososNoPerimetro: _preservacaoCuriososNoPerimetro,
+            preservacaoPessoasAcessaram:
+                _pessoasAcessaramController.text.trim().isEmpty
+                ? null
+                : _pessoasAcessaramController.text.trim(),
+            preservacaoAlteracoesDetectadas:
+                _alteracoesDetectadasController.text.trim().isEmpty
+                ? null
+                : _alteracoesDetectadasController.text.trim(),
+            // Preservar condições meteorológicas e demais observações
+            condicoesEstavel: widget.ficha.dadosFichaBase?.condicoesEstavel,
+            condicoesNublado: widget.ficha.dadosFichaBase?.condicoesNublado,
+            condicoesParcialmenteNublado:
+                widget.ficha.dadosFichaBase?.condicoesParcialmenteNublado,
+            condicoesChuvoso: widget.ficha.dadosFichaBase?.condicoesChuvoso,
+            demaisObservacoes: widget.ficha.dadosFichaBase?.demaisObservacoes,
+          );
 
       final fichaAtualizada = widget.ficha.copyWith(
         dadosFichaBase: fichaBaseAtualizada,
@@ -135,7 +152,8 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
         final navigator = Navigator.of(context);
         final resultado = await navigator.push(
           MaterialPageRoute(
-            builder: (context) => CondicoesObservacoesScreen(ficha: fichaAtualizada),
+            builder: (context) =>
+                CondicoesObservacoesScreen(ficha: fichaAtualizada),
           ),
         );
 
@@ -166,10 +184,7 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Preservação'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Preservação'), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -269,7 +284,8 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                                               setState(() {
                                                 _preservacaoInidoneo = value;
                                                 if (value == true) {
-                                                  _preservacaoParcialmenteIdoneo = false;
+                                                  _preservacaoParcialmenteIdoneo =
+                                                      false;
                                                 }
                                               });
                                             }
@@ -278,11 +294,14 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                                     const Flexible(child: Text('Inidôneo')),
                                     const SizedBox(width: 16),
                                     Checkbox(
-                                      value: _preservacaoParcialmenteIdoneo ?? false,
+                                      value:
+                                          _preservacaoParcialmenteIdoneo ??
+                                          false,
                                       onChanged: (_preservacaoNao ?? false)
                                           ? (value) {
                                               setState(() {
-                                                _preservacaoParcialmenteIdoneo = value;
+                                                _preservacaoParcialmenteIdoneo =
+                                                    value;
                                                 if (value == true) {
                                                   _preservacaoInidoneo = false;
                                                 }
@@ -290,7 +309,9 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                                             }
                                           : null,
                                     ),
-                                    const Flexible(child: Text('Parcialmente Idôneo')),
+                                    const Flexible(
+                                      child: Text('Parcialmente Idôneo'),
+                                    ),
                                   ],
                                 ),
                               ],
@@ -309,9 +330,8 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                         Expanded(
                           child: Text(
                             'Curiosos no perímetro:',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w500),
                           ),
                         ),
                         Checkbox(
@@ -334,15 +354,15 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                       children: [
                         Text(
                           'Pessoas que acessaram:',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _pessoasAcessaramController,
                           decoration: const InputDecoration(
-                            hintText: 'Descreva as pessoas que acessaram o local',
+                            hintText:
+                                'Descreva as pessoas que acessaram o local',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -360,15 +380,15 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                       children: [
                         Text(
                           'Alterações observadas:',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _alteracoesDetectadasController,
                           decoration: const InputDecoration(
-                            hintText: 'Descreva as alterações detectadas no local',
+                            hintText:
+                                'Descreva as alterações detectadas no local',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -395,11 +415,12 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                     )
                   : const Text('Salvar e Continuar'),
             ),
-            const SizedBox(height: 80), // Padding extra no final para garantir que o botão fique visível
+            const SizedBox(
+              height: 80,
+            ), // Padding extra no final para garantir que o botão fique visível
           ],
         ),
       ),
     );
   }
 }
-

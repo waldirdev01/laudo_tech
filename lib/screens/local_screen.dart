@@ -471,7 +471,7 @@ class _LocalScreenState extends State<LocalScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Coordenadas:',
+                                'Coordenadas (opcional):',
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(fontWeight: FontWeight.w500),
                               ),

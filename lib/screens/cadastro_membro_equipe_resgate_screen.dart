@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/membro_equipe_resgate_model.dart';
+
 import '../models/equipe_resgate_model.dart';
+import '../models/membro_equipe_resgate_model.dart';
+import '../utils/equipe_hierarchy.dart';
 
 class CadastroMembroEquipeResgateScreen extends StatefulWidget {
   final TipoEquipeResgate tipoEquipe;
@@ -25,6 +27,9 @@ class _CadastroMembroEquipeResgateScreenState
   final _matriculaController = TextEditingController();
   final _crmController = TextEditingController();
   bool _ehMedico = false;
+  String? _graduacaoCbmSelecionada;
+
+  bool get _usaDropdownCbm => widget.tipoEquipe == TipoEquipeResgate.cbm;
 
   @override
   void initState() {
@@ -34,8 +39,14 @@ class _CadastroMembroEquipeResgateScreenState
       _cargoController.text = widget.membroExistente!.cargo ?? '';
       _matriculaController.text = widget.membroExistente!.matricula ?? '';
       _crmController.text = widget.membroExistente!.crm ?? '';
-      _ehMedico = widget.membroExistente!.crm != null &&
+      _ehMedico =
+          widget.membroExistente!.crm != null &&
           widget.membroExistente!.crm!.isNotEmpty;
+      if (EquipeHierarchy.graduacoesMilitaresBaixoParaCima.contains(
+        widget.membroExistente!.cargo,
+      )) {
+        _graduacaoCbmSelecionada = widget.membroExistente!.cargo;
+      }
     }
   }
 
@@ -53,15 +64,25 @@ class _CadastroMembroEquipeResgateScreenState
       return;
     }
 
+    final cargo = _usaDropdownCbm
+        ? _graduacaoCbmSelecionada
+        : (_cargoController.text.trim().isEmpty
+              ? null
+              : _cargoController.text.trim());
+
     final membro = MembroEquipeResgateModel(
-      id: widget.membroExistente?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id:
+          widget.membroExistente?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       nome: _nomeController.text.trim(),
-      cargo: _cargoController.text.trim().isEmpty ? null : _cargoController.text.trim(),
-      matricula: _matriculaController.text.trim().isEmpty ? null : _matriculaController.text.trim(),
+      cargo: cargo,
+      matricula: _matriculaController.text.trim().isEmpty
+          ? null
+          : _matriculaController.text.trim(),
       crm: _ehMedico && _crmController.text.trim().isNotEmpty
           ? _crmController.text.trim()
           : null,
-      unidadeNumero: null, // Unidade é da equipe, não do membro
+      unidadeNumero: null,
     );
 
     Navigator.of(context).pop(membro);
@@ -72,9 +93,7 @@ class _CadastroMembroEquipeResgateScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.membroExistente == null
-              ? 'Adicionar Membro'
-              : 'Editar Membro',
+          widget.membroExistente == null ? 'Adicionar Membro' : 'Editar Membro',
         ),
       ),
       body: SingleChildScrollView(
@@ -99,14 +118,41 @@ class _CadastroMembroEquipeResgateScreenState
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _cargoController,
-                decoration: const InputDecoration(
-                  labelText: 'Cargo/Função',
-                  hintText: 'Ex: Médico, Enfermeiro, Técnico',
-                  border: OutlineInputBorder(),
+              if (_usaDropdownCbm)
+                DropdownButtonFormField<String>(
+                  initialValue: _graduacaoCbmSelecionada,
+                  decoration: const InputDecoration(
+                    labelText: 'Posto/Graduação *',
+                    border: OutlineInputBorder(),
+                  ),
+                  isExpanded: true,
+                  items: EquipeHierarchy.graduacoesMilitaresBaixoParaCima
+                      .map(
+                        (opcao) => DropdownMenuItem<String>(
+                          value: opcao,
+                          child: Text(opcao),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => _graduacaoCbmSelecionada = value);
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Por favor, informe o posto/graduação';
+                    }
+                    return null;
+                  },
+                )
+              else
+                TextFormField(
+                  controller: _cargoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Cargo/Função',
+                    hintText: 'Ex: Médico, Enfermeiro, Técnico',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _matriculaController,
@@ -121,19 +167,20 @@ class _CadastroMembroEquipeResgateScreenState
                 ),
               ),
               const SizedBox(height: 16),
-              CheckboxListTile(
-                title: const Text('É médico?'),
-                value: _ehMedico,
-                onChanged: (value) {
-                  setState(() {
-                    _ehMedico = value ?? false;
-                    if (!_ehMedico) {
-                      _crmController.clear();
-                    }
-                  });
-                },
-              ),
-              if (_ehMedico) ...[
+              if (widget.tipoEquipe != TipoEquipeResgate.cbm)
+                CheckboxListTile(
+                  title: const Text('É médico?'),
+                  value: _ehMedico,
+                  onChanged: (value) {
+                    setState(() {
+                      _ehMedico = value ?? false;
+                      if (!_ehMedico) {
+                        _crmController.clear();
+                      }
+                    });
+                  },
+                ),
+              if (_ehMedico && widget.tipoEquipe != TipoEquipeResgate.cbm) ...[
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _crmController,
@@ -153,7 +200,9 @@ class _CadastroMembroEquipeResgateScreenState
               const SizedBox(height: 32),
               FilledButton(
                 onPressed: _salvarMembro,
-                style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                ),
                 child: const Text('Salvar'),
               ),
             ],

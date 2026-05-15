@@ -16,12 +16,14 @@ class BloodstainAnalysisScreen extends StatefulWidget {
   final String fichaId;
   final String initialContextText;
   final List<String> initialOverviewImagePaths;
+  final String? ambiente;
 
   const BloodstainAnalysisScreen({
     super.key,
     required this.fichaId,
     required this.initialContextText,
     this.initialOverviewImagePaths = const [],
+    this.ambiente,
   });
 
   @override
@@ -89,7 +91,9 @@ class _BloodstainAnalysisScreenState extends State<BloodstainAnalysisScreen> {
   Future<void> _addCameraImage(List<String> target) async {
     final image = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 90,
+      imageQuality: 75,
+      maxWidth: 2048,
+      maxHeight: 2048,
     );
     if (image == null || !mounted) return;
     setState(() => target.add(image.path));
@@ -465,6 +469,7 @@ Preserve as cautelas, limitações e necessidade de revisão humana quando exist
     final analysis = BloodstainAnalysisModel(
       id: analysisId,
       createdAt: DateTime.now(),
+      ambiente: widget.ambiente,
       contextText: _contextController.text.trim(),
       surfaceType: _surfaceTypeController.text.trim(),
       planeOrientation: _planeOrientation,

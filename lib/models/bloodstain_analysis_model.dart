@@ -1,6 +1,7 @@
 class BloodstainAnalysisModel {
   final String id;
   final DateTime createdAt;
+  final String? ambiente;
   final String contextText;
   final String surfaceType;
   final String planeOrientation;
@@ -12,6 +13,7 @@ class BloodstainAnalysisModel {
   const BloodstainAnalysisModel({
     required this.id,
     required this.createdAt,
+    this.ambiente,
     required this.contextText,
     required this.surfaceType,
     required this.planeOrientation,
@@ -24,6 +26,7 @@ class BloodstainAnalysisModel {
   Map<String, dynamic> toJson() => {
     'id': id,
     'createdAt': createdAt.toIso8601String(),
+    'ambiente': ambiente,
     'contextText': contextText,
     'surfaceType': surfaceType,
     'planeOrientation': planeOrientation,
@@ -39,6 +42,7 @@ class BloodstainAnalysisModel {
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
+      ambiente: json['ambiente'] as String?,
       contextText: json['contextText'] as String? ?? '',
       surfaceType: json['surfaceType'] as String? ?? '',
       planeOrientation: json['planeOrientation'] as String? ?? '',
