@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -289,6 +290,7 @@ class _CrimeTransitoLevantamentoScreenState
   }
 
   Future<String?> _persistirFoto(XFile foto, String subpasta) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -301,7 +303,7 @@ class _CrimeTransitoLevantamentoScreenState
       // (galeria no Android moderno), ao contrário de File.copy().
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -330,6 +332,7 @@ class _CrimeTransitoLevantamentoScreenState
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 30),
         ),
       );
       setState(() {
@@ -340,6 +343,15 @@ class _CrimeTransitoLevantamentoScreenState
           pos.longitude.toStringAsFixed(6),
         );
       });
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'GPS sem sinal após 30s. Insira as coordenadas manualmente.'),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1312,6 +1324,7 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
   }
 
   Future<String?> _persistirFoto(XFile foto) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -1322,7 +1335,7 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
       final destino = File('${pasta.path}/$nome');
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;

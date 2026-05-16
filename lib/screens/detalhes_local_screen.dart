@@ -763,6 +763,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
   }
 
   Future<String?> _persistirFotoVestigio(XFile arquivo) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -779,7 +780,7 @@ class _LocalFurtoScreenState extends State<LocalFurtoScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;

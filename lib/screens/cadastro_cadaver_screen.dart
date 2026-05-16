@@ -427,6 +427,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   }
 
   Future<String?> _persistirFotoCadaver(XFile arquivo, String subpasta) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -441,7 +442,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -2721,6 +2722,7 @@ class _CadastroTatuagemMarcaScreenState
   }
 
   Future<String?> _persistirFoto(XFile arquivo) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -2735,7 +2737,7 @@ class _CadastroTatuagemMarcaScreenState
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -2933,6 +2935,7 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
   }
 
   Future<String?> _persistirFotoVeste(XFile arquivo) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -2947,7 +2950,7 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;

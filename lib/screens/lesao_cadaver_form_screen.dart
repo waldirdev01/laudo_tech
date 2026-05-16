@@ -169,6 +169,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
   }
 
   Future<String?> _persistirFotoLesao(XFile arquivo) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -183,7 +184,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;

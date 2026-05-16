@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class PhotoBackupService {
@@ -16,6 +17,24 @@ class PhotoBackupService {
       return saved ?? false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Salva na galeria e exibe aviso via SnackBar se falhar.
+  /// Recebe o [ScaffoldMessengerState] já capturado antes de qualquer await
+  /// para evitar o uso de BuildContext através de gaps assíncronos.
+  static Future<void> saveToGalleryWithFeedback(
+    ScaffoldMessengerState messenger,
+    String path,
+  ) async {
+    final ok = await saveToGallery(path);
+    if (!ok) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Foto salva no app. O backup na galeria falhou.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 }

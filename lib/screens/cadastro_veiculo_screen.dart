@@ -699,6 +699,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   }
 
   Future<String?> _persistirFotoVeiculo(XFile arquivo, String subpasta) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -713,7 +714,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;

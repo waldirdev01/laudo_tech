@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -224,6 +225,7 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       _metodoPosicionamentoEfetivo == MetodoPosicionamentoVestigio.gps;
 
   Future<String?> _persistirFotoVestigio(XFile arquivo) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -240,7 +242,7 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -267,6 +269,7 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 30),
         ),
       );
       if (!mounted) return;
@@ -276,6 +279,13 @@ class _VestigioLocalFormScreenState extends State<VestigioLocalFormScreen> {
         _precisaoGpsMetros = pos.accuracy;
         _gpsCapturadoEm = DateTime.now();
       });
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _erroMensagem =
+              'GPS sem sinal após 30s. Insira as coordenadas manualmente.';
+        });
+      }
     } catch (e) {
       setState(() {
         _erroMensagem = 'Erro ao capturar coordenadas GPS: $e';

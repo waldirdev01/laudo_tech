@@ -1,68 +1,93 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ficha_completa_model.dart';
 
-/// Serviço para gerenciar fichas salvas
 class FichaService {
-  static const String _fichasKey = 'fichas_salvas';
+  static const String _migrationKey = 'fichas_migradas_v2';
+  static const String _migrationInProgressKey = 'fichas_migracao_v2_em_andamento';
+  static const String _legacyKey = 'fichas_salvas';
 
-  /// Salva uma ficha
-  Future<void> salvarFicha(FichaCompletaModel ficha) async {
-    final fichas = await listarFichas();
-    
-    // Se já existe, atualiza. Senão, adiciona nova
-    final index = fichas.indexWhere((f) => f.id == ficha.id);
-    if (index >= 0) {
-      // Usar a ficha passada diretamente (já vem com dataUltimaAtualizacao atualizada)
-      fichas[index] = ficha;
-    } else {
-      fichas.add(ficha);
-    }
-    
-    await _atualizarListaFichas(fichas);
+  Future<Directory> _fichasDir() async {
+    final base = await getApplicationDocumentsDirectory();
+    final dir = Directory('${base.path}/fichas');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
   }
 
-  /// Lista todas as fichas salvas
-  Future<List<FichaCompletaModel>> listarFichas() async {
+  // Migra fichas do SharedPreferences para arquivos individuais na primeira execução.
+  // A migração é idempotente: pode rodar mais de uma vez sem duplicar/invalidar,
+  // pois cada ficha é gravada no mesmo arquivo por id.
+  Future<void> _migrarSeNecessario() async {
     final prefs = await SharedPreferences.getInstance();
-    final fichasJson = prefs.getStringList(_fichasKey) ?? [];
+    if (prefs.getBool(_migrationKey) == true) return;
+    await prefs.setBool(_migrationInProgressKey, true);
 
-    final fichas = <FichaCompletaModel>[];
+    final fichasJson = prefs.getStringList(_legacyKey) ?? [];
     for (final item in fichasJson) {
       try {
-        fichas.add(FichaCompletaModel.fromJson(jsonDecode(item)));
+        final ficha = FichaCompletaModel.fromJson(jsonDecode(item));
+        await _escreverArquivo(ficha);
       } catch (_) {
-        // Ignora registros inválidos/corrompidos para não derrubar o app inteiro.
+        // ignora registros inválidos do storage antigo
+      }
+    }
+
+    await prefs.setBool(_migrationKey, true);
+    await prefs.remove(_migrationInProgressKey);
+    await prefs.remove(_legacyKey);
+  }
+
+  Future<void> _escreverArquivo(FichaCompletaModel ficha) async {
+    final dir = await _fichasDir();
+    final file = File('${dir.path}/${ficha.id}.json');
+    await file.writeAsString(jsonEncode(ficha.toJson()));
+  }
+
+  Future<void> salvarFicha(FichaCompletaModel ficha) async {
+    await _migrarSeNecessario();
+    await _escreverArquivo(ficha);
+  }
+
+  Future<List<FichaCompletaModel>> listarFichas() async {
+    await _migrarSeNecessario();
+    final dir = await _fichasDir();
+    final fichas = <FichaCompletaModel>[];
+
+    await for (final entity in dir.list()) {
+      if (entity is File && entity.path.endsWith('.json')) {
+        try {
+          final content = await entity.readAsString();
+          fichas.add(FichaCompletaModel.fromJson(jsonDecode(content)));
+        } catch (_) {
+          // ignora arquivos corrompidos individualmente
+        }
       }
     }
 
     fichas.sort((a, b) => b.dataCriacao.compareTo(a.dataCriacao));
-    return fichas; // Mais recentes primeiro
+    return fichas;
   }
 
-  /// Obtém uma ficha por ID
   Future<FichaCompletaModel?> obterFicha(String id) async {
-    final fichas = await listarFichas();
+    await _migrarSeNecessario();
+    final dir = await _fichasDir();
+    final file = File('${dir.path}/$id.json');
+    if (!await file.exists()) return null;
     try {
-      return fichas.firstWhere((f) => f.id == id);
-    } catch (e) {
+      final content = await file.readAsString();
+      return FichaCompletaModel.fromJson(jsonDecode(content));
+    } catch (_) {
       return null;
     }
   }
 
-  /// Remove uma ficha
   Future<bool> removerFicha(String id) async {
-    final fichas = await listarFichas();
-    final fichasAtualizadas = fichas.where((f) => f.id != id).toList();
-    await _atualizarListaFichas(fichasAtualizadas);
+    await _migrarSeNecessario();
+    final dir = await _fichasDir();
+    final file = File('${dir.path}/$id.json');
+    if (await file.exists()) await file.delete();
     return true;
-  }
-
-  Future<void> _atualizarListaFichas(List<FichaCompletaModel> fichas) async {
-    final prefs = await SharedPreferences.getInstance();
-    final fichasJson = fichas
-        .map((f) => jsonEncode(f.toJson()))
-        .toList();
-    await prefs.setStringList(_fichasKey, fichasJson);
   }
 }

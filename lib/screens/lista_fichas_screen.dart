@@ -1203,6 +1203,7 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
     String fichaId,
     List<File> fotos,
   ) async {
+    final messenger = ScaffoldMessenger.of(context);
     final dir = await getApplicationDocumentsDirectory();
     final pasta = Directory('${dir.path}/levantamento_fotografico/$fichaId');
     if (!await pasta.exists()) {
@@ -1210,14 +1211,25 @@ class _ListaFichasScreenState extends State<ListaFichasScreen> {
     }
 
     final paths = <String>[];
+    var galleryFailed = false;
     for (final foto in fotos) {
       if (!await foto.exists()) continue;
       final ext = foto.path.split('.').last.toLowerCase();
       final nome = 'foto_${DateTime.now().microsecondsSinceEpoch}.$ext';
       final destino = File('${pasta.path}/$nome');
       await foto.copy(destino.path);
-      await PhotoBackupService.saveToGallery(destino.path);
+      if (!await PhotoBackupService.saveToGallery(destino.path)) {
+        galleryFailed = true;
+      }
       paths.add(destino.path);
+    }
+    if (galleryFailed) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Fotos salvas no app. O backup na galeria falhou.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
     return paths;
   }

@@ -89,6 +89,7 @@ class _CadastroEnvolvidoTransitoScreenState
   }
 
   Future<String?> _persistirFoto(XFile foto, String subpasta) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final pasta = Directory(
@@ -99,7 +100,7 @@ class _CadastroEnvolvidoTransitoScreenState
       final destino = File('${pasta.path}/$nome');
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGallery(destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
