@@ -2,7 +2,7 @@ name: laudo_tech
 description: "Ferramenta para geração automatizada de laudos periciais. Aplicativo profissional para documentação de ocorrências com precisão e eficiência."
 publish_to: 'none'
 
-version: 1.1.0+27
+version: 1.1.0+28
 
 environment:
   sdk: ^3.8.1
@@ -24,8 +24,6 @@ dependencies:
   archive: ^4.0.7
   xml: ^6.6.1
   image_picker: ^1.2.1
-  http: ^1.6.0
-  flutter_secure_storage: ^10.1.0
 
 dev_dependencies:
   flutter_test:
@@ -55,7 +53,5 @@ flutter:
   uses-material-design: true
   
   assets:
-    - assets/ai/
-    - assets/ai/bloodstain/
     - assets/templates/
     - assets/images/

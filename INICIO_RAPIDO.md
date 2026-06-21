@@ -24,8 +24,7 @@ O projeto **Laudo Tech** foi completamente reestruturado mantendo **todas as con
 ### ✅ Assets
 - ✅ Logo do app (assets/images/logo.png)
 - ✅ Imagens da loja (appstore.png, playstore.png)
-- ✅ **6 templates de laudos** preservados:
-  - crime_transito.docx
+- ✅ **5 templates de laudos** preservados:
   - Laudo_PADRON._CT.docx
   - Laudo_PADRON._Dano.docx
   - Laudo_PADRON._Disparo_de_Arma_de_Fogo.docx
@@ -188,4 +187,3 @@ Consulte os arquivos de documentação criados. Eles contêm:
 
 *Última atualização: 03/01/2025*  
 *Versão atual: 1.0.0+8*
-

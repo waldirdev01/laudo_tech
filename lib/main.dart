@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import 'core/ai/bloodstain_feature_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'screens/cadastro_perito_screen.dart';
@@ -36,9 +35,6 @@ class LaudoTechApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(
-          create: (_) => BloodstainFeatureProvider()..load(),
-        ),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -66,6 +62,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _peritoService = PeritoService();
   bool _temPerito = false;
+  bool _carregandoPerito = true;
 
   @override
   void initState() {
@@ -77,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final temPerito = await _peritoService.temPeritoCadastrado();
     setState(() {
       _temPerito = temPerito;
+      _carregandoPerito = false;
     });
   }
 
@@ -92,6 +90,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_carregandoPerito) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     // Se não tem perito cadastrado, mostra tela de cadastro
     if (!_temPerito) {
       return Scaffold(
@@ -110,8 +112,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'Bem-vindo ao Laudo Tech',
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -161,8 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: SingleChildScrollView(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight:
-                  MediaQuery.of(context).size.height -
+              minHeight: MediaQuery.of(context).size.height -
                   MediaQuery.of(context).padding.top -
                   MediaQuery.of(context).padding.bottom -
                   kToolbarHeight,
@@ -181,11 +182,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 24),
                     Text(
                       'Laudo Tech',
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
                     ),
                     const SizedBox(height: 16),
                     Padding(
@@ -194,8 +195,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         'Ferramenta profissional para geração de laudos periciais',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                     ),
                     const SizedBox(height: 48),

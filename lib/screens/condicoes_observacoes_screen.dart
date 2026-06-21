@@ -6,6 +6,7 @@ import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
 import 'crime_transito_condicoes_screen.dart';
 import 'detalhes_local_screen.dart';
+import 'vistoria_veiculo_local_screen.dart';
 
 class CondicoesObservacoesScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -20,7 +21,6 @@ class CondicoesObservacoesScreen extends StatefulWidget {
 class _CondicoesObservacoesScreenState
     extends State<CondicoesObservacoesScreen> {
   final _fichaService = FichaService();
-  final _demaisObservacoesController = TextEditingController();
   bool _salvando = false;
 
   // Estados dos checkboxes de condições meteorológicas
@@ -43,13 +43,11 @@ class _CondicoesObservacoesScreenState
       _condicoesParcialmenteNublado =
           dados.condicoesParcialmenteNublado ?? false;
       _condicoesChuvoso = dados.condicoesChuvoso ?? false;
-      _demaisObservacoesController.text = dados.demaisObservacoes ?? '';
     }
   }
 
   @override
   void dispose() {
-    _demaisObservacoesController.dispose();
     super.dispose();
   }
 
@@ -99,8 +97,7 @@ class _CondicoesObservacoesScreenState
 
     try {
       // Criar ou atualizar dados da ficha base
-      final fichaBase =
-          widget.ficha.dadosFichaBase?.copyWith(
+      final fichaBase = widget.ficha.dadosFichaBase?.copyWith(
             historico: widget.ficha.dadosFichaBase?.historico,
             // Preservar isolamento
             isolamentoSim: widget.ficha.dadosFichaBase?.isolamentoSim,
@@ -143,10 +140,6 @@ class _CondicoesObservacoesScreenState
             condicoesNublado: _condicoesNublado,
             condicoesParcialmenteNublado: _condicoesParcialmenteNublado,
             condicoesChuvoso: _condicoesChuvoso,
-            // Atualizar demais observações
-            demaisObservacoes: _demaisObservacoesController.text.trim().isEmpty
-                ? null
-                : _demaisObservacoesController.text.trim(),
           ) ??
           FichaBaseModel(
             historico: widget.ficha.dadosFichaBase?.historico,
@@ -154,9 +147,6 @@ class _CondicoesObservacoesScreenState
             condicoesNublado: _condicoesNublado,
             condicoesParcialmenteNublado: _condicoesParcialmenteNublado,
             condicoesChuvoso: _condicoesChuvoso,
-            demaisObservacoes: _demaisObservacoesController.text.trim().isEmpty
-                ? null
-                : _demaisObservacoesController.text.trim(),
           );
 
       // Preservar todos os dados existentes
@@ -179,7 +169,19 @@ class _CondicoesObservacoesScreenState
         );
 
         // Navegar para a próxima tela conforme o tipo de ocorrência
-        if (widget.ficha.tipoOcorrencia == TipoOcorrencia.furtoDanoExameLocal ||
+        if (widget.ficha.tipoOcorrencia == TipoOcorrencia.vistoriaVeiculo) {
+          if (!mounted) return;
+          final resultado = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  VistoriaVeiculoLocalScreen(ficha: fichaAtualizada),
+            ),
+          );
+          if (mounted && resultado == true) {
+            Navigator.of(context).pop(true);
+          }
+        } else if (widget.ficha.tipoOcorrencia ==
+                TipoOcorrencia.furtoDanoExameLocal ||
             widget.ficha.tipoOcorrencia == TipoOcorrencia.cvli) {
           if (!mounted) return;
           final resultado = await Navigator.of(context).push(
@@ -337,60 +339,6 @@ class _CondicoesObservacoesScreenState
                             ],
                           ),
                         ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Tabela 2: DEMAIS OBSERVAÇÕES
-            Container(
-              margin: const EdgeInsets.only(bottom: 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade700,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        topRight: Radius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'DEMAIS OBSERVAÇÕES',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  // Conteúdo
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(8),
-                        bottomRight: Radius.circular(8),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: TextFormField(
-                        controller: _demaisObservacoesController,
-                        decoration: const InputDecoration(
-                          hintText: 'Digite observações adicionais...',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 8),
-                        ),
-                        maxLines: null,
-                        minLines: 6,
-                        textInputAction: TextInputAction.newline,
-                        keyboardType: TextInputType.multiline,
                       ),
                     ),
                   ),

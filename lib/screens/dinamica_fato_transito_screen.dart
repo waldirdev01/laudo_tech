@@ -7,8 +7,6 @@ import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
-import '../services/openai_service.dart';
-import '../widgets/ai_suggestion_button.dart';
 
 /// Last screen in the traffic flow when the nature of the occurrence does not
 /// have a velocity calculation yet (e.g. not Atropelamento). Shows the dynamics
@@ -87,67 +85,13 @@ class _DinamicaFatoTransitoScreenState
     };
   }
 
-  String _buildAiContextComplemento() {
-    final natureza = widget.ficha.crimeTransitoNatureza;
-    final partes = <String>['Tipo de ocorrência: crime de trânsito.'];
-
-    if (natureza?.tipo != null) {
-      partes.add(
-        'Natureza: ${natureza!.tipo == CrimeTransitoNaturezaTipo.simples ? 'simples' : 'composta'}.',
-      );
-    }
-
-    final formas =
-        natureza?.formasInteracao ?? const <CrimeTransitoFormaInteracao>[];
-    if (formas.isNotEmpty) {
-      partes.add('Formas de interação: ${formas.map(_labelForma).join(', ')}.');
-    }
-
-    if (_dinamicaPrincipal != null) {
-      partes.add(
-        'Dinâmica principal derivada: ${CausasDeterminantesCatalogo.labelDinamica(_dinamicaPrincipal!)}.',
-      );
-    }
-
-    if (natureza?.observacoes?.trim().isNotEmpty == true) {
-      partes.add('Observações da natureza: ${natureza!.observacoes!.trim()}.');
-    }
-
-    if (_causasSelecionadas.isNotEmpty && _dinamicaPrincipal != null) {
-      final opcoes = CausasDeterminantesCatalogo.opcoesPara(_dinamicaPrincipal!)
-          .where((c) => _causasSelecionadas.contains(c.id))
-          .map((c) => '${c.referencia} - ${c.titulo}')
-          .toList();
-      if (opcoes.isNotEmpty) {
-        partes.add('Causas determinantes marcadas: ${opcoes.join('; ')}.');
-      }
-    }
-
-    return partes.join('\n');
-  }
-
-  void _replaceComplemento(String text) {
-    setState(() => _complementoCtrl.text = text.trim());
-  }
-
-  void _appendComplemento(String text) {
-    final atual = _complementoCtrl.text.trim();
-    setState(() {
-      _complementoCtrl.text = atual.isEmpty
-          ? text.trim()
-          : '$atual\n\n${text.trim()}';
-    });
-  }
-
   Future<void> _finalizar() async {
     setState(() => _salvando = true);
     try {
       final natureza = widget.ficha.crimeTransitoNatureza;
-      final causasIds = _causasSelecionadas.isEmpty
-          ? null
-          : _causasSelecionadas.toList();
-      final naturezaAtualizada =
-          natureza?.copyWith(
+      final causasIds =
+          _causasSelecionadas.isEmpty ? null : _causasSelecionadas.toList();
+      final naturezaAtualizada = natureza?.copyWith(
             complementoDinamicaFato: _complementoCtrl.text.trim().isEmpty
                 ? null
                 : _complementoCtrl.text.trim(),
@@ -203,12 +147,15 @@ class _DinamicaFatoTransitoScreenState
     final tipoStr = natureza?.tipo == CrimeTransitoNaturezaTipo.simples
         ? 'Simples (1 unidade)'
         : natureza?.tipo == CrimeTransitoNaturezaTipo.composta
-        ? 'Composta (2 ou mais unidades)'
-        : null;
+            ? 'Composta (2 ou mais unidades)'
+            : null;
     final formas = natureza?.formasInteracao ?? [];
-    final formasLabel = formas.isEmpty
-        ? 'Não informado'
-        : formas.map(_labelForma).join(', ');
+    final formasLabel =
+        formas.isEmpty ? 'Não informado' : formas.map(_labelForma).join(', ');
+    final calculoVelocidade = widget.ficha.atropelamentoCalculo;
+    final statusVelocidade = calculoVelocidade == null
+        ? 'Sem estimativa registrada para esta ficha.'
+        : 'Estimativa registrada (${calculoVelocidade.useNorthwestern == true ? 'Northwestern' : 'Searle'}).';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Dinâmica do Fato'), centerTitle: true),
@@ -217,162 +164,125 @@ class _DinamicaFatoTransitoScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'DINÂMICA DO FATO',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    if (tipoStr != null) ...[
-                      _rowLabel(context, 'Natureza', tipoStr),
-                      const SizedBox(height: 12),
-                    ],
-                    if (natureza?.quantidadeUnidades != null) ...[
-                      _rowLabel(
-                        context,
-                        'Unidades envolvidas',
-                        natureza!.quantidadeUnidades.toString(),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    _rowLabel(context, 'Formas de interação', formasLabel),
-                    if (_dinamicaPrincipal != null) ...[
-                      const SizedBox(height: 12),
-                      _rowLabel(
-                        context,
-                        'Dinâmica principal (levantamento)',
-                        CausasDeterminantesCatalogo.labelDinamica(
-                          _dinamicaPrincipal!,
-                        ),
-                      ),
-                    ],
-                    if (natureza?.observacoes != null &&
-                        natureza!.observacoes!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _rowLabel(
-                        context,
-                        'Observações',
-                        natureza.observacoes!.trim(),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_dinamicaPrincipal != null) ...[
-              Text(
-                'Modelos de causa (SDT / IC-PCDF)',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Conforme a dinâmica principal indicada no levantamento, '
-                'marque as linhas do documento de referência que melhor descrevem o caso. '
-                'Você pode marcar mais de uma.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ...CausasDeterminantesCatalogo.opcoesPara(
-                _dinamicaPrincipal!,
-              ).map(
-                (c) => CheckboxListTile(
-                  value: _causasSelecionadas.contains(c.id),
-                  onChanged: (v) {
-                    setState(() {
-                      if (v == true) {
-                        _causasSelecionadas.add(c.id);
-                      } else {
-                        _causasSelecionadas.remove(c.id);
-                      }
-                    });
-                  },
-                  title: Text('${c.referencia} — ${c.titulo}'),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  dense: true,
-                ),
-              ),
-              const SizedBox(height: 20),
-            ] else ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Não foi possível determinar a dinâmica principal a partir do levantamento. '
-                  'Conclua o levantamento fotográfico marcando uma forma de interação principal, '
-                  'ou use o complemento abaixo para descrever a dinâmica.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ],
-            TextField(
-              controller: _complementoCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Complemento / Ajuste na dinâmica do fato',
-                hintText:
-                    'Se desejar, descreva ou ajuste algo na dinâmica do fato.',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
-              maxLines: 4,
-            ),
-            const SizedBox(height: 8),
-            AiSuggestionButton(
-              fieldLabel: 'Complemento da dinâmica do fato',
-              currentText: _complementoCtrl.text,
-              currentTextBuilder: () => _complementoCtrl.text,
-              contextTextBuilder: _buildAiContextComplemento,
-              profile: AiSuggestionProfile.crimeTransito,
-              onReplace: _replaceComplemento,
-              onAppend: _appendComplemento,
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 28,
-                    color: Theme.of(context).colorScheme.primary,
+            _sectionCard(
+              context,
+              title: '7.1 Dinâmica do Evento',
+              icon: Icons.timeline,
+              children: [
+                if (tipoStr != null) ...[
+                  _rowLabel(context, 'Natureza', tipoStr),
+                  const SizedBox(height: 12),
+                ],
+                if (natureza?.quantidadeUnidades != null) ...[
+                  _rowLabel(
+                    context,
+                    'Unidades envolvidas',
+                    natureza!.quantidadeUnidades.toString(),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    'Cálculo de velocidade',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                ],
+                _rowLabel(context, 'Formas de interação', formasLabel),
+                if (_dinamicaPrincipal != null) ...[
+                  const SizedBox(height: 12),
+                  _rowLabel(
+                    context,
+                    'Dinâmica principal indicada no levantamento',
+                    CausasDeterminantesCatalogo.labelDinamica(
+                      _dinamicaPrincipal!,
                     ),
+                  ),
+                ],
+                if (natureza?.observacoes != null &&
+                    natureza!.observacoes!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _rowLabel(
+                      context, 'Observações', natureza.observacoes!.trim()),
+                ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _complementoCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Complemento da dinâmica do evento',
+                    hintText:
+                        'Descreva origem, deslocamento, interação e sequência observável.',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 5,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _sectionCard(
+              context,
+              title: '7.2 Estimativa de Velocidade',
+              icon: Icons.speed,
+              children: [
+                _statusBox(
+                  context,
+                  icon: calculoVelocidade == null
+                      ? Icons.info_outline
+                      : Icons.check_circle_outline,
+                  text: statusVelocidade,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  calculoVelocidade == null
+                      ? 'Quando houver cálculo aplicável, registre-o na etapa Cálculo de velocidade. Para os demais casos, o laudo indicará a ausência de elementos ou de método aplicável registrado.'
+                      : 'Os parâmetros salvos serão usados na seção 7.2 do laudo, com a metodologia e o resultado estimado.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _sectionCard(
+              context,
+              title: '7.3 Análise da Causa Determinante',
+              icon: Icons.fact_check_outlined,
+              children: [
+                if (_dinamicaPrincipal != null) ...[
+                  Text(
+                    'Modelos de causa (SDT / IC-PCDF)',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Para o tipo de ocorrência selecionado, o cálculo de velocidade ainda não está disponível neste aplicativo. Será incluído em versões futuras.\n\nPara ocorrências do tipo Atropelamento, retorne à tela Natureza da Ocorrência e selecione Atropelamento para acessar o cálculo (Searle/Northwestern).',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    'Marque as linhas do documento de referência que melhor descrevem o caso. Você pode marcar mais de uma.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
-                ],
-              ),
+                  const SizedBox(height: 12),
+                  ...CausasDeterminantesCatalogo.opcoesPara(
+                    _dinamicaPrincipal!,
+                  ).map(
+                    (c) => CheckboxListTile(
+                      value: _causasSelecionadas.contains(c.id),
+                      onChanged: (v) {
+                        setState(() {
+                          if (v == true) {
+                            _causasSelecionadas.add(c.id);
+                          } else {
+                            _causasSelecionadas.remove(c.id);
+                          }
+                        });
+                      },
+                      title: Text('${c.referencia} - ${c.titulo}'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ] else
+                  _statusBox(
+                    context,
+                    icon: Icons.warning_amber_outlined,
+                    text:
+                        'Não foi possível determinar a dinâmica principal a partir do levantamento. Conclua o levantamento da via ou use o complemento da seção 7.1.',
+                  ),
+              ],
             ),
             const SizedBox(height: 32),
             FilledButton.icon(
@@ -397,6 +307,66 @@ class _DinamicaFatoTransitoScreenState
     );
   }
 
+  Widget _sectionCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBox(
+    BuildContext context, {
+    required IconData icon,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
+        ],
+      ),
+    );
+  }
+
   Widget _rowLabel(BuildContext context, String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,8 +374,8 @@ class _DinamicaFatoTransitoScreenState
         Text(
           label,
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
         ),
         const SizedBox(height: 4),
         Text(value, style: Theme.of(context).textTheme.bodyLarge),

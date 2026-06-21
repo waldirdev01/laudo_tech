@@ -6,7 +6,9 @@ import '../models/ficha_completa_model.dart';
 
 class FichaService {
   static const String _migrationKey = 'fichas_migradas_v2';
-  static const String _migrationInProgressKey = 'fichas_migracao_v2_em_andamento';
+  static const String _migrationInProgressKey =
+      'fichas_migracao_v2_em_andamento';
+  static const String _rootJsonRecoveryKey = 'fichas_jsons_raiz_recuperados_v1';
   static const String _legacyKey = 'fichas_salvas';
 
   Future<Directory> _fichasDir() async {
@@ -16,15 +18,7 @@ class FichaService {
     return dir;
   }
 
-  // Migra fichas do SharedPreferences para arquivos individuais na primeira execução.
-  // A migração é idempotente: pode rodar mais de uma vez sem duplicar/invalidar,
-  // pois cada ficha é gravada no mesmo arquivo por id.
-  Future<void> _migrarSeNecessario() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_migrationKey) == true) return;
-    await prefs.setBool(_migrationInProgressKey, true);
-
-    final fichasJson = prefs.getStringList(_legacyKey) ?? [];
+  Future<void> _migrarItensLegados(List<String> fichasJson) async {
     for (final item in fichasJson) {
       try {
         final ficha = FichaCompletaModel.fromJson(jsonDecode(item));
@@ -33,6 +27,47 @@ class FichaService {
         // ignora registros inválidos do storage antigo
       }
     }
+  }
+
+  Future<void> _recuperarJsonsNaRaiz() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_rootJsonRecoveryKey) == true) return;
+
+    final base = await getApplicationDocumentsDirectory();
+    await for (final entity in base.list()) {
+      if (entity is! File || !entity.path.endsWith('.json')) continue;
+      try {
+        final content = await entity.readAsString();
+        final ficha = FichaCompletaModel.fromJson(jsonDecode(content));
+        await _escreverArquivo(ficha);
+      } catch (_) {
+        // ignora JSONs da raiz que não sejam fichas válidas
+      }
+    }
+
+    await prefs.setBool(_rootJsonRecoveryKey, true);
+  }
+
+  // Migra fichas do SharedPreferences para arquivos individuais.
+  // Também cobre casos em que a versão antiga gravou novos itens após a flag
+  // de migração já estar marcada, preservando fichas criadas na loja.
+  Future<void> _migrarSeNecessario() async {
+    final prefs = await SharedPreferences.getInstance();
+    final fichasJson = prefs.getStringList(_legacyKey) ?? [];
+
+    if (prefs.getBool(_migrationKey) == true) {
+      if (fichasJson.isNotEmpty) {
+        await _migrarItensLegados(fichasJson);
+        await prefs.remove(_legacyKey);
+      }
+      await _recuperarJsonsNaRaiz();
+      return;
+    }
+
+    await prefs.setBool(_migrationInProgressKey, true);
+
+    await _migrarItensLegados(fichasJson);
+    await _recuperarJsonsNaRaiz();
 
     await prefs.setBool(_migrationKey, true);
     await prefs.remove(_migrationInProgressKey);

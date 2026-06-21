@@ -31,7 +31,6 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
   final _dataHoraDeslocamentoController = TextEditingController();
   final _dataHoraInicioController = TextEditingController();
   final _dataHoraTerminoController = TextEditingController();
-  final _pedidoDilacaoController = TextEditingController();
 
   final _fichaService = FichaService();
   final _pdfService = PdfExtractionService();
@@ -50,8 +49,7 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
   void initState() {
     super.initState();
     // Se está editando, usar ID existente. Senão, criar novo
-    _fichaId =
-        widget.fichaExistente?.id ??
+    _fichaId = widget.fichaExistente?.id ??
         DateTime.now().millisecondsSinceEpoch.toString();
 
     // Se está editando, preencher campos da ficha existente
@@ -62,8 +60,6 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
           widget.fichaExistente!.dataHoraInicio ?? '';
       _dataHoraTerminoController.text =
           widget.fichaExistente!.dataHoraTermino ?? '';
-      _pedidoDilacaoController.text =
-          widget.fichaExistente!.pedidoDilacao ?? '';
     } else {
       // Se é uma nova ficha, preencher com dados extraídos do PDF (se disponíveis)
       _dataHoraDeslocamentoController.text =
@@ -72,8 +68,6 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
           _dadosSolicitacaoEfetivos.dataHoraInicio ?? '';
       _dataHoraTerminoController.text =
           _dadosSolicitacaoEfetivos.dataHoraTermino ?? '';
-      _pedidoDilacaoController.text =
-          _dadosSolicitacaoEfetivos.pedidoDilacao ?? '';
     }
 
     // Debug: verificar dados recebidos
@@ -84,7 +78,6 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
     _dataHoraDeslocamentoController.dispose();
     _dataHoraInicioController.dispose();
     _dataHoraTerminoController.dispose();
-    _pedidoDilacaoController.dispose();
     super.dispose();
   }
 
@@ -135,23 +128,19 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
 
     try {
       // Se está editando, preservar dados existentes (equipe, equipes policiais, etc.)
-      final ficha =
-          widget.fichaExistente?.copyWith(
+      final ficha = widget.fichaExistente?.copyWith(
             dadosSolicitacao: _dadosSolicitacaoEfetivos,
             dataHoraDeslocamento:
                 _dataHoraDeslocamentoController.text.trim().isEmpty
-                ? null
-                : _dataHoraDeslocamentoController.text.trim(),
+                    ? null
+                    : _dataHoraDeslocamentoController.text.trim(),
             dataHoraInicio: _dataHoraInicioController.text.trim().isEmpty
                 ? null
                 : _dataHoraInicioController.text.trim(),
             dataHoraTermino: _dataHoraTerminoController.text.trim().isEmpty
                 ? null
                 : _dataHoraTerminoController.text
-                      .trim(), // Pode ficar em branco
-            pedidoDilacao: _pedidoDilacaoController.text.trim().isEmpty
-                ? null
-                : _pedidoDilacaoController.text.trim(),
+                    .trim(), // Pode ficar em branco
             dataUltimaAtualizacao: DateTime.now(),
           ) ??
           FichaCompletaModel(
@@ -160,18 +149,15 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
             dadosSolicitacao: _dadosSolicitacaoEfetivos,
             dataHoraDeslocamento:
                 _dataHoraDeslocamentoController.text.trim().isEmpty
-                ? null
-                : _dataHoraDeslocamentoController.text.trim(),
+                    ? null
+                    : _dataHoraDeslocamentoController.text.trim(),
             dataHoraInicio: _dataHoraInicioController.text.trim().isEmpty
                 ? null
                 : _dataHoraInicioController.text.trim(),
             dataHoraTermino: _dataHoraTerminoController.text.trim().isEmpty
                 ? null
                 : _dataHoraTerminoController.text
-                      .trim(), // Pode ficar em branco
-            pedidoDilacao: _pedidoDilacaoController.text.trim().isEmpty
-                ? null
-                : _pedidoDilacaoController.text.trim(),
+                    .trim(), // Pode ficar em branco
             dadosFichaBase: null, // Será preenchido nas próximas telas
             dataCriacao: DateTime.now(),
             dataUltimaAtualizacao: DateTime.now(),
@@ -248,9 +234,6 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
         }
         if (_dataHoraTerminoController.text.trim().isEmpty) {
           _dataHoraTerminoController.text = dados.dataHoraTermino ?? '';
-        }
-        if (_pedidoDilacaoController.text.trim().isEmpty) {
-          _pedidoDilacaoController.text = dados.pedidoDilacao ?? '';
         }
         _salvando = false;
       });
@@ -398,7 +381,9 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                         children: [
                           Text(
                             'Unidade Afeta:',
-                            style: Theme.of(context).textTheme.bodySmall
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
                                 ?.copyWith(fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(height: 4),
@@ -407,36 +392,15 @@ class _PreenchimentoFichaScreenState extends State<PreenchimentoFichaScreen> {
                                     true
                                 ? '-'
                                 : _dadosSolicitacaoEfetivos.unidadeAfeta!,
-                            style: Theme.of(context).textTheme.bodyMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
                     ),
                     const Divider(height: 1),
-                    // Linha 6: Pedido de Dilação (largura total)
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pedido de Dilação (se houver, informar n. do Processo SEI):',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _pedidoDilacaoController,
-                            decoration: const InputDecoration(
-                              hintText: 'Número do Processo SEI',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),

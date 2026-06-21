@@ -11,7 +11,6 @@ class SolicitacaoModel {
   final String? dataHoraDeslocamento;
   final String? dataHoraInicio;
   final String? dataHoraTermino;
-  final String? pedidoDilacao; // Número do Processo SEI se houver
 
   // EQUIPE DE PERÍCIA CRIMINAL ACIONADA
   final String? peritoCriminal;
@@ -56,7 +55,6 @@ class SolicitacaoModel {
     this.dataHoraDeslocamento,
     this.dataHoraInicio,
     this.dataHoraTermino,
-    this.pedidoDilacao,
     this.peritoCriminal,
     this.matriculaPerito,
     this.fotografoCriminalistico,
@@ -98,38 +96,37 @@ class SolicitacaoModel {
   }
 
   Map<String, dynamic> toJson() => {
-    'raiNumero': raiNumero,
-    'numeroOcorrencia': numeroOcorrencia,
-    'naturezaOcorrencia': naturezaOcorrencia,
-    'dataHoraComunicacao': dataHoraComunicacao,
-    'dataHoraDeslocamento': dataHoraDeslocamento,
-    'dataHoraInicio': dataHoraInicio,
-    'dataHoraTermino': dataHoraTermino,
-    'pedidoDilacao': pedidoDilacao,
-    'peritoCriminal': peritoCriminal,
-    'matriculaPerito': matriculaPerito,
-    'fotografoCriminalistico': fotografoCriminalistico,
-    'demaisServidoresPoliciais': demaisServidoresPoliciais,
-    'policiaMilitarRodoviariaViatura': policiaMilitarRodoviariaViatura,
-    'equipePolicial': equipePolicial?.map((e) => e.toJson()).toList(),
-    'autoridadePolicial': autoridadePolicial,
-    'matriculaAutoridade': matriculaAutoridade,
-    'agentesPolicia': agentesPolicia?.map((e) => e.toJson()).toList(),
-    'cbm': cbm,
-    'samu': samu,
-    'semResgate': semResgate,
-    'unidadeNumero': unidadeNumero,
-    'medicoAssistente': medicoAssistente,
-    'crmGo': crmGo,
-    'outrosSocorristas': outrosSocorristas,
-    'unidadeOrigem': unidadeOrigem,
-    'unidadeAfeta': unidadeAfeta,
-    'pessoasEnvolvidas': pessoasEnvolvidas?.map((e) => e.toJson()).toList(),
-    'endereco': endereco,
-    'municipio': municipio,
-    'coordenadasS': coordenadasS,
-    'coordenadasW': coordenadasW,
-  };
+        'raiNumero': raiNumero,
+        'numeroOcorrencia': numeroOcorrencia,
+        'naturezaOcorrencia': naturezaOcorrencia,
+        'dataHoraComunicacao': dataHoraComunicacao,
+        'dataHoraDeslocamento': dataHoraDeslocamento,
+        'dataHoraInicio': dataHoraInicio,
+        'dataHoraTermino': dataHoraTermino,
+        'peritoCriminal': peritoCriminal,
+        'matriculaPerito': matriculaPerito,
+        'fotografoCriminalistico': fotografoCriminalistico,
+        'demaisServidoresPoliciais': demaisServidoresPoliciais,
+        'policiaMilitarRodoviariaViatura': policiaMilitarRodoviariaViatura,
+        'equipePolicial': equipePolicial?.map((e) => e.toJson()).toList(),
+        'autoridadePolicial': autoridadePolicial,
+        'matriculaAutoridade': matriculaAutoridade,
+        'agentesPolicia': agentesPolicia?.map((e) => e.toJson()).toList(),
+        'cbm': cbm,
+        'samu': samu,
+        'semResgate': semResgate,
+        'unidadeNumero': unidadeNumero,
+        'medicoAssistente': medicoAssistente,
+        'crmGo': crmGo,
+        'outrosSocorristas': outrosSocorristas,
+        'unidadeOrigem': unidadeOrigem,
+        'unidadeAfeta': unidadeAfeta,
+        'pessoasEnvolvidas': pessoasEnvolvidas?.map((e) => e.toJson()).toList(),
+        'endereco': endereco,
+        'municipio': municipio,
+        'coordenadasS': coordenadasS,
+        'coordenadasW': coordenadasW,
+      };
 
   factory SolicitacaoModel.fromJson(Map<String, dynamic> json) =>
       SolicitacaoModel(
@@ -140,7 +137,6 @@ class SolicitacaoModel {
         dataHoraDeslocamento: json['dataHoraDeslocamento'] as String?,
         dataHoraInicio: json['dataHoraInicio'] as String?,
         dataHoraTermino: json['dataHoraTermino'] as String?,
-        pedidoDilacao: json['pedidoDilacao'] as String?,
         peritoCriminal: json['peritoCriminal'] as String?,
         matriculaPerito: json['matriculaPerito'] as String?,
         fotografoCriminalistico: json['fotografoCriminalistico'] as String?,
@@ -185,7 +181,7 @@ class PessoaEquipe {
   Map<String, dynamic> toJson() => {'nome': nome, 'matricula': matricula};
 
   factory PessoaEquipe.fromJson(Map<String, dynamic> json) => PessoaEquipe(
-    nome: json['nome'] as String?,
-    matricula: json['matricula'] as String?,
-  );
+        nome: json['nome'] as String?,
+        matricula: json['matricula'] as String?,
+      );
 }

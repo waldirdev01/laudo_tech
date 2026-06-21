@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/theme_provider.dart';
-import 'ai_configuracoes_screen.dart';
 import 'cadastro_perito_screen.dart';
 import 'cadastro_unidades_laboratorios_screen.dart';
 import 'equipe_screen.dart';
@@ -35,8 +34,8 @@ class ConfiguracoesScreen extends StatelessWidget {
                     themeProvider.themeMode == ThemeMode.light
                         ? 'Claro'
                         : themeProvider.themeMode == ThemeMode.dark
-                        ? 'Escuro'
-                        : 'Sistema',
+                            ? 'Escuro'
+                            : 'Sistema',
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
@@ -92,33 +91,6 @@ class ConfiguracoesScreen extends StatelessWidget {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => const EquipeScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          const Text(
-            'Inteligência Artificial',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.auto_awesome),
-                  title: const Text('OpenAI / DeepSeek'),
-                  subtitle: const Text(
-                    'Configurar provedor, chave de API e sugestões por campo',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const AiConfiguracoesScreen(),
                       ),
                     );
                   },

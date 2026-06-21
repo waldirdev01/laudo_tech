@@ -47,8 +47,7 @@ Use este checklist para verificar que tudo está funcionando corretamente após 
 - [x] App Store image: `assets/images/appstore.png`
 - [x] Play Store image: `assets/images/playstore.png`
 
-### Templates (6 arquivos)
-- [x] crime_transito.docx
+### Templates (5 arquivos)
 - [x] Laudo_PADRON._CT.docx
 - [x] Laudo_PADRON._Dano.docx
 - [x] Laudo_PADRON._Disparo_de_Arma_de_Fogo.docx
@@ -222,4 +221,3 @@ Se tiver dúvidas sobre configurações:
 4. 📚 Consulte documentação quando precisar
 
 **Bom desenvolvimento! 🚀**
-

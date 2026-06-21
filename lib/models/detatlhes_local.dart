@@ -44,10 +44,14 @@ class LocalFurtoModel {
   final int? quantidadeAcessosMediato;
   final List<String>? tiposAcessoMediato;
   final List<String>? posicoesAcessoMediato;
+  final String? tipoRegiaoMediato;
+  final List<String>? infraestruturaMediato;
+  final String? tipoImovelMediato;
+  final int? qtdPavimentosMediato;
+  final List<String>? delimitacaoMediato;
   final String? abrangenciaImediato;
   final List<String>? ambientesImediato;
   final String? ambienteDestaqueImediato;
-  final String? estadoConservacaoImediato;
   final String? observacaoImediato;
   final Map<String, List<String>>? acessosPorAmbienteImediato;
   final Map<String, List<String>>? comunicacaoAmbientesImediato;
@@ -56,8 +60,11 @@ class LocalFurtoModel {
   final MetodoPosicionamentoVestigio? metodoPosicionamentoMediato;
   final MetodoPosicionamentoVestigio? metodoPosicionamentoRelacionado;
   final Map<String, MetodoPosicionamentoVestigio>?
-  metodosPosicionamentoAmbientesImediato;
+      metodosPosicionamentoAmbientesImediato;
   final Map<String, String>? consideracoesTecnicasAmbientesImediato;
+  final List<String>? ambientesComSinaisArrombamento;
+  final Map<String, String>? sinaisArrombamentoDescricaoPorAmbiente;
+  final Map<String, List<String>>? fotosSinaisArrombamentoPorAmbiente;
   final String? sinaisArrombamentoDescricao;
   final String? descricaoLocal;
   final String? demaisObservacoes;
@@ -123,10 +130,14 @@ class LocalFurtoModel {
     this.quantidadeAcessosMediato,
     this.tiposAcessoMediato,
     this.posicoesAcessoMediato,
+    this.tipoRegiaoMediato,
+    this.infraestruturaMediato,
+    this.tipoImovelMediato,
+    this.qtdPavimentosMediato,
+    this.delimitacaoMediato,
     this.abrangenciaImediato,
     this.ambientesImediato,
     this.ambienteDestaqueImediato,
-    this.estadoConservacaoImediato,
     this.observacaoImediato,
     this.acessosPorAmbienteImediato,
     this.comunicacaoAmbientesImediato,
@@ -136,6 +147,9 @@ class LocalFurtoModel {
     this.metodoPosicionamentoRelacionado,
     this.metodosPosicionamentoAmbientesImediato,
     this.consideracoesTecnicasAmbientesImediato,
+    this.ambientesComSinaisArrombamento,
+    this.sinaisArrombamentoDescricaoPorAmbiente,
+    this.fotosSinaisArrombamentoPorAmbiente,
     this.sinaisArrombamentoDescricao,
     this.descricaoLocal,
     this.demaisObservacoes,
@@ -163,225 +177,266 @@ class LocalFurtoModel {
   });
 
   Map<String, dynamic> toJson() => {
-    'classificacaoMediato': classificacaoMediato,
-    'classificacaoImediato': classificacaoImediato,
-    'classificacaoRelacionado': classificacaoRelacionado,
-    'pisoSecoMediato': pisoSecoMediato,
-    'pisoUmidoMediato': pisoUmidoMediato,
-    'pisoMolhadoMediato': pisoMolhadoMediato,
-    'iluminacaoArtificialMediato': iluminacaoArtificialMediato,
-    'iluminacaoNaturalMediato': iluminacaoNaturalMediato,
-    'iluminacaoAusenteMediato': iluminacaoAusenteMediato,
-    'pisoSecoImediato': pisoSecoImediato,
-    'pisoUmidoImediato': pisoUmidoImediato,
-    'pisoMolhadoImediato': pisoMolhadoImediato,
-    'iluminacaoArtificialImediato': iluminacaoArtificialImediato,
-    'iluminacaoNaturalImediato': iluminacaoNaturalImediato,
-    'iluminacaoAusenteImediato': iluminacaoAusenteImediato,
-    'pisoSecoRelacionado': pisoSecoRelacionado,
-    'pisoUmidoRelacionado': pisoUmidoRelacionado,
-    'pisoMolhadoRelacionado': pisoMolhadoRelacionado,
-    'iluminacaoArtificialRelacionado': iluminacaoArtificialRelacionado,
-    'iluminacaoNaturalRelacionado': iluminacaoNaturalRelacionado,
-    'iluminacaoAusenteRelacionado': iluminacaoAusenteRelacionado,
-    'descricaoViasAcesso': descricaoViasAcesso,
-    'quantidadeAcessosMediato': quantidadeAcessosMediato,
-    'tiposAcessoMediato': tiposAcessoMediato,
-    'posicoesAcessoMediato': posicoesAcessoMediato,
-    'abrangenciaImediato': abrangenciaImediato,
-    'ambientesImediato': ambientesImediato,
-    'ambienteDestaqueImediato': ambienteDestaqueImediato,
-    'estadoConservacaoImediato': estadoConservacaoImediato,
-    'observacaoImediato': observacaoImediato,
-    'acessosPorAmbienteImediato': acessosPorAmbienteImediato,
-    'comunicacaoAmbientesImediato': comunicacaoAmbientesImediato,
-    'acessoExternoPorAmbienteImediato': acessoExternoPorAmbienteImediato,
-    'marcosZeroAmbientesImediato': marcosZeroAmbientesImediato?.map(
-      (key, value) => MapEntry(key, value.toJson()),
-    ),
-    'metodoPosicionamentoMediato': metodoPosicionamentoMediato?.name,
-    'metodoPosicionamentoRelacionado': metodoPosicionamentoRelacionado?.name,
-    'metodosPosicionamentoAmbientesImediato':
-        metodosPosicionamentoAmbientesImediato?.map(
+        'classificacaoMediato': classificacaoMediato,
+        'classificacaoImediato': classificacaoImediato,
+        'classificacaoRelacionado': classificacaoRelacionado,
+        'pisoSecoMediato': pisoSecoMediato,
+        'pisoUmidoMediato': pisoUmidoMediato,
+        'pisoMolhadoMediato': pisoMolhadoMediato,
+        'iluminacaoArtificialMediato': iluminacaoArtificialMediato,
+        'iluminacaoNaturalMediato': iluminacaoNaturalMediato,
+        'iluminacaoAusenteMediato': iluminacaoAusenteMediato,
+        'pisoSecoImediato': pisoSecoImediato,
+        'pisoUmidoImediato': pisoUmidoImediato,
+        'pisoMolhadoImediato': pisoMolhadoImediato,
+        'iluminacaoArtificialImediato': iluminacaoArtificialImediato,
+        'iluminacaoNaturalImediato': iluminacaoNaturalImediato,
+        'iluminacaoAusenteImediato': iluminacaoAusenteImediato,
+        'pisoSecoRelacionado': pisoSecoRelacionado,
+        'pisoUmidoRelacionado': pisoUmidoRelacionado,
+        'pisoMolhadoRelacionado': pisoMolhadoRelacionado,
+        'iluminacaoArtificialRelacionado': iluminacaoArtificialRelacionado,
+        'iluminacaoNaturalRelacionado': iluminacaoNaturalRelacionado,
+        'iluminacaoAusenteRelacionado': iluminacaoAusenteRelacionado,
+        'descricaoViasAcesso': descricaoViasAcesso,
+        'quantidadeAcessosMediato': quantidadeAcessosMediato,
+        'tiposAcessoMediato': tiposAcessoMediato,
+        'posicoesAcessoMediato': posicoesAcessoMediato,
+        'tipoRegiaoMediato': tipoRegiaoMediato,
+        'infraestruturaMediato': infraestruturaMediato,
+        'tipoImovelMediato': tipoImovelMediato,
+        'qtdPavimentosMediato': qtdPavimentosMediato,
+        'delimitacaoMediato': delimitacaoMediato,
+        'abrangenciaImediato': abrangenciaImediato,
+        'ambientesImediato': ambientesImediato,
+        'ambienteDestaqueImediato': ambienteDestaqueImediato,
+        'observacaoImediato': observacaoImediato,
+        'acessosPorAmbienteImediato': acessosPorAmbienteImediato,
+        'comunicacaoAmbientesImediato': comunicacaoAmbientesImediato,
+        'acessoExternoPorAmbienteImediato': acessoExternoPorAmbienteImediato,
+        'marcosZeroAmbientesImediato': marcosZeroAmbientesImediato?.map(
+          (key, value) => MapEntry(key, value.toJson()),
+        ),
+        'metodoPosicionamentoMediato': metodoPosicionamentoMediato?.name,
+        'metodoPosicionamentoRelacionado':
+            metodoPosicionamentoRelacionado?.name,
+        'metodosPosicionamentoAmbientesImediato':
+            metodosPosicionamentoAmbientesImediato?.map(
           (key, value) => MapEntry(key, value.name),
         ),
-    'consideracoesTecnicasAmbientesImediato':
-        consideracoesTecnicasAmbientesImediato,
-    'sinaisArrombamentoDescricao': sinaisArrombamentoDescricao,
-    'descricaoLocal': descricaoLocal,
-    'demaisObservacoes': demaisObservacoes,
-    'descricaoLocalMediato': descricaoLocalMediato,
-    'descricaoLocalImediato': descricaoLocalImediato,
-    'descricaoLocalRelacionado': descricaoLocalRelacionado,
-    'marcoZeroMediato': marcoZeroMediato?.toJson(),
-    'marcoZeroImediato': marcoZeroImediato?.toJson(),
-    'marcoZeroRelacionado': marcoZeroRelacionado?.toJson(),
-    'vestigiosMediato': vestigiosMediato?.map((v) => v.toJson()).toList(),
-    'vestigiosImediato': vestigiosImediato?.map((v) => v.toJson()).toList(),
-    'vestigiosRelacionado': vestigiosRelacionado
-        ?.map((v) => v.toJson())
-        .toList(),
-    'semVestigiosMediato': semVestigiosMediato,
-    'semVestigiosImediato': semVestigiosImediato,
-    'semVestigiosRelacionado': semVestigiosRelacionado,
-    'sinaisArrombamentoSim': sinaisArrombamentoSim,
-    'sinaisArrombamentoNao': sinaisArrombamentoNao,
-    'sinaisArrombamentoNaoSeAplica': sinaisArrombamentoNaoSeAplica,
-    'fotosVistaAmplaPaths': fotosVistaAmplaPaths,
-    'fotosVistaAmplaMediatoPaths': fotosVistaAmplaMediatoPaths,
-    'fotosVistaAmplaImediatoPaths': fotosVistaAmplaImediatoPaths,
-    'fotosVistaAmplaAmbientesImediato': fotosVistaAmplaAmbientesImediato,
-    'fotosSinaisArrombamentoPaths': fotosSinaisArrombamentoPaths,
-    'localEmViaPublica': localEmViaPublica,
-  };
+        'consideracoesTecnicasAmbientesImediato':
+            consideracoesTecnicasAmbientesImediato,
+        'ambientesComSinaisArrombamento': ambientesComSinaisArrombamento,
+        'sinaisArrombamentoDescricaoPorAmbiente':
+            sinaisArrombamentoDescricaoPorAmbiente,
+        'fotosSinaisArrombamentoPorAmbiente':
+            fotosSinaisArrombamentoPorAmbiente,
+        'sinaisArrombamentoDescricao': sinaisArrombamentoDescricao,
+        'descricaoLocal': descricaoLocal,
+        'demaisObservacoes': demaisObservacoes,
+        'descricaoLocalMediato': descricaoLocalMediato,
+        'descricaoLocalImediato': descricaoLocalImediato,
+        'descricaoLocalRelacionado': descricaoLocalRelacionado,
+        'marcoZeroMediato': marcoZeroMediato?.toJson(),
+        'marcoZeroImediato': marcoZeroImediato?.toJson(),
+        'marcoZeroRelacionado': marcoZeroRelacionado?.toJson(),
+        'vestigiosMediato': vestigiosMediato?.map((v) => v.toJson()).toList(),
+        'vestigiosImediato': vestigiosImediato?.map((v) => v.toJson()).toList(),
+        'vestigiosRelacionado':
+            vestigiosRelacionado?.map((v) => v.toJson()).toList(),
+        'semVestigiosMediato': semVestigiosMediato,
+        'semVestigiosImediato': semVestigiosImediato,
+        'semVestigiosRelacionado': semVestigiosRelacionado,
+        'sinaisArrombamentoSim': sinaisArrombamentoSim,
+        'sinaisArrombamentoNao': sinaisArrombamentoNao,
+        'sinaisArrombamentoNaoSeAplica': sinaisArrombamentoNaoSeAplica,
+        'fotosVistaAmplaPaths': fotosVistaAmplaPaths,
+        'fotosVistaAmplaMediatoPaths': fotosVistaAmplaMediatoPaths,
+        'fotosVistaAmplaImediatoPaths': fotosVistaAmplaImediatoPaths,
+        'fotosVistaAmplaAmbientesImediato': fotosVistaAmplaAmbientesImediato,
+        'fotosSinaisArrombamentoPaths': fotosSinaisArrombamentoPaths,
+        'localEmViaPublica': localEmViaPublica,
+      };
 
   factory LocalFurtoModel.fromJson(
     Map<String, dynamic> json,
-  ) => LocalFurtoModel(
-    classificacaoMediato: json['classificacaoMediato'] as bool?,
-    classificacaoImediato: json['classificacaoImediato'] as bool?,
-    classificacaoRelacionado: json['classificacaoRelacionado'] as bool?,
-    pisoSecoMediato: json['pisoSecoMediato'] as bool?,
-    pisoUmidoMediato: json['pisoUmidoMediato'] as bool?,
-    pisoMolhadoMediato: json['pisoMolhadoMediato'] as bool?,
-    iluminacaoArtificialMediato: json['iluminacaoArtificialMediato'] as bool?,
-    iluminacaoNaturalMediato: json['iluminacaoNaturalMediato'] as bool?,
-    iluminacaoAusenteMediato: json['iluminacaoAusenteMediato'] as bool?,
-    pisoSecoImediato: json['pisoSecoImediato'] as bool?,
-    pisoUmidoImediato: json['pisoUmidoImediato'] as bool?,
-    pisoMolhadoImediato: json['pisoMolhadoImediato'] as bool?,
-    iluminacaoArtificialImediato: json['iluminacaoArtificialImediato'] as bool?,
-    iluminacaoNaturalImediato: json['iluminacaoNaturalImediato'] as bool?,
-    iluminacaoAusenteImediato: json['iluminacaoAusenteImediato'] as bool?,
-    pisoSecoRelacionado: json['pisoSecoRelacionado'] as bool?,
-    pisoUmidoRelacionado: json['pisoUmidoRelacionado'] as bool?,
-    pisoMolhadoRelacionado: json['pisoMolhadoRelacionado'] as bool?,
-    iluminacaoArtificialRelacionado:
-        json['iluminacaoArtificialRelacionado'] as bool?,
-    iluminacaoNaturalRelacionado: json['iluminacaoNaturalRelacionado'] as bool?,
-    iluminacaoAusenteRelacionado: json['iluminacaoAusenteRelacionado'] as bool?,
-    descricaoViasAcesso: json['descricaoViasAcesso'] as String?,
-    quantidadeAcessosMediato: (json['quantidadeAcessosMediato'] as num?)
-        ?.toInt(),
-    tiposAcessoMediato: (json['tiposAcessoMediato'] as List<dynamic>?)
-        ?.map((e) => e.toString())
-        .toList(),
-    posicoesAcessoMediato: (json['posicoesAcessoMediato'] as List<dynamic>?)
-        ?.map((e) => e.toString())
-        .toList(),
-    abrangenciaImediato: json['abrangenciaImediato'] as String?,
-    ambientesImediato: (json['ambientesImediato'] as List<dynamic>?)
-        ?.map((e) => e.toString())
-        .toList(),
-    ambienteDestaqueImediato: json['ambienteDestaqueImediato'] as String?,
-    estadoConservacaoImediato: json['estadoConservacaoImediato'] as String?,
-    observacaoImediato: json['observacaoImediato'] as String?,
-    acessosPorAmbienteImediato:
-        (json['acessosPorAmbienteImediato'] as Map<String, dynamic>?)?.map(
+  ) =>
+      LocalFurtoModel(
+        classificacaoMediato: json['classificacaoMediato'] as bool?,
+        classificacaoImediato: json['classificacaoImediato'] as bool?,
+        classificacaoRelacionado: json['classificacaoRelacionado'] as bool?,
+        pisoSecoMediato: json['pisoSecoMediato'] as bool?,
+        pisoUmidoMediato: json['pisoUmidoMediato'] as bool?,
+        pisoMolhadoMediato: json['pisoMolhadoMediato'] as bool?,
+        iluminacaoArtificialMediato:
+            json['iluminacaoArtificialMediato'] as bool?,
+        iluminacaoNaturalMediato: json['iluminacaoNaturalMediato'] as bool?,
+        iluminacaoAusenteMediato: json['iluminacaoAusenteMediato'] as bool?,
+        pisoSecoImediato: json['pisoSecoImediato'] as bool?,
+        pisoUmidoImediato: json['pisoUmidoImediato'] as bool?,
+        pisoMolhadoImediato: json['pisoMolhadoImediato'] as bool?,
+        iluminacaoArtificialImediato:
+            json['iluminacaoArtificialImediato'] as bool?,
+        iluminacaoNaturalImediato: json['iluminacaoNaturalImediato'] as bool?,
+        iluminacaoAusenteImediato: json['iluminacaoAusenteImediato'] as bool?,
+        pisoSecoRelacionado: json['pisoSecoRelacionado'] as bool?,
+        pisoUmidoRelacionado: json['pisoUmidoRelacionado'] as bool?,
+        pisoMolhadoRelacionado: json['pisoMolhadoRelacionado'] as bool?,
+        iluminacaoArtificialRelacionado:
+            json['iluminacaoArtificialRelacionado'] as bool?,
+        iluminacaoNaturalRelacionado:
+            json['iluminacaoNaturalRelacionado'] as bool?,
+        iluminacaoAusenteRelacionado:
+            json['iluminacaoAusenteRelacionado'] as bool?,
+        descricaoViasAcesso: json['descricaoViasAcesso'] as String?,
+        quantidadeAcessosMediato:
+            (json['quantidadeAcessosMediato'] as num?)?.toInt(),
+        tiposAcessoMediato: (json['tiposAcessoMediato'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+        posicoesAcessoMediato: (json['posicoesAcessoMediato'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+        tipoRegiaoMediato: json['tipoRegiaoMediato'] as String?,
+        infraestruturaMediato: (json['infraestruturaMediato'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+        tipoImovelMediato: json['tipoImovelMediato'] as String?,
+        qtdPavimentosMediato: (json['qtdPavimentosMediato'] as num?)?.toInt(),
+        delimitacaoMediato: (json['delimitacaoMediato'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+        abrangenciaImediato: json['abrangenciaImediato'] as String?,
+        ambientesImediato: (json['ambientesImediato'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+        ambienteDestaqueImediato: json['ambienteDestaqueImediato'] as String?,
+        observacaoImediato: json['observacaoImediato'] as String?,
+        acessosPorAmbienteImediato:
+            (json['acessosPorAmbienteImediato'] as Map<String, dynamic>?)?.map(
           (key, value) => MapEntry(
             key,
             (value as List<dynamic>).map((e) => e.toString()).toList(),
           ),
         ),
-    comunicacaoAmbientesImediato:
-        (json['comunicacaoAmbientesImediato'] as Map<String, dynamic>?)?.map(
+        comunicacaoAmbientesImediato:
+            (json['comunicacaoAmbientesImediato'] as Map<String, dynamic>?)
+                ?.map(
           (key, value) => MapEntry(
             key,
             (value as List<dynamic>).map((e) => e.toString()).toList(),
           ),
         ),
-    acessoExternoPorAmbienteImediato:
-        (json['acessoExternoPorAmbienteImediato'] as Map<String, dynamic>?)
-            ?.map((key, value) => MapEntry(key, value as bool? ?? false)),
-    marcosZeroAmbientesImediato:
-        (json['marcosZeroAmbientesImediato'] as Map<String, dynamic>?)?.map(
+        acessoExternoPorAmbienteImediato:
+            (json['acessoExternoPorAmbienteImediato'] as Map<String, dynamic>?)
+                ?.map((key, value) => MapEntry(key, value as bool? ?? false)),
+        marcosZeroAmbientesImediato:
+            (json['marcosZeroAmbientesImediato'] as Map<String, dynamic>?)?.map(
           (key, value) => MapEntry(
             key,
             MarcoZeroLocalModel.fromJson(value as Map<String, dynamic>),
           ),
         ),
-    metodoPosicionamentoMediato: MetodoPosicionamentoVestigio.fromName(
-      json['metodoPosicionamentoMediato'] as String?,
-    ),
-    metodoPosicionamentoRelacionado: MetodoPosicionamentoVestigio.fromName(
-      json['metodoPosicionamentoRelacionado'] as String?,
-    ),
-    metodosPosicionamentoAmbientesImediato:
-        (json['metodosPosicionamentoAmbientesImediato']
-                as Map<String, dynamic>?)
-            ?.map(
-              (key, value) => MapEntry(
-                key,
-                MetodoPosicionamentoVestigio.fromName(value as String?) ??
-                    MetodoPosicionamentoVestigio.nenhum,
-              ),
-            ),
-    consideracoesTecnicasAmbientesImediato:
-        (json['consideracoesTecnicasAmbientesImediato']
-                as Map<String, dynamic>?)
-            ?.map((key, value) => MapEntry(key, value?.toString() ?? '')),
-    sinaisArrombamentoDescricao: json['sinaisArrombamentoDescricao'] as String?,
-    descricaoLocal: json['descricaoLocal'] as String?,
-    demaisObservacoes: json['demaisObservacoes'] as String?,
-    descricaoLocalMediato: json['descricaoLocalMediato'] as String?,
-    descricaoLocalImediato: json['descricaoLocalImediato'] as String?,
-    descricaoLocalRelacionado: json['descricaoLocalRelacionado'] as String?,
-    marcoZeroMediato: json['marcoZeroMediato'] != null
-        ? MarcoZeroLocalModel.fromJson(
-            json['marcoZeroMediato'] as Map<String, dynamic>,
-          )
-        : null,
-    marcoZeroImediato: json['marcoZeroImediato'] != null
-        ? MarcoZeroLocalModel.fromJson(
-            json['marcoZeroImediato'] as Map<String, dynamic>,
-          )
-        : null,
-    marcoZeroRelacionado: json['marcoZeroRelacionado'] != null
-        ? MarcoZeroLocalModel.fromJson(
-            json['marcoZeroRelacionado'] as Map<String, dynamic>,
-          )
-        : null,
-    vestigiosMediato: (json['vestigiosMediato'] as List<dynamic>?)
-        ?.map((e) => VestigioLocalModel.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    vestigiosImediato: (json['vestigiosImediato'] as List<dynamic>?)
-        ?.map((e) => VestigioLocalModel.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    vestigiosRelacionado: (json['vestigiosRelacionado'] as List<dynamic>?)
-        ?.map((e) => VestigioLocalModel.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    semVestigiosMediato: json['semVestigiosMediato'] as bool?,
-    semVestigiosImediato: json['semVestigiosImediato'] as bool?,
-    semVestigiosRelacionado: json['semVestigiosRelacionado'] as bool?,
-    sinaisArrombamentoSim: json['sinaisArrombamentoSim'] as bool?,
-    sinaisArrombamentoNao: json['sinaisArrombamentoNao'] as bool?,
-    sinaisArrombamentoNaoSeAplica:
-        json['sinaisArrombamentoNaoSeAplica'] as bool?,
-    fotosVistaAmplaPaths: (json['fotosVistaAmplaPaths'] as List<dynamic>?)
-        ?.map((e) => e.toString())
-        .toList(),
-    fotosVistaAmplaMediatoPaths:
-        (json['fotosVistaAmplaMediatoPaths'] as List<dynamic>?)
+        metodoPosicionamentoMediato: MetodoPosicionamentoVestigio.fromName(
+          json['metodoPosicionamentoMediato'] as String?,
+        ),
+        metodoPosicionamentoRelacionado: MetodoPosicionamentoVestigio.fromName(
+          json['metodoPosicionamentoRelacionado'] as String?,
+        ),
+        metodosPosicionamentoAmbientesImediato:
+            (json['metodosPosicionamentoAmbientesImediato']
+                    as Map<String, dynamic>?)
+                ?.map(
+          (key, value) => MapEntry(
+            key,
+            MetodoPosicionamentoVestigio.fromName(value as String?) ??
+                MetodoPosicionamentoVestigio.nenhum,
+          ),
+        ),
+        consideracoesTecnicasAmbientesImediato:
+            (json['consideracoesTecnicasAmbientesImediato']
+                    as Map<String, dynamic>?)
+                ?.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        ambientesComSinaisArrombamento:
+            (json['ambientesComSinaisArrombamento'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList(),
+        sinaisArrombamentoDescricaoPorAmbiente:
+            (json['sinaisArrombamentoDescricaoPorAmbiente']
+                    as Map<String, dynamic>?)
+                ?.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        fotosSinaisArrombamentoPorAmbiente:
+            (json['fotosSinaisArrombamentoPorAmbiente']
+                    as Map<String, dynamic>?)
+                ?.map(
+          (key, value) => MapEntry(
+            key,
+            (value as List<dynamic>).map((e) => e.toString()).toList(),
+          ),
+        ),
+        sinaisArrombamentoDescricao:
+            json['sinaisArrombamentoDescricao'] as String?,
+        descricaoLocal: json['descricaoLocal'] as String?,
+        demaisObservacoes: json['demaisObservacoes'] as String?,
+        descricaoLocalMediato: json['descricaoLocalMediato'] as String?,
+        descricaoLocalImediato: json['descricaoLocalImediato'] as String?,
+        descricaoLocalRelacionado: json['descricaoLocalRelacionado'] as String?,
+        marcoZeroMediato: json['marcoZeroMediato'] != null
+            ? MarcoZeroLocalModel.fromJson(
+                json['marcoZeroMediato'] as Map<String, dynamic>,
+              )
+            : null,
+        marcoZeroImediato: json['marcoZeroImediato'] != null
+            ? MarcoZeroLocalModel.fromJson(
+                json['marcoZeroImediato'] as Map<String, dynamic>,
+              )
+            : null,
+        marcoZeroRelacionado: json['marcoZeroRelacionado'] != null
+            ? MarcoZeroLocalModel.fromJson(
+                json['marcoZeroRelacionado'] as Map<String, dynamic>,
+              )
+            : null,
+        vestigiosMediato: (json['vestigiosMediato'] as List<dynamic>?)
+            ?.map((e) => VestigioLocalModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        vestigiosImediato: (json['vestigiosImediato'] as List<dynamic>?)
+            ?.map((e) => VestigioLocalModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        vestigiosRelacionado: (json['vestigiosRelacionado'] as List<dynamic>?)
+            ?.map((e) => VestigioLocalModel.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        semVestigiosMediato: json['semVestigiosMediato'] as bool?,
+        semVestigiosImediato: json['semVestigiosImediato'] as bool?,
+        semVestigiosRelacionado: json['semVestigiosRelacionado'] as bool?,
+        sinaisArrombamentoSim: json['sinaisArrombamentoSim'] as bool?,
+        sinaisArrombamentoNao: json['sinaisArrombamentoNao'] as bool?,
+        sinaisArrombamentoNaoSeAplica:
+            json['sinaisArrombamentoNaoSeAplica'] as bool?,
+        fotosVistaAmplaPaths: (json['fotosVistaAmplaPaths'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList(),
-    fotosVistaAmplaImediatoPaths:
-        (json['fotosVistaAmplaImediatoPaths'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList(),
-    fotosVistaAmplaAmbientesImediato:
-        (json['fotosVistaAmplaAmbientesImediato'] as Map<String, dynamic>?)
-            ?.map(
-              (key, value) => MapEntry(
-                key,
-                (value as List<dynamic>).map((e) => e.toString()).toList(),
-              ),
-            ),
-    fotosSinaisArrombamentoPaths:
-        (json['fotosSinaisArrombamentoPaths'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList(),
-    localEmViaPublica: json['localEmViaPublica'] as bool?,
-  );
+        fotosVistaAmplaMediatoPaths:
+            (json['fotosVistaAmplaMediatoPaths'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList(),
+        fotosVistaAmplaImediatoPaths:
+            (json['fotosVistaAmplaImediatoPaths'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList(),
+        fotosVistaAmplaAmbientesImediato:
+            (json['fotosVistaAmplaAmbientesImediato'] as Map<String, dynamic>?)
+                ?.map(
+          (key, value) => MapEntry(
+            key,
+            (value as List<dynamic>).map((e) => e.toString()).toList(),
+          ),
+        ),
+        fotosSinaisArrombamentoPaths:
+            (json['fotosSinaisArrombamentoPaths'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList(),
+        localEmViaPublica: json['localEmViaPublica'] as bool?,
+      );
 
   LocalFurtoModel copyWith({
     bool? classificacaoMediato,
@@ -409,10 +464,14 @@ class LocalFurtoModel {
     int? quantidadeAcessosMediato,
     List<String>? tiposAcessoMediato,
     List<String>? posicoesAcessoMediato,
+    String? tipoRegiaoMediato,
+    List<String>? infraestruturaMediato,
+    String? tipoImovelMediato,
+    int? qtdPavimentosMediato,
+    List<String>? delimitacaoMediato,
     String? abrangenciaImediato,
     List<String>? ambientesImediato,
     String? ambienteDestaqueImediato,
-    String? estadoConservacaoImediato,
     String? observacaoImediato,
     Map<String, List<String>>? acessosPorAmbienteImediato,
     Map<String, List<String>>? comunicacaoAmbientesImediato,
@@ -421,8 +480,11 @@ class LocalFurtoModel {
     MetodoPosicionamentoVestigio? metodoPosicionamentoMediato,
     MetodoPosicionamentoVestigio? metodoPosicionamentoRelacionado,
     Map<String, MetodoPosicionamentoVestigio>?
-    metodosPosicionamentoAmbientesImediato,
+        metodosPosicionamentoAmbientesImediato,
     Map<String, String>? consideracoesTecnicasAmbientesImediato,
+    List<String>? ambientesComSinaisArrombamento,
+    Map<String, String>? sinaisArrombamentoDescricaoPorAmbiente,
+    Map<String, List<String>>? fotosSinaisArrombamentoPorAmbiente,
     String? sinaisArrombamentoDescricao,
     String? descricaoLocal,
     String? demaisObservacoes,
@@ -476,8 +538,7 @@ class LocalFurtoModel {
       pisoUmidoRelacionado: pisoUmidoRelacionado ?? this.pisoUmidoRelacionado,
       pisoMolhadoRelacionado:
           pisoMolhadoRelacionado ?? this.pisoMolhadoRelacionado,
-      iluminacaoArtificialRelacionado:
-          iluminacaoArtificialRelacionado ??
+      iluminacaoArtificialRelacionado: iluminacaoArtificialRelacionado ??
           this.iluminacaoArtificialRelacionado,
       iluminacaoNaturalRelacionado:
           iluminacaoNaturalRelacionado ?? this.iluminacaoNaturalRelacionado,
@@ -489,33 +550,42 @@ class LocalFurtoModel {
       tiposAcessoMediato: tiposAcessoMediato ?? this.tiposAcessoMediato,
       posicoesAcessoMediato:
           posicoesAcessoMediato ?? this.posicoesAcessoMediato,
+      tipoRegiaoMediato: tipoRegiaoMediato ?? this.tipoRegiaoMediato,
+      infraestruturaMediato:
+          infraestruturaMediato ?? this.infraestruturaMediato,
+      tipoImovelMediato: tipoImovelMediato ?? this.tipoImovelMediato,
+      qtdPavimentosMediato: qtdPavimentosMediato ?? this.qtdPavimentosMediato,
+      delimitacaoMediato: delimitacaoMediato ?? this.delimitacaoMediato,
       abrangenciaImediato: abrangenciaImediato ?? this.abrangenciaImediato,
       ambientesImediato: ambientesImediato ?? this.ambientesImediato,
       ambienteDestaqueImediato:
           ambienteDestaqueImediato ?? this.ambienteDestaqueImediato,
-      estadoConservacaoImediato:
-          estadoConservacaoImediato ?? this.estadoConservacaoImediato,
       observacaoImediato: observacaoImediato ?? this.observacaoImediato,
       acessosPorAmbienteImediato:
           acessosPorAmbienteImediato ?? this.acessosPorAmbienteImediato,
       comunicacaoAmbientesImediato:
           comunicacaoAmbientesImediato ?? this.comunicacaoAmbientesImediato,
-      acessoExternoPorAmbienteImediato:
-          acessoExternoPorAmbienteImediato ??
+      acessoExternoPorAmbienteImediato: acessoExternoPorAmbienteImediato ??
           this.acessoExternoPorAmbienteImediato,
       marcosZeroAmbientesImediato:
           marcosZeroAmbientesImediato ?? this.marcosZeroAmbientesImediato,
       metodoPosicionamentoMediato:
           metodoPosicionamentoMediato ?? this.metodoPosicionamentoMediato,
-      metodoPosicionamentoRelacionado:
-          metodoPosicionamentoRelacionado ??
+      metodoPosicionamentoRelacionado: metodoPosicionamentoRelacionado ??
           this.metodoPosicionamentoRelacionado,
       metodosPosicionamentoAmbientesImediato:
           metodosPosicionamentoAmbientesImediato ??
-          this.metodosPosicionamentoAmbientesImediato,
+              this.metodosPosicionamentoAmbientesImediato,
       consideracoesTecnicasAmbientesImediato:
           consideracoesTecnicasAmbientesImediato ??
-          this.consideracoesTecnicasAmbientesImediato,
+              this.consideracoesTecnicasAmbientesImediato,
+      ambientesComSinaisArrombamento:
+          ambientesComSinaisArrombamento ?? this.ambientesComSinaisArrombamento,
+      sinaisArrombamentoDescricaoPorAmbiente:
+          sinaisArrombamentoDescricaoPorAmbiente ??
+              this.sinaisArrombamentoDescricaoPorAmbiente,
+      fotosSinaisArrombamentoPorAmbiente: fotosSinaisArrombamentoPorAmbiente ??
+          this.fotosSinaisArrombamentoPorAmbiente,
       sinaisArrombamentoDescricao:
           sinaisArrombamentoDescricao ?? this.sinaisArrombamentoDescricao,
       descricaoLocal: descricaoLocal ?? this.descricaoLocal,
@@ -547,8 +617,7 @@ class LocalFurtoModel {
           fotosVistaAmplaMediatoPaths ?? this.fotosVistaAmplaMediatoPaths,
       fotosVistaAmplaImediatoPaths:
           fotosVistaAmplaImediatoPaths ?? this.fotosVistaAmplaImediatoPaths,
-      fotosVistaAmplaAmbientesImediato:
-          fotosVistaAmplaAmbientesImediato ??
+      fotosVistaAmplaAmbientesImediato: fotosVistaAmplaAmbientesImediato ??
           this.fotosVistaAmplaAmbientesImediato,
       fotosSinaisArrombamentoPaths:
           fotosSinaisArrombamentoPaths ?? this.fotosSinaisArrombamentoPaths,

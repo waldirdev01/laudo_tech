@@ -12,10 +12,8 @@ import '../models/crime_transito_levantamento_model.dart';
 import '../models/crime_transito_model.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
-import '../services/openai_service.dart';
 import '../services/photo_backup_service.dart';
 import '../utils/coordinate_formatter.dart';
-import '../widgets/ai_suggestion_button.dart';
 import 'lista_veiculos_screen.dart';
 
 class CrimeTransitoLevantamentoScreen extends StatefulWidget {
@@ -303,7 +301,8 @@ class _CrimeTransitoLevantamentoScreenState
       // (galeria no Android moderno), ao contrário de File.copy().
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(
+          messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -387,9 +386,8 @@ class _CrimeTransitoLevantamentoScreenState
       quantidadeVeiculos: _qtdVeiculos,
       tipoOcorrencia: _tipoOcorrenciaDerivado,
       quantidadeUnidades: null,
-      formasInteracao: _formasInteracao.isEmpty
-          ? null
-          : _formasInteracao.toList(),
+      formasInteracao:
+          _formasInteracao.isEmpty ? null : _formasInteracao.toList(),
       materialRecolhido: _materialRecolhido,
       materialDescricao: _materialDescricaoCtrl.text.trim().isEmpty
           ? null
@@ -402,8 +400,7 @@ class _CrimeTransitoLevantamentoScreenState
           ? null
           : _examesDinamicaCtrl.text.trim(),
       croquiObservacoes: null,
-      marcoZero:
-          (_marcoZeroDescricaoCtrl.text.trim().isEmpty &&
+      marcoZero: (_marcoZeroDescricaoCtrl.text.trim().isEmpty &&
               _marcoZeroLatCtrl.text.trim().isEmpty &&
               _marcoZeroFotos.isEmpty)
           ? null
@@ -449,9 +446,8 @@ class _CrimeTransitoLevantamentoScreenState
     final natureza = CrimeTransitoNaturezaModel(
       tipo: _tipoOcorrenciaDerivado,
       quantidadeUnidades: exNat?.quantidadeUnidades,
-      formasInteracao: _formasInteracao.isEmpty
-          ? null
-          : _formasInteracao.toList(),
+      formasInteracao:
+          _formasInteracao.isEmpty ? null : _formasInteracao.toList(),
       observacoesComplementares: exNat?.observacoesComplementares,
       materialRecolhido: _materialRecolhido,
       materialDescricao: _materialDescricaoCtrl.text.trim().isEmpty
@@ -693,84 +689,53 @@ class _CrimeTransitoLevantamentoScreenState
   }
 
   String _labelFormaInteracao(CrimeTransitoFormaInteracao f) => switch (f) {
-    CrimeTransitoFormaInteracao.saidaPista => 'Saída de pista',
-    CrimeTransitoFormaInteracao.colisao => 'Colisão',
-    CrimeTransitoFormaInteracao.colisaoFrontal => 'Colisão frontal',
-    CrimeTransitoFormaInteracao.colisaoOposta => 'Colisão oposta',
-    CrimeTransitoFormaInteracao.objetoFixo => 'Objeto fixo',
-    CrimeTransitoFormaInteracao.capotamento => 'Capotamento',
-    CrimeTransitoFormaInteracao.abalroamento => 'Abalroamento',
-    CrimeTransitoFormaInteracao.colisaoTraseira => 'Colisão traseira',
-    CrimeTransitoFormaInteracao.colisaoTransversal => 'Colisão transversal',
-    CrimeTransitoFormaInteracao.veiculoEstacionado => 'Veículo estacionado',
-    CrimeTransitoFormaInteracao.tombamento => 'Tombamento',
-    CrimeTransitoFormaInteracao.choque => 'Choque',
-    CrimeTransitoFormaInteracao.colisaoLateral => 'Colisão lateral',
-    CrimeTransitoFormaInteracao.colisaoObliqua => 'Colisão oblíqua',
-    CrimeTransitoFormaInteracao.veiculoParado => 'Veículo parado',
-    CrimeTransitoFormaInteracao.colisaoLongitudinal => 'Colisão longitudinal',
-    CrimeTransitoFormaInteracao.colisaoOrtogonal => 'Colisão ortogonal',
-    CrimeTransitoFormaInteracao.pedestre => 'Pedestre',
-    CrimeTransitoFormaInteracao.queda => 'Queda',
-    CrimeTransitoFormaInteracao.atropelamento => 'Atropelamento',
-    CrimeTransitoFormaInteracao.animal => 'Animal',
-    CrimeTransitoFormaInteracao.outro => 'Outro',
-  };
-
-  String _buildAiContextDinamicaOutro() {
-    final partes = <String>['Tipo de ocorrência: crime de trânsito.'];
-
-    if (_formasInteracao.isNotEmpty) {
-      partes.add(
-        'Formas de interação selecionadas: ${_formasInteracao.map(_labelFormaInteracao).join(', ')}.',
-      );
-    }
-
-    if (_dinamicaDerivada != null) {
-      partes.add(
-        'Dinâmica principal derivada: ${CausasDeterminantesCatalogo.labelDinamica(_dinamicaDerivada!)}.',
-      );
-    }
-
-    partes.add('Quantidade de veículos considerada: $_qtdVeiculos.');
-
-    return partes.join('\n');
-  }
-
-  void _replaceDinamicaOutro(String text) {
-    setState(() => _dinamicaOutroCtrl.text = text.trim());
-  }
-
-  void _appendDinamicaOutro(String text) {
-    final atual = _dinamicaOutroCtrl.text.trim();
-    setState(() {
-      _dinamicaOutroCtrl.text = atual.isEmpty
-          ? text.trim()
-          : '$atual\n\n${text.trim()}';
-    });
-  }
+        CrimeTransitoFormaInteracao.saidaPista => 'Saída de pista',
+        CrimeTransitoFormaInteracao.colisao => 'Colisão',
+        CrimeTransitoFormaInteracao.colisaoFrontal => 'Colisão frontal',
+        CrimeTransitoFormaInteracao.colisaoOposta => 'Colisão oposta',
+        CrimeTransitoFormaInteracao.objetoFixo => 'Objeto fixo',
+        CrimeTransitoFormaInteracao.capotamento => 'Capotamento',
+        CrimeTransitoFormaInteracao.abalroamento => 'Abalroamento',
+        CrimeTransitoFormaInteracao.colisaoTraseira => 'Colisão traseira',
+        CrimeTransitoFormaInteracao.colisaoTransversal => 'Colisão transversal',
+        CrimeTransitoFormaInteracao.veiculoEstacionado => 'Veículo estacionado',
+        CrimeTransitoFormaInteracao.tombamento => 'Tombamento',
+        CrimeTransitoFormaInteracao.choque => 'Choque',
+        CrimeTransitoFormaInteracao.colisaoLateral => 'Colisão lateral',
+        CrimeTransitoFormaInteracao.colisaoObliqua => 'Colisão oblíqua',
+        CrimeTransitoFormaInteracao.veiculoParado => 'Veículo parado',
+        CrimeTransitoFormaInteracao.colisaoLongitudinal =>
+          'Colisão longitudinal',
+        CrimeTransitoFormaInteracao.colisaoOrtogonal => 'Colisão ortogonal',
+        CrimeTransitoFormaInteracao.pedestre => 'Pedestre',
+        CrimeTransitoFormaInteracao.queda => 'Queda',
+        CrimeTransitoFormaInteracao.atropelamento => 'Atropelamento',
+        CrimeTransitoFormaInteracao.animal => 'Animal',
+        CrimeTransitoFormaInteracao.outro => 'Outro',
+      };
 
   String _labelTipoVestigio(TipoVestigioVia t) => switch (t) {
-    TipoVestigioVia.marcaFrenagem => 'Marca de frenagem',
-    TipoVestigioVia.marcaDerrapagem => 'Marca de derrapagem',
-    TipoVestigioVia.sulcagem => 'Sulcagem',
-    TipoVestigioVia.friccao => 'Fricção',
-    TipoVestigioVia.arraste => 'Arraste',
-    TipoVestigioVia.arrastamentoCorpoFlacido => 'Arrastamento de corpo flácido',
-    TipoVestigioVia.marcaGuinada => 'Marca de guinada',
-    TipoVestigioVia.materialBiologico => 'Material biológico',
-    TipoVestigioVia.substanciaHematica => 'Substância com aspecto hemático',
-    TipoVestigioVia.liquidos => 'Líquidos',
-    TipoVestigioVia.fragmentos => 'Fragmentos',
-    TipoVestigioVia.outro => 'Outro',
-  };
+        TipoVestigioVia.marcaFrenagem => 'Marca de frenagem',
+        TipoVestigioVia.marcaDerrapagem => 'Marca de derrapagem',
+        TipoVestigioVia.sulcagem => 'Sulcagem',
+        TipoVestigioVia.friccao => 'Fricção',
+        TipoVestigioVia.arraste => 'Arraste',
+        TipoVestigioVia.arrastamentoCorpoFlacido =>
+          'Arrastamento de corpo flácido',
+        TipoVestigioVia.marcaGuinada => 'Marca de guinada',
+        TipoVestigioVia.materialBiologico => 'Material biológico',
+        TipoVestigioVia.substanciaHematica => 'Substância com aspecto hemático',
+        TipoVestigioVia.liquidos => 'Líquidos',
+        TipoVestigioVia.fragmentos => 'Fragmentos',
+        TipoVestigioVia.outro => 'Outro',
+      };
 
   String _labelPosicao(PosicaoRelativaVestigio p) => switch (p) {
-    PosicaoRelativaVestigio.antes => 'Antes do sítio',
-    PosicaoRelativaVestigio.apos => 'Após o sítio',
-    PosicaoRelativaVestigio.noSitio => 'No sítio',
-    PosicaoRelativaVestigio.naoSeAplica => 'N/A',
-  };
+        PosicaoRelativaVestigio.antes => 'Antes do sítio',
+        PosicaoRelativaVestigio.apos => 'Após o sítio',
+        PosicaoRelativaVestigio.noSitio => 'No sítio',
+        PosicaoRelativaVestigio.naoSeAplica => 'N/A',
+      };
 
   Future<void> _adicionarVestigio() async {
     final resultado = await showModalBottomSheet<VestigioViaModel>(
@@ -856,16 +821,6 @@ class _CrimeTransitoLevantamentoScreenState
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      AiSuggestionButton(
-                        fieldLabel: 'Descrição da dinâmica do acidente',
-                        currentText: _dinamicaOutroCtrl.text,
-                        currentTextBuilder: () => _dinamicaOutroCtrl.text,
-                        contextTextBuilder: _buildAiContextDinamicaOutro,
-                        profile: AiSuggestionProfile.crimeTransito,
-                        onReplace: _replaceDinamicaOutro,
-                        onAppend: _appendDinamicaOutro,
-                      ),
                     ],
                     const SizedBox(height: 16),
                     Row(
@@ -893,15 +848,13 @@ class _CrimeTransitoLevantamentoScreenState
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                _tipoOcorrenciaDerivado ==
+                            color: _tipoOcorrenciaDerivado ==
                                     CrimeTransitoNaturezaTipo.composta
                                 ? Colors.orange.shade100
                                 : Colors.green.shade100,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color:
-                                  _tipoOcorrenciaDerivado ==
+                              color: _tipoOcorrenciaDerivado ==
                                       CrimeTransitoNaturezaTipo.composta
                                   ? Colors.orange.shade400
                                   : Colors.green.shade400,
@@ -914,8 +867,7 @@ class _CrimeTransitoLevantamentoScreenState
                                 : 'Simples',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color:
-                                  _tipoOcorrenciaDerivado ==
+                              color: _tipoOcorrenciaDerivado ==
                                       CrimeTransitoNaturezaTipo.composta
                                   ? Colors.orange.shade800
                                   : Colors.green.shade800,
@@ -1077,9 +1029,9 @@ class _CrimeTransitoLevantamentoScreenState
               _buildSectionTitle('3. Fotos da dinâmica'),
               ...categorias.map((cat) {
                 final subpasta = cat.toLowerCase().replaceAll(
-                  RegExp(r'[^a-z0-9]+'),
-                  '_',
-                );
+                      RegExp(r'[^a-z0-9]+'),
+                      '_',
+                    );
                 return _buildGrupoFotos(
                   titulo: cat,
                   fotos: _getFotosContextuais(cat),
@@ -1335,7 +1287,8 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
       final destino = File('${pasta.path}/$nome');
       final bytes = await foto.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(
+          messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -1344,20 +1297,18 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
 
   void _salvar() {
     final vestigio = VestigioViaModel(
-      id:
-          widget.vestigioExistente?.id ??
+      id: widget.vestigioExistente?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       tipo: _tipo,
       tipoOutroDescricao: _tipo == TipoVestigioVia.outro
           ? (_tipoOutroCtrl.text.trim().isEmpty
-                ? null
-                : _tipoOutroCtrl.text.trim())
+              ? null
+              : _tipoOutroCtrl.text.trim())
           : null,
       condutorAssociado: _condutorAssociado,
       posicao: _posicao,
-      medidaMetros: _medidaCtrl.text.trim().isEmpty
-          ? null
-          : _medidaCtrl.text.trim(),
+      medidaMetros:
+          _medidaCtrl.text.trim().isEmpty ? null : _medidaCtrl.text.trim(),
       fotos: _fotos,
       observacao: _obsCtrl.text.trim().isEmpty ? null : _obsCtrl.text.trim(),
     );
@@ -1365,19 +1316,20 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
   }
 
   String _labelTipo(TipoVestigioVia t) => switch (t) {
-    TipoVestigioVia.marcaFrenagem => 'Marca de frenagem',
-    TipoVestigioVia.marcaDerrapagem => 'Marca de derrapagem',
-    TipoVestigioVia.sulcagem => 'Sulcagem',
-    TipoVestigioVia.friccao => 'Fricção',
-    TipoVestigioVia.arraste => 'Arraste',
-    TipoVestigioVia.arrastamentoCorpoFlacido => 'Arrastamento de corpo flácido',
-    TipoVestigioVia.marcaGuinada => 'Marca de guinada',
-    TipoVestigioVia.materialBiologico => 'Material biológico',
-    TipoVestigioVia.substanciaHematica => 'Substância com aspecto hemático',
-    TipoVestigioVia.liquidos => 'Líquidos',
-    TipoVestigioVia.fragmentos => 'Fragmentos',
-    TipoVestigioVia.outro => 'Outro',
-  };
+        TipoVestigioVia.marcaFrenagem => 'Marca de frenagem',
+        TipoVestigioVia.marcaDerrapagem => 'Marca de derrapagem',
+        TipoVestigioVia.sulcagem => 'Sulcagem',
+        TipoVestigioVia.friccao => 'Fricção',
+        TipoVestigioVia.arraste => 'Arraste',
+        TipoVestigioVia.arrastamentoCorpoFlacido =>
+          'Arrastamento de corpo flácido',
+        TipoVestigioVia.marcaGuinada => 'Marca de guinada',
+        TipoVestigioVia.materialBiologico => 'Material biológico',
+        TipoVestigioVia.substanciaHematica => 'Substância com aspecto hemático',
+        TipoVestigioVia.liquidos => 'Líquidos',
+        TipoVestigioVia.fragmentos => 'Fragmentos',
+        TipoVestigioVia.outro => 'Outro',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -1415,7 +1367,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
               ),
               const Divider(),
               const SizedBox(height: 8),
-
               DropdownButtonFormField<TipoVestigioVia>(
                 isExpanded: true,
                 initialValue: _tipo,
@@ -1432,7 +1383,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                     .toList(),
                 onChanged: (v) => setState(() => _tipo = v!),
               ),
-
               if (_tipo == TipoVestigioVia.outro) ...[
                 const SizedBox(height: 12),
                 TextField(
@@ -1442,7 +1392,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 isExpanded: true,
@@ -1456,7 +1405,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                     .toList(),
                 onChanged: (v) => setState(() => _condutorAssociado = v),
               ),
-
               const SizedBox(height: 16),
               DropdownButtonFormField<PosicaoRelativaVestigio>(
                 isExpanded: true,
@@ -1480,7 +1428,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                     .toList(),
                 onChanged: (v) => setState(() => _posicao = v),
               ),
-
               const SizedBox(height: 16),
               TextField(
                 controller: _medidaCtrl,
@@ -1496,7 +1443,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                   suffixText: 'm',
                 ),
               ),
-
               const SizedBox(height: 16),
               TextField(
                 controller: _obsCtrl,
@@ -1505,7 +1451,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                   labelText: 'Observação / legenda',
                 ),
               ),
-
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
@@ -1618,7 +1563,6 @@ class _VestigioBottomSheetState extends State<_VestigioBottomSheet> {
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 ),
-
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,

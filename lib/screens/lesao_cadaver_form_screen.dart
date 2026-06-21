@@ -5,12 +5,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/cadaver_model.dart';
-import '../services/openai_service.dart';
 import '../services/photo_backup_service.dart';
-import '../widgets/ai_suggestion_button.dart';
 
-typedef AjudaRegiaoLesaoCallback =
-    void Function(BuildContext context, TextEditingController regiaoCtrl);
+typedef AjudaRegiaoLesaoCallback = void Function(
+    BuildContext context, TextEditingController regiaoCtrl);
 
 enum TipoLesaoArmaBranca {
   puntiforme('Puntiforme'),
@@ -38,11 +36,11 @@ class SinaisPab {
   static const maiorExtensao = 'Predomínio de extensão superficial';
 
   static List<String> get todos => [
-    bordasRegulares,
-    caudaEscoriacao,
-    maiorProfundidade,
-    maiorExtensao,
-  ];
+        bordasRegulares,
+        caudaEscoriacao,
+        maiorProfundidade,
+        maiorExtensao,
+      ];
 }
 
 /// Tela cheia para cadastrar ou editar uma lesão/evidência no exame do cadáver.
@@ -69,9 +67,9 @@ class LesaoCadaverFormScreen extends StatefulWidget {
     this.onSalvo,
     required this.onAjudaRegiao,
   }) : assert(
-         !manterNaTelaAposSalvarNovo || onSalvo != null,
-         'onSalvo é obrigatório quando manterNaTelaAposSalvarNovo é true',
-       );
+          !manterNaTelaAposSalvarNovo || onSalvo != null,
+          'onSalvo é obrigatório quando manterNaTelaAposSalvarNovo é true',
+        );
 
   static String gerarIdLesao() =>
       DateTime.now().microsecondsSinceEpoch.toString();
@@ -184,7 +182,8 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(
+          messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -266,9 +265,8 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
       if (_isPaf) {
         pafData = PafData(
           tipo: _tipoLesaoPaf,
-          distancia: _tipoLesaoPaf != TipoLesaoPaf.saida
-              ? _distanciaTiro
-              : null,
+          distancia:
+              _tipoLesaoPaf != TipoLesaoPaf.saida ? _distanciaTiro : null,
           diametro: double.tryParse(_diametroCtrl.text),
           sinais: Set<String>.from(_sinaisSelecionados),
         );
@@ -279,14 +277,16 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
         nome: _nomeCtrl.text.trim().isEmpty ? null : _nomeCtrl.text.trim(),
         regiao: widget.modoRapido
             ? (_regiaoCtrl.text.trim().isEmpty
-                  ? 'Região não informada'
-                  : _regiaoCtrl.text.trim())
+                ? 'Região não informada'
+                : _regiaoCtrl.text.trim())
             : _regiaoCtrl.text.trim(),
         tipo: _isPaf
             ? 'PAF'
             : _isPab
-            ? 'PAB'
-            : (_tipoCtrl.text.trim().isEmpty ? null : _tipoCtrl.text.trim()),
+                ? 'PAB'
+                : (_tipoCtrl.text.trim().isEmpty
+                    ? null
+                    : _tipoCtrl.text.trim()),
         descricao: _descricaoCtrl.text.trim().isEmpty
             ? null
             : _descricaoCtrl.text.trim(),
@@ -298,8 +298,7 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
 
       if (!mounted) return;
 
-      final continuar =
-          widget.manterNaTelaAposSalvarNovo &&
+      final continuar = widget.manterNaTelaAposSalvarNovo &&
           widget.lesaoExistente == null &&
           widget.onSalvo != null;
 
@@ -319,56 +318,6 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
     } finally {
       if (mounted) setState(() => _salvando = false);
     }
-  }
-
-  String _buildAiContextLesao() {
-    final partes = <String>[];
-    if (_nomeCtrl.text.trim().isNotEmpty) {
-      partes.add('Identificação: ${_nomeCtrl.text.trim()}.');
-    }
-    if (_regiaoCtrl.text.trim().isNotEmpty) {
-      partes.add('Região anatômica: ${_regiaoCtrl.text.trim()}.');
-    }
-    if (_tipoCtrl.text.trim().isNotEmpty) {
-      partes.add('Tipo informado: ${_tipoCtrl.text.trim()}.');
-    }
-    if (_isPaf) {
-      partes.add('Marcado como lesão por PAF.');
-      partes.add('Tipo de lesão PAF: ${_tipoLesaoPaf.label}.');
-      if (_distanciaTiro != null) {
-        partes.add('Distância selecionada: ${_distanciaTiro!.label}.');
-      }
-      if (_diametroCtrl.text.trim().isNotEmpty) {
-        partes.add('Diâmetro informado: ${_diametroCtrl.text.trim()} mm.');
-      }
-      if (_sinaisSelecionados.isNotEmpty) {
-        partes.add('Sinais selecionados: ${_sinaisSelecionados.join(', ')}.');
-      }
-    }
-    if (_isPab) {
-      partes.add('Marcado como lesão por faca/punhal (PAB).');
-      partes.add('Tipo de lesão por arma branca: ${_tipoLesaoPab.label}.');
-      partes.add('Classificação da lâmina: ${_classificacaoLamina.label}.');
-      if (_sinaisPabSelecionados.isNotEmpty) {
-        partes.add(
-          'Características selecionadas: ${_sinaisPabSelecionados.join(', ')}.',
-        );
-      }
-    }
-    return partes.join('\n');
-  }
-
-  void _replaceDescricao(String text) {
-    setState(() => _descricaoCtrl.text = text.trim());
-  }
-
-  void _appendDescricao(String text) {
-    final atual = _descricaoCtrl.text.trim();
-    setState(() {
-      _descricaoCtrl.text = atual.isEmpty
-          ? text.trim()
-          : '$atual\n\n${text.trim()}';
-    });
   }
 
   Widget _buildSecaoFotosLesao() {
@@ -876,22 +825,11 @@ class _LesaoCadaverFormScreenState extends State<LesaoCadaverFormScreen> {
                     labelText: _isPaf
                         ? 'Descrição (gerada automaticamente)'
                         : _isPab
-                        ? 'Descrição (gerada automaticamente)'
-                        : 'Descrição',
+                            ? 'Descrição (gerada automaticamente)'
+                            : 'Descrição',
                     border: const OutlineInputBorder(),
                   ),
                   maxLines: 5,
-                ),
-                const SizedBox(height: 8),
-                AiSuggestionButton(
-                  fieldLabel: 'Descrição de lesão',
-                  currentText: _descricaoCtrl.text,
-                  currentTextBuilder: () => _descricaoCtrl.text,
-                  profile: AiSuggestionProfile.cvli,
-                  contextTextBuilder: _buildAiContextLesao,
-                  imagePathsBuilder: () => _fotosLesao,
-                  onReplace: _replaceDescricao,
-                  onAppend: _appendDescricao,
                 ),
                 const SizedBox(height: 24),
                 FilledButton(

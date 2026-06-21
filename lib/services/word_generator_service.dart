@@ -65,8 +65,7 @@ class WordGeneratorService {
     final archive = ZipDecoder().decodeBytes(templateBytes);
 
     // Carregar imagens do corpo para CVLI (cadaveres)
-    final temCadaveres =
-        ficha.tipoOcorrencia == TipoOcorrencia.cvli &&
+    final temCadaveres = ficha.tipoOcorrencia == TipoOcorrencia.cvli &&
         ficha.cadaveres != null &&
         ficha.cadaveres!.isNotEmpty;
     Uint8List? bytesCorpoMasculino;
@@ -75,12 +74,16 @@ class WordGeneratorService {
       try {
         bytesCorpoMasculino = (await rootBundle.load(
           _assetCorpoMasculino,
-        )).buffer.asUint8List();
+        ))
+            .buffer
+            .asUint8List();
       } catch (_) {}
       try {
         bytesCorpoFeminino = (await rootBundle.load(
           _assetCorpoFeminino,
-        )).buffer.asUint8List();
+        ))
+            .buffer
+            .asUint8List();
       } catch (_) {}
     }
 
@@ -199,8 +202,8 @@ class WordGeneratorService {
 
     // Salvar em um local temporário
     final diretorio = await getApplicationDocumentsDirectory();
-    final raiNumeroSaneado = (ficha.dadosSolicitacao.raiNumero ?? ficha.id)
-        .replaceAll('/', '-');
+    final raiNumeroSaneado =
+        (ficha.dadosSolicitacao.raiNumero ?? ficha.id).replaceAll('/', '-');
     final nomeArquivo =
         'Ficha_${raiNumeroSaneado}_${DateTime.now().millisecondsSinceEpoch}.docx';
     final arquivoFinal = File('${diretorio.path}/$nomeArquivo');
@@ -234,9 +237,8 @@ class WordGeneratorService {
     for (final arquivo in archive) {
       dynamic conteudo = arquivo.content;
       if (arquivo.name == 'word/document.xml') {
-        final xmlOriginal = conteudo is List<int>
-            ? utf8.decode(conteudo)
-            : conteudo.toString();
+        final xmlOriginal =
+            conteudo is List<int> ? utf8.decode(conteudo) : conteudo.toString();
         final sectPr = _extrairSectPr(xmlOriginal);
         final novoXml = _montarDocumentoCompleto(conteudoXml, sectPr);
         conteudo = Uint8List.fromList(utf8.encode(novoXml));
@@ -259,8 +261,8 @@ class WordGeneratorService {
     final novoBytes = ZipEncoder().encode(novoArchive);
 
     final diretorio = await getApplicationDocumentsDirectory();
-    final raiNumeroSaneado = (ficha.dadosSolicitacao.raiNumero ?? ficha.id)
-        .replaceAll('/', '-');
+    final raiNumeroSaneado =
+        (ficha.dadosSolicitacao.raiNumero ?? ficha.id).replaceAll('/', '-');
     final nomeArquivo =
         'Quadro_Posicionamento_${raiNumeroSaneado}_${DateTime.now().millisecondsSinceEpoch}.docx';
     final arquivoFinal = File('${diretorio.path}/$nomeArquivo');
@@ -523,6 +525,21 @@ $conteudo
     </w:p>''';
   }
 
+  String _gerarParagrafoTexto(String texto) {
+    return '''    <w:p>
+      <w:pPr>
+        <w:spacing w:after="0"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="$_fontName" w:hAnsi="$_fontName"/>
+          <w:sz w:val="$_fontSize"/>
+        </w:rPr>
+        <w:t>${_escapeXml(texto)}</w:t>
+      </w:r>
+    </w:p>''';
+  }
+
   /// Gera um parágrafo com imagem inline (figura do corpo) para a ficha Word.
   /// [rId] deve ser o Id do relacionamento em document.xml.rels (ex.: rIdCorpoM, rIdCorpoF).
   String _gerarParagrafoImagemCorpo(String rId) {
@@ -579,7 +596,6 @@ $conteudo
         ['Data/Hora Deslocamento', ficha.dataHoraDeslocamento ?? ''],
         ['Data/Hora Início', ficha.dataHoraInicio ?? ''],
         ['Data/Hora Término', ficha.dataHoraTermino ?? 'Em andamento'],
-        ['Pedido de Dilação', ficha.pedidoDilacao ?? ''],
       ],
     );
   }
@@ -741,23 +757,9 @@ $conteudo
     // Perito Criminal (sempre o dono do app)
     linhas.add(['Perito Criminal', '${perito.nome} - ${perito.matricula}']);
 
-    // Fotógrafo e outros membros
+    // Outros membros
     if (ficha.equipe != null) {
       final membros = await _equipeService.listarEquipe();
-
-      if (ficha.equipe!.fotografoCriminalisticoId != null) {
-        final fotografo = membros.firstWhere(
-          (m) => m.id == ficha.equipe!.fotografoCriminalisticoId,
-          orElse: () =>
-              MembroEquipeModel(id: '', cargo: '', nome: '', matricula: ''),
-        );
-        if (fotografo.nome.isNotEmpty) {
-          linhas.add([
-            'Fotógrafo Criminalístico',
-            '${fotografo.nome} - ${fotografo.matricula}',
-          ]);
-        }
-      }
 
       if (ficha.equipe!.demaisServidoresIds.isNotEmpty) {
         final demais = ficha.equipe!.demaisServidoresIds
@@ -803,29 +805,24 @@ $conteudo
               equipe.viaturaNumero!.trim().isNotEmpty) {
             tipoNome += ' - Viatura n. ${equipe.viaturaNumero}';
           }
-          final membrosOrdenados = [...equipe.membros]
-            ..sort(
-              (a, b) =>
-                  EquipeHierarchy.ordemQualificacaoPolicial(
-                    equipe.tipo,
-                    a.postoGraduacao,
-                  ).compareTo(
-                    EquipeHierarchy.ordemQualificacaoPolicial(
-                      equipe.tipo,
-                      b.postoGraduacao,
-                    ),
-                  ),
+          final membrosOrdenados = [...equipe.membros]..sort(
+              (a, b) => EquipeHierarchy.ordemQualificacaoPolicial(
+                equipe.tipo,
+                a.postoGraduacao,
+              ).compareTo(
+                EquipeHierarchy.ordemQualificacaoPolicial(
+                  equipe.tipo,
+                  b.postoGraduacao,
+                ),
+              ),
             );
-          final membrosTexto = membrosOrdenados
-              .map((m) {
-                final qualificacao = m.postoGraduacao?.trim();
-                final prefixo =
-                    (qualificacao != null && qualificacao.isNotEmpty)
-                    ? '$qualificacao '
-                    : '';
-                return '$prefixo${m.nome} - ${m.matricula}';
-              })
-              .join('\n');
+          final membrosTexto = membrosOrdenados.map((m) {
+            final qualificacao = m.postoGraduacao?.trim();
+            final prefixo = (qualificacao != null && qualificacao.isNotEmpty)
+                ? '$qualificacao '
+                : '';
+            return '$prefixo${m.nome} - ${m.matricula}';
+          }).join('\n');
 
           linhas.add([tipoNome, membrosTexto]);
         }
@@ -837,35 +834,31 @@ $conteudo
           final tipoNome = equipe.outrosTipo ?? equipe.tipo.label;
 
           // Formatar membros com cargo, nome, CRM e matrícula
-          final membrosOrdenados = [...equipe.membros]
-            ..sort(
-              (a, b) =>
-                  EquipeHierarchy.ordemQualificacaoResgate(
-                    equipe.tipo,
-                    a.cargo,
-                  ).compareTo(
-                    EquipeHierarchy.ordemQualificacaoResgate(
-                      equipe.tipo,
-                      b.cargo,
-                    ),
-                  ),
+          final membrosOrdenados = [...equipe.membros]..sort(
+              (a, b) => EquipeHierarchy.ordemQualificacaoResgate(
+                equipe.tipo,
+                a.cargo,
+              ).compareTo(
+                EquipeHierarchy.ordemQualificacaoResgate(
+                  equipe.tipo,
+                  b.cargo,
+                ),
+              ),
             );
-          final membrosTexto = membrosOrdenados
-              .map((m) {
-                final partes = <String>[];
-                if (m.cargo != null && m.cargo!.isNotEmpty) {
-                  partes.add(m.cargo!);
-                }
-                partes.add(m.nome);
-                if (m.crm != null && m.crm!.isNotEmpty) {
-                  partes.add('CRM ${m.crm}');
-                }
-                if (m.matricula != null && m.matricula!.isNotEmpty) {
-                  partes.add('Mat. ${m.matricula}');
-                }
-                return partes.join(' - ');
-              })
-              .join('\n');
+          final membrosTexto = membrosOrdenados.map((m) {
+            final partes = <String>[];
+            if (m.cargo != null && m.cargo!.isNotEmpty) {
+              partes.add(m.cargo!);
+            }
+            partes.add(m.nome);
+            if (m.crm != null && m.crm!.isNotEmpty) {
+              partes.add('CRM ${m.crm}');
+            }
+            if (m.matricula != null && m.matricula!.isNotEmpty) {
+              partes.add('Mat. ${m.matricula}');
+            }
+            return partes.join(' - ');
+          }).join('\n');
 
           // Adicionar informação sobre "não estava no local"
           String observacao = '';
@@ -1065,10 +1058,22 @@ $conteudo
     }
 
     if (lf.sinaisArrombamentoSim == true &&
-        lf.sinaisArrombamentoDescricao != null) {
+        (lf.sinaisArrombamentoDescricaoPorAmbiente?.isNotEmpty == true ||
+            lf.sinaisArrombamentoDescricao != null)) {
+      final descricoesPorAmbiente = <String>[];
+      for (final ambiente in lf.ambientesComSinaisArrombamento ?? const []) {
+        final descricao = lf.sinaisArrombamentoDescricaoPorAmbiente?[ambiente];
+        if (descricao == null || descricao.trim().isEmpty) continue;
+        final ambienteFormatado = ambiente.isEmpty
+            ? ambiente
+            : ambiente[0].toUpperCase() + ambiente.substring(1);
+        descricoesPorAmbiente.add('$ambienteFormatado: $descricao');
+      }
       linhasGerais.add([
         'Descrição do Arrombamento',
-        lf.sinaisArrombamentoDescricao!,
+        descricoesPorAmbiente.isNotEmpty
+            ? descricoesPorAmbiente.join('; ')
+            : lf.sinaisArrombamentoDescricao!,
       ]);
     }
 
@@ -1112,12 +1117,12 @@ $conteudo
           ficha: ficha,
           nomeLocal: 'LOCAL IMEDIATO',
           classificacao: true,
-          pisoSeco: lf.pisoSecoImediato,
-          pisoUmido: lf.pisoUmidoImediato,
-          pisoMolhado: lf.pisoMolhadoImediato,
-          iluminacaoArtificial: lf.iluminacaoArtificialImediato,
-          iluminacaoNatural: lf.iluminacaoNaturalImediato,
-          iluminacaoAusente: lf.iluminacaoAusenteImediato,
+          pisoSeco: null,
+          pisoUmido: null,
+          pisoMolhado: null,
+          iluminacaoArtificial: null,
+          iluminacaoNatural: null,
+          iluminacaoAusente: null,
           descricaoLocal: lf.descricaoLocalImediato,
           vestigios: lf.vestigiosImediato ?? [],
           semVestigios: lf.semVestigiosImediato ?? false,
@@ -1400,9 +1405,8 @@ $conteudo
         );
 
         // Recolhido (Sim/Não)
-        final recolhido = vestigio.tipoAcao == TipoAcaoVestigio.coletado
-            ? 'Sim'
-            : 'Não';
+        final recolhido =
+            vestigio.tipoAcao == TipoAcaoVestigio.coletado ? 'Sim' : 'Não';
         _adicionarCelulaTabela(buffer, recolhido);
 
         buffer.writeln('      </w:tr>');
@@ -1420,9 +1424,9 @@ $conteudo
         (vestigio.latitude != null && vestigio.longitude != null
             ? MetodoPosicionamentoVestigio.gps
             : ((vestigio.coordenadaX ?? '').trim().isNotEmpty ||
-                      (vestigio.coordenadaY ?? '').trim().isNotEmpty
-                  ? MetodoPosicionamentoVestigio.marcoZero
-                  : MetodoPosicionamentoVestigio.nenhum));
+                    (vestigio.coordenadaY ?? '').trim().isNotEmpty
+                ? MetodoPosicionamentoVestigio.marcoZero
+                : MetodoPosicionamentoVestigio.nenhum));
   }
 
   String _textoPosicionamentoVestigioLocal(VestigioLocalModel vestigio) {
@@ -1496,25 +1500,25 @@ $conteudo
   }
 
   String _labelCondicaoSolo(CondicaoSoloLocal valor) => switch (valor) {
-    CondicaoSoloLocal.seco => 'Seco',
-    CondicaoSoloLocal.umido => 'Úmido',
-    CondicaoSoloLocal.molhado => 'Molhado',
-  };
+        CondicaoSoloLocal.seco => 'Seco',
+        CondicaoSoloLocal.umido => 'Úmido',
+        CondicaoSoloLocal.molhado => 'Molhado',
+      };
 
   String _labelIluminacao(IluminacaoLocal valor) => switch (valor) {
-    IluminacaoLocal.artificial => 'Artificial',
-    IluminacaoLocal.naturalDia => 'Natural (Dia)',
-    IluminacaoLocal.ausente => 'Ausente (Noturno)',
-  };
+        IluminacaoLocal.artificial => 'Artificial',
+        IluminacaoLocal.naturalDia => 'Natural (Dia)',
+        IluminacaoLocal.ausente => 'Ausente (Noturno)',
+      };
 
   String _labelTracado(TracadoPista valor) => switch (valor) {
-    TracadoPista.curvaEsquerda => 'Curva à esquerda',
-    TracadoPista.curvaDireita => 'Curva à direita',
-    TracadoPista.reto => 'Reto',
-    TracadoPista.raioAmplo => 'Raio amplo',
-    TracadoPista.raioPequeno => 'Raio pequeno',
-    TracadoPista.cruzamento => 'Cruzamento',
-  };
+        TracadoPista.curvaEsquerda => 'Curva à esquerda',
+        TracadoPista.curvaDireita => 'Curva à direita',
+        TracadoPista.reto => 'Reto',
+        TracadoPista.raioAmplo => 'Raio amplo',
+        TracadoPista.raioPequeno => 'Raio pequeno',
+        TracadoPista.cruzamento => 'Cruzamento',
+      };
 
   String _labelTipoPista(TipoPistaRodovia valor) =>
       valor == TipoPistaRodovia.simples ? 'Simples' : 'Dupla';
@@ -1522,114 +1526,115 @@ $conteudo
       valor == SentidoPista.unico ? 'Único' : 'Duplo';
 
   String _labelPerfil(PerfilPista valor) => switch (valor) {
-    PerfilPista.plano => 'Plano',
-    PerfilPista.suave => 'Suave',
-    PerfilPista.declive => 'Declive',
-    PerfilPista.moderado => 'Moderado',
-    PerfilPista.aclive => 'Aclive',
-    PerfilPista.acentuado => 'Acentuado',
-  };
+        PerfilPista.plano => 'Plano',
+        PerfilPista.suave => 'Suave',
+        PerfilPista.declive => 'Declive',
+        PerfilPista.moderado => 'Moderado',
+        PerfilPista.aclive => 'Aclive',
+        PerfilPista.acentuado => 'Acentuado',
+      };
 
   String _labelCondicaoVia(CondicaoViaOpcao valor) => switch (valor) {
-    CondicaoViaOpcao.seca => 'Seca',
-    CondicaoViaOpcao.umida => 'Úmida',
-    CondicaoViaOpcao.molhada => 'Molhada',
-    CondicaoViaOpcao.semDefeito => 'Sem defeito',
-    CondicaoViaOpcao.comBuracos => 'Com buracos',
-    CondicaoViaOpcao.comOndulacoes => 'Com ondulações',
-    CondicaoViaOpcao.emObras => 'Em obras',
-    CondicaoViaOpcao.escorregadia => 'Escorregadia',
-    CondicaoViaOpcao.comContaminantes => 'Com contaminantes',
-    CondicaoViaOpcao.outro => 'Outro',
-  };
+        CondicaoViaOpcao.seca => 'Seca',
+        CondicaoViaOpcao.umida => 'Úmida',
+        CondicaoViaOpcao.molhada => 'Molhada',
+        CondicaoViaOpcao.semDefeito => 'Sem defeito',
+        CondicaoViaOpcao.comBuracos => 'Com buracos',
+        CondicaoViaOpcao.comOndulacoes => 'Com ondulações',
+        CondicaoViaOpcao.emObras => 'Em obras',
+        CondicaoViaOpcao.escorregadia => 'Escorregadia',
+        CondicaoViaOpcao.comContaminantes => 'Com contaminantes',
+        CondicaoViaOpcao.outro => 'Outro',
+      };
 
   String _labelRegime(RegimeTrafego? valor) => switch (valor) {
-    RegimeTrafego.intenso => 'Intenso',
-    RegimeTrafego.moderado => 'Moderado',
-    RegimeTrafego.leve => 'Leve',
-    RegimeTrafego.outro => 'Outro',
-    null => '',
-  };
+        RegimeTrafego.intenso => 'Intenso',
+        RegimeTrafego.moderado => 'Moderado',
+        RegimeTrafego.leve => 'Leve',
+        RegimeTrafego.outro => 'Outro',
+        null => '',
+      };
 
   String _labelVisibilidade(VisibilidadeTipo? valor) => switch (valor) {
-    VisibilidadeTipo.boa => 'Boa',
-    VisibilidadeTipo.reduzida => 'Reduzida',
-    null => '',
-  };
+        VisibilidadeTipo.boa => 'Boa',
+        VisibilidadeTipo.reduzida => 'Reduzida',
+        null => '',
+      };
 
   String _labelSeparacaoFaixa(SeparacaoFaixasOpcao valor) => switch (valor) {
-    SeparacaoFaixasOpcao.simplesContinua => 'Simples contínua',
-    SeparacaoFaixasOpcao.duplaContinua => 'Dupla contínua',
-    SeparacaoFaixasOpcao.simplesSeccionada => 'Simples seccionada',
-    SeparacaoFaixasOpcao.duplaContinuaSeccionada => 'Dupla contínua/seccionada',
-  };
+        SeparacaoFaixasOpcao.simplesContinua => 'Simples contínua',
+        SeparacaoFaixasOpcao.duplaContinua => 'Dupla contínua',
+        SeparacaoFaixasOpcao.simplesSeccionada => 'Simples seccionada',
+        SeparacaoFaixasOpcao.duplaContinuaSeccionada =>
+          'Dupla contínua/seccionada',
+      };
 
   String _labelCorFaixa(CorFaixa valor) =>
       valor == CorFaixa.amarela ? 'Amarela' : 'Branca';
 
   String _labelSeparacaoPista(SeparacaoPistasOpcao valor) => switch (valor) {
-    SeparacaoPistasOpcao.canteiro => 'Canteiro',
-    SeparacaoPistasOpcao.muretaConcreto => 'Mureta de concreto',
-    SeparacaoPistasOpcao.tachoes => 'Tachões',
-    SeparacaoPistasOpcao.defensa => 'Defensa / Guard rail',
-    SeparacaoPistasOpcao.nenhum => 'Nenhum',
-    SeparacaoPistasOpcao.outro => 'Outro',
-  };
+        SeparacaoPistasOpcao.canteiro => 'Canteiro',
+        SeparacaoPistasOpcao.muretaConcreto => 'Mureta de concreto',
+        SeparacaoPistasOpcao.tachoes => 'Tachões',
+        SeparacaoPistasOpcao.defensa => 'Defensa / Guard rail',
+        SeparacaoPistasOpcao.nenhum => 'Nenhum',
+        SeparacaoPistasOpcao.outro => 'Outro',
+      };
 
   String _labelElementoLateral(ElementoLateral valor) => switch (valor) {
-    ElementoLateral.meioFio => 'Meio-fio',
-    ElementoLateral.faixaPintada => 'Faixa pintada',
-    ElementoLateral.acostamento => 'Acostamento',
-    ElementoLateral.muretaConcreto => 'Mureta de concreto',
-    ElementoLateral.outro => 'Outro',
-  };
+        ElementoLateral.meioFio => 'Meio-fio',
+        ElementoLateral.faixaPintada => 'Faixa pintada',
+        ElementoLateral.acostamento => 'Acostamento',
+        ElementoLateral.muretaConcreto => 'Mureta de concreto',
+        ElementoLateral.outro => 'Outro',
+      };
 
   String _labelConservacao(ConservacaoEstado? valor) => switch (valor) {
-    ConservacaoEstado.boa => 'Boa',
-    ConservacaoEstado.ruim => 'Ruim',
-    null => '',
-  };
+        ConservacaoEstado.boa => 'Boa',
+        ConservacaoEstado.ruim => 'Ruim',
+        null => '',
+      };
 
   String _labelIntensidadeDano(IntensidadeDano? valor) => switch (valor) {
-    IntensidadeDano.leve => 'Leve',
-    IntensidadeDano.media => 'Média',
-    IntensidadeDano.grave => 'Grave',
-    IntensidadeDano.gravissima => 'Gravíssima',
-    null => '',
-  };
+        IntensidadeDano.leve => 'Leve',
+        IntensidadeDano.media => 'Média',
+        IntensidadeDano.grave => 'Grave',
+        IntensidadeDano.gravissima => 'Gravíssima',
+        null => '',
+      };
 
   String _labelSetorImpacto(SetorImpacto valor) => switch (valor) {
-    SetorImpacto.anterior => 'Anterior',
-    SetorImpacto.posterior => 'Posterior',
-    SetorImpacto.lateralEsquerdo => 'Lateral esquerdo',
-    SetorImpacto.lateralDireito => 'Lateral direito',
-    SetorImpacto.angularAnteriorEsquerdo => 'Angular anterior esquerdo',
-    SetorImpacto.angularAnteriorDireito => 'Angular anterior direito',
-    SetorImpacto.angularPosteriorEsquerdo => 'Angular posterior esquerdo',
-    SetorImpacto.angularPosteriorDireito => 'Angular posterior direito',
-  };
+        SetorImpacto.anterior => 'Anterior',
+        SetorImpacto.posterior => 'Posterior',
+        SetorImpacto.lateralEsquerdo => 'Lateral esquerdo',
+        SetorImpacto.lateralDireito => 'Lateral direito',
+        SetorImpacto.angularAnteriorEsquerdo => 'Angular anterior esquerdo',
+        SetorImpacto.angularAnteriorDireito => 'Angular anterior direito',
+        SetorImpacto.angularPosteriorEsquerdo => 'Angular posterior esquerdo',
+        SetorImpacto.angularPosteriorDireito => 'Angular posterior direito',
+      };
 
   String _labelTipificacao(TipificacaoDeformacao valor) => switch (valor) {
-    TipificacaoDeformacao.amassamento => 'Amassamento',
-    TipificacaoDeformacao.cisalhamento => 'Cisalhamento',
-    TipificacaoDeformacao.arrastamento => 'Arrastamento',
-    TipificacaoDeformacao.empenamento => 'Empenamento',
-    TipificacaoDeformacao.arrancamento => 'Arrancamento',
-    TipificacaoDeformacao.estampamento => 'Estampamento',
-    TipificacaoDeformacao.quebramento => 'Quebramento',
-    TipificacaoDeformacao.esmagamento => 'Esmagamento',
-    TipificacaoDeformacao.sanfonamento => 'Sanfonamento',
-    TipificacaoDeformacao.mossa => 'Mossa',
-    TipificacaoDeformacao.atritamento => 'Atritamento',
-    TipificacaoDeformacao.afundamento => 'Afundamento',
-  };
+        TipificacaoDeformacao.amassamento => 'Amassamento',
+        TipificacaoDeformacao.cisalhamento => 'Cisalhamento',
+        TipificacaoDeformacao.arrastamento => 'Arrastamento',
+        TipificacaoDeformacao.empenamento => 'Empenamento',
+        TipificacaoDeformacao.arrancamento => 'Arrancamento',
+        TipificacaoDeformacao.estampamento => 'Estampamento',
+        TipificacaoDeformacao.quebramento => 'Quebramento',
+        TipificacaoDeformacao.esmagamento => 'Esmagamento',
+        TipificacaoDeformacao.sanfonamento => 'Sanfonamento',
+        TipificacaoDeformacao.mossa => 'Mossa',
+        TipificacaoDeformacao.atritamento => 'Atritamento',
+        TipificacaoDeformacao.afundamento => 'Afundamento',
+      };
 
   String _labelOrientacao(OrientacaoDeformacao valor) => switch (valor) {
-    OrientacaoDeformacao.direitaParaEsquerda => 'Direita → Esquerda',
-    OrientacaoDeformacao.esquerdaParaDireita => 'Esquerda → Direita',
-    OrientacaoDeformacao.dianteiraParaTraseira => 'Dianteira → Traseira',
-    OrientacaoDeformacao.traseiraParaDianteira => 'Traseira → Dianteira',
-  };
+        OrientacaoDeformacao.direitaParaEsquerda => 'Direita → Esquerda',
+        OrientacaoDeformacao.esquerdaParaDireita => 'Esquerda → Direita',
+        OrientacaoDeformacao.dianteiraParaTraseira => 'Dianteira → Traseira',
+        OrientacaoDeformacao.traseiraParaDianteira => 'Traseira → Dianteira',
+      };
 
   String _labelStatusComponente(StatusComponenteVeiculo? status) =>
       switch (status) {
@@ -1640,40 +1645,41 @@ $conteudo
       };
 
   String _labelEstadoPneu(EstadoPneumaticos? estado) => switch (estado) {
-    EstadoPneumaticos.novos => 'Novos',
-    EstadoPneumaticos.meiaVida => 'Meia vida',
-    EstadoPneumaticos.desgastados => 'Desgastados',
-    null => '',
-  };
+        EstadoPneumaticos.novos => 'Novos',
+        EstadoPneumaticos.meiaVida => 'Meia vida',
+        EstadoPneumaticos.desgastados => 'Desgastados',
+        null => '',
+      };
 
   String _labelAirbag(AirbagStatus? status) => switch (status) {
-    AirbagStatus.acionado => 'Acionado',
-    AirbagStatus.naoAcionado => 'Não acionado',
-    AirbagStatus.ausente => 'Ausente',
-    null => '',
-  };
+        AirbagStatus.acionado => 'Acionado',
+        AirbagStatus.naoAcionado => 'Não acionado',
+        AirbagStatus.ausente => 'Ausente',
+        null => '',
+      };
 
   String _labelRetrovisor(RetrovisorStatus? status) => switch (status) {
-    RetrovisorStatus.presente => 'Presente',
-    RetrovisorStatus.ausente => 'Ausente',
-    null => '',
-  };
+        RetrovisorStatus.presente => 'Presente',
+        RetrovisorStatus.ausente => 'Ausente',
+        null => '',
+      };
 
   String _labelTacografo(TacografoStatus? status) => switch (status) {
-    TacografoStatus.ausente => 'Ausente',
-    TacografoStatus.recolhido => 'Recolhido',
-    TacografoStatus.naoSeAplica => 'Não se aplica',
-    null => '',
-  };
+        TacografoStatus.ausente => 'Ausente',
+        TacografoStatus.recolhido => 'Recolhido',
+        TacografoStatus.naoSeAplica => 'Não se aplica',
+        null => '',
+      };
 
   String _labelClassificacaoEnvolvido(
     CrimeTransitoClassificacaoEnvolvido? valor,
-  ) => switch (valor) {
-    CrimeTransitoClassificacaoEnvolvido.condutor => 'Condutor',
-    CrimeTransitoClassificacaoEnvolvido.passageiro => 'Passageiro',
-    CrimeTransitoClassificacaoEnvolvido.pedestre => 'Pedestre',
-    null => '',
-  };
+  ) =>
+      switch (valor) {
+        CrimeTransitoClassificacaoEnvolvido.condutor => 'Condutor',
+        CrimeTransitoClassificacaoEnvolvido.passageiro => 'Passageiro',
+        CrimeTransitoClassificacaoEnvolvido.pedestre => 'Pedestre',
+        null => '',
+      };
 
   String _labelEquipamento(CrimeTransitoEquipamentoSeguranca valor) =>
       switch (valor) {
@@ -1700,10 +1706,10 @@ $conteudo
       };
 
   String _labelNaturezaTipo(CrimeTransitoNaturezaTipo? tipo) => switch (tipo) {
-    CrimeTransitoNaturezaTipo.simples => 'Simples (1 unidade)',
-    CrimeTransitoNaturezaTipo.composta => 'Composta (2 ou mais unidades)',
-    null => '',
-  };
+        CrimeTransitoNaturezaTipo.simples => 'Simples (1 unidade)',
+        CrimeTransitoNaturezaTipo.composta => 'Composta (2 ou mais unidades)',
+        null => '',
+      };
 
   String _labelFormaInteracao(CrimeTransitoFormaInteracao valor) =>
       switch (valor) {
@@ -2326,8 +2332,7 @@ $conteudo
     }
     final idsCausas = natureza.causasDeterminantesIds;
     if (idsCausas != null && idsCausas.isNotEmpty) {
-      final d =
-          ficha.crimeTransitoLevantamento?.dinamica ??
+      final d = ficha.crimeTransitoLevantamento?.dinamica ??
           CausasDeterminantesCatalogo.derivarDinamica(natureza.formasInteracao);
       if (d != null) {
         final map = {
@@ -2440,9 +2445,8 @@ $conteudo
       // Descrição (nome opcional + descrição técnica; sangue na mesma célula)
       String descricao = vestigio.rotuloNomeDescricao;
       if (vestigio.isSangueHumano) {
-        descricao = descricao.isEmpty
-            ? 'Sangue humano'
-            : '$descricao — Sangue humano';
+        descricao =
+            descricao.isEmpty ? 'Sangue humano' : '$descricao — Sangue humano';
       }
       _adicionarCelulaTabelaVestigioVeiculo(buffer, descricao);
 
@@ -2455,9 +2459,8 @@ $conteudo
       _adicionarCelulaTabelaVestigioVeiculo(buffer, localizacaoPosicionamento);
 
       // Recolhido (Sim/Não)
-      final recolhido = vestigio.tipoAcao == TipoAcaoVestigioVeiculo.coletado
-          ? 'Sim'
-          : 'Não';
+      final recolhido =
+          vestigio.tipoAcao == TipoAcaoVestigioVeiculo.coletado ? 'Sim' : 'Não';
       _adicionarCelulaTabelaVestigioVeiculo(buffer, recolhido);
 
       buffer.writeln('      </w:tr>');
@@ -2476,9 +2479,9 @@ $conteudo
         (vestigio.latitude != null && vestigio.longitude != null
             ? MetodoPosicionamentoVestigio.gps
             : ((vestigio.coordenadaX ?? '').trim().isNotEmpty ||
-                      (vestigio.coordenadaY ?? '').trim().isNotEmpty
-                  ? MetodoPosicionamentoVestigio.marcoZero
-                  : MetodoPosicionamentoVestigio.nenhum));
+                    (vestigio.coordenadaY ?? '').trim().isNotEmpty
+                ? MetodoPosicionamentoVestigio.marcoZero
+                : MetodoPosicionamentoVestigio.nenhum));
   }
 
   String _textoPosicionamentoVestigioVeiculo(
@@ -3158,10 +3161,6 @@ $conteudo
           cadaver.hipostasePosicao!.isNotEmpty) {
         hipostase = 'Posição: ${cadaver.hipostasePosicao}';
       }
-      if (cadaver.hipostaseEstado != null) {
-        if (hipostase.isNotEmpty) hipostase += '\n';
-        hipostase += 'Estado: ${cadaver.hipostaseEstado!.label}';
-      }
       if (cadaver.hipostaseCompativeis != null) {
         if (hipostase.isNotEmpty) hipostase += '\n';
         hipostase +=
@@ -3244,8 +3243,16 @@ $conteudo
       buffer.writeln(_gerarParagrafoImagemCorpo(rIdCorpo));
       buffer.writeln(_gerarParagrafoVazio());
 
-      // Gerar tabela de vestes se houver
-      if (cadaver.vestes != null && cadaver.vestes!.isNotEmpty) {
+      // Gerar vestes conforme o modo escolhido
+      if (cadaver.modoVestes == ModoVestesCadaver.geral) {
+        if (cadaver.descricaoVestesGerais != null &&
+            cadaver.descricaoVestesGerais!.isNotEmpty) {
+          buffer.writeln(_gerarParagrafoVazio());
+          buffer.writeln(
+            _gerarParagrafoTexto('Vestes: ${cadaver.descricaoVestesGerais}'),
+          );
+        }
+      } else if (cadaver.vestes != null && cadaver.vestes!.isNotEmpty) {
         buffer.writeln(_gerarParagrafoVazio());
         buffer.writeln(
           _gerarTabelaVestesCadaver(
@@ -3669,14 +3676,12 @@ $conteudo
       // Vestígio de local
       if (info.tipoDestino != null) {
         if (info.tipoDestino == TipoDestinoVestigio.unidade) {
-          final unidade = unidades
-              .where((u) => u.id == info.destinoId)
-              .firstOrNull;
+          final unidade =
+              unidades.where((u) => u.id == info.destinoId).firstOrNull;
           return unidade?.nome ?? '';
         } else if (info.tipoDestino == TipoDestinoVestigio.laboratorio) {
-          final lab = laboratorios
-              .where((l) => l.id == info.destinoId)
-              .firstOrNull;
+          final lab =
+              laboratorios.where((l) => l.id == info.destinoId).firstOrNull;
           return lab?.nome ?? '';
         }
       }
@@ -3684,15 +3689,13 @@ $conteudo
       // Vestígio de veículo
       if (info.tipoDestinoVeiculo != null) {
         if (info.tipoDestinoVeiculo == TipoDestinoVestigioVeiculo.unidade) {
-          final unidade = unidades
-              .where((u) => u.id == info.destinoId)
-              .firstOrNull;
+          final unidade =
+              unidades.where((u) => u.id == info.destinoId).firstOrNull;
           return unidade?.nome ?? '';
         } else if (info.tipoDestinoVeiculo ==
             TipoDestinoVestigioVeiculo.laboratorio) {
-          final lab = laboratorios
-              .where((l) => l.id == info.destinoId)
-              .firstOrNull;
+          final lab =
+              laboratorios.where((l) => l.id == info.destinoId).firstOrNull;
           return lab?.nome ?? '';
         }
       }

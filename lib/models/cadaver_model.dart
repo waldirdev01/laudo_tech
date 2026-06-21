@@ -120,16 +120,6 @@ enum EstadoRigidez {
   const EstadoRigidez(this.label);
 }
 
-enum EstadoHipostase {
-  movel('Móvel'),
-  quaseFixas('Quase Fixas'),
-  fixas('Fixas'),
-  ausente('Ausente');
-
-  final String label;
-  const EstadoHipostase(this.label);
-}
-
 /// Modelo para tatuagem/marca corporal no cadáver
 class TatuagemMarcaCorporalModel {
   final String? id;
@@ -262,6 +252,12 @@ class VesteCadaverModel {
       fotosPaths: fotosPaths ?? this.fotosPaths,
     );
   }
+}
+
+enum ModoVestesCadaver {
+  geral,
+  completa,
+  umaAUma,
 }
 
 // ========== ENUMS E MODELO PAF (Projétil de Arma de Fogo) ==========
@@ -674,7 +670,6 @@ class CadaverModel {
 
   // Exames - Manchas de Hipóstase
   final String? hipostasePosicao;
-  final EstadoHipostase? hipostaseEstado;
   final bool? hipostaseCompativeis;
 
   // Exames - Secreções
@@ -695,7 +690,6 @@ class CadaverModel {
       fotosVistaCadaversAmbiente; // obrigatório: vista do cadáver no ambiente
   final List<String>
       fotosPosicaoEncontrada; // obrigatório: posição em que foi encontrado
-  final List<String> fotosHipostaseSecrecoes; // opcional
   final List<String> fotosTatuagens; // opcional (tatuagens e marcas corporais)
 
   // Lesões/Evidências no cadáver
@@ -709,6 +703,9 @@ class CadaverModel {
   final List<int>? numerosFotosLesoesDefesa;
 
   // Vestes
+  final ModoVestesCadaver? modoVestes;
+  final String? descricaoVestesGerais;
+  final List<String>? fotosVestesGerais;
   final List<VesteCadaverModel>? vestes;
 
   // Tatuagens e marcas corporais
@@ -758,7 +755,6 @@ class CadaverModel {
     this.rigidezMemSuperior,
     this.rigidezMemInferior,
     this.hipostasePosicao,
-    this.hipostaseEstado,
     this.hipostaseCompativeis,
     this.secrecaoNasal,
     this.secrecaoNasalTipo,
@@ -771,7 +767,6 @@ class CadaverModel {
     this.outrasObservacoes,
     this.fotosVistaCadaversAmbiente = const [],
     this.fotosPosicaoEncontrada = const [],
-    this.fotosHipostaseSecrecoes = const [],
     this.fotosTatuagens = const [],
     this.lesoes,
     this.ausenciaLesoesDefesa = false,
@@ -779,6 +774,9 @@ class CadaverModel {
     this.observacoesLesoesDefesa,
     this.fotosLesoesDefesa = const [],
     this.numerosFotosLesoesDefesa,
+    this.modoVestes,
+    this.descricaoVestesGerais,
+    this.fotosVestesGerais,
     this.vestes,
     this.tatuagensMarcas,
     this.tatuagensMarcasLista,
@@ -825,7 +823,6 @@ class CadaverModel {
         'rigidezMemSuperior': rigidezMemSuperior?.name,
         'rigidezMemInferior': rigidezMemInferior?.name,
         'hipostasePosicao': hipostasePosicao,
-        'hipostaseEstado': hipostaseEstado?.name,
         'hipostaseCompativeis': hipostaseCompativeis,
         'secrecaoNasal': secrecaoNasal,
         'secrecaoNasalTipo': secrecaoNasalTipo,
@@ -838,7 +835,6 @@ class CadaverModel {
         'outrasObservacoes': outrasObservacoes,
         'fotosVistaCadaversAmbiente': fotosVistaCadaversAmbiente,
         'fotosPosicaoEncontrada': fotosPosicaoEncontrada,
-        'fotosHipostaseSecrecoes': fotosHipostaseSecrecoes,
         'fotosTatuagens': fotosTatuagens,
         'lesoes': lesoes?.map((l) => l.toJson()).toList(),
         'ausenciaLesoesDefesa': ausenciaLesoesDefesa,
@@ -846,6 +842,9 @@ class CadaverModel {
         'observacoesLesoesDefesa': observacoesLesoesDefesa,
         'fotosLesoesDefesa': fotosLesoesDefesa,
         'numerosFotosLesoesDefesa': numerosFotosLesoesDefesa,
+        'modoVestes': modoVestes?.name,
+        'descricaoVestesGerais': descricaoVestesGerais,
+        'fotosVestesGerais': fotosVestesGerais,
         'vestes': vestes?.map((v) => v.toJson()).toList(),
         'tatuagensMarcas': tatuagensMarcas,
         'tatuagensMarcasLista':
@@ -959,12 +958,6 @@ class CadaverModel {
             )
           : null,
       hipostasePosicao: json['hipostasePosicao'] as String?,
-      hipostaseEstado: json['hipostaseEstado'] != null
-          ? EstadoHipostase.values.firstWhere(
-              (e) => e.name == json['hipostaseEstado'],
-              orElse: () => EstadoHipostase.movel,
-            )
-          : null,
       hipostaseCompativeis: json['hipostaseCompativeis'] as bool?,
       secrecaoNasal: json['secrecaoNasal'] as bool?,
       secrecaoNasalTipo: json['secrecaoNasalTipo'] as String?,
@@ -984,11 +977,6 @@ class CadaverModel {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      fotosHipostaseSecrecoes:
-          (json['fotosHipostaseSecrecoes'] as List<dynamic>?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              const [],
       fotosTatuagens: ((json['fotosTatuagens'] ?? json['fotosTatuagensLesoes'])
                   as List<dynamic>?)
               ?.map((e) => e.toString())
@@ -1012,6 +1000,12 @@ class CadaverModel {
           (json['numerosFotosLesoesDefesa'] as List<dynamic>?)
               ?.map((e) => e as int)
               .toList(),
+      modoVestes: _modoVestesFromName(json['modoVestes'] as String?),
+      descricaoVestesGerais: json['descricaoVestesGerais'] as String?,
+      fotosVestesGerais: (json['fotosVestesGerais'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       vestes: (json['vestes'] as List<dynamic>?)
           ?.map((v) => VesteCadaverModel.fromJson(v as Map<String, dynamic>))
           .toList(),
@@ -1066,7 +1060,6 @@ class CadaverModel {
     EstadoRigidez? rigidezMemSuperior,
     EstadoRigidez? rigidezMemInferior,
     String? hipostasePosicao,
-    EstadoHipostase? hipostaseEstado,
     bool? hipostaseCompativeis,
     bool? secrecaoNasal,
     String? secrecaoNasalTipo,
@@ -1079,7 +1072,6 @@ class CadaverModel {
     String? outrasObservacoes,
     List<String>? fotosVistaCadaversAmbiente,
     List<String>? fotosPosicaoEncontrada,
-    List<String>? fotosHipostaseSecrecoes,
     List<String>? fotosTatuagens,
     List<LesaoCadaverModel>? lesoes,
     bool? ausenciaLesoesDefesa,
@@ -1087,6 +1079,9 @@ class CadaverModel {
     String? observacoesLesoesDefesa,
     List<String>? fotosLesoesDefesa,
     List<int>? numerosFotosLesoesDefesa,
+    ModoVestesCadaver? modoVestes,
+    String? descricaoVestesGerais,
+    List<String>? fotosVestesGerais,
     List<VesteCadaverModel>? vestes,
     String? tatuagensMarcas,
     List<TatuagemMarcaCorporalModel>? tatuagensMarcasLista,
@@ -1136,7 +1131,6 @@ class CadaverModel {
       rigidezMemSuperior: rigidezMemSuperior ?? this.rigidezMemSuperior,
       rigidezMemInferior: rigidezMemInferior ?? this.rigidezMemInferior,
       hipostasePosicao: hipostasePosicao ?? this.hipostasePosicao,
-      hipostaseEstado: hipostaseEstado ?? this.hipostaseEstado,
       hipostaseCompativeis: hipostaseCompativeis ?? this.hipostaseCompativeis,
       secrecaoNasal: secrecaoNasal ?? this.secrecaoNasal,
       secrecaoNasalTipo: secrecaoNasalTipo ?? this.secrecaoNasalTipo,
@@ -1153,8 +1147,6 @@ class CadaverModel {
           fotosVistaCadaversAmbiente ?? this.fotosVistaCadaversAmbiente,
       fotosPosicaoEncontrada:
           fotosPosicaoEncontrada ?? this.fotosPosicaoEncontrada,
-      fotosHipostaseSecrecoes:
-          fotosHipostaseSecrecoes ?? this.fotosHipostaseSecrecoes,
       fotosTatuagens: fotosTatuagens ?? this.fotosTatuagens,
       lesoes: lesoes ?? this.lesoes,
       ausenciaLesoesDefesa: ausenciaLesoesDefesa ?? this.ausenciaLesoesDefesa,
@@ -1165,10 +1157,27 @@ class CadaverModel {
       fotosLesoesDefesa: fotosLesoesDefesa ?? this.fotosLesoesDefesa,
       numerosFotosLesoesDefesa:
           numerosFotosLesoesDefesa ?? this.numerosFotosLesoesDefesa,
+      modoVestes: modoVestes ?? this.modoVestes,
+      descricaoVestesGerais:
+          descricaoVestesGerais ?? this.descricaoVestesGerais,
+      fotosVestesGerais: fotosVestesGerais ?? this.fotosVestesGerais,
       vestes: vestes ?? this.vestes,
       tatuagensMarcas: tatuagensMarcas ?? this.tatuagensMarcas,
       tatuagensMarcasLista: tatuagensMarcasLista ?? this.tatuagensMarcasLista,
       pertences: pertences ?? this.pertences,
     );
+  }
+}
+
+ModoVestesCadaver? _modoVestesFromName(String? name) {
+  switch (name) {
+    case 'geral':
+      return ModoVestesCadaver.geral;
+    case 'completa':
+      return ModoVestesCadaver.completa;
+    case 'umaAUma':
+      return ModoVestesCadaver.umaAUma;
+    default:
+      return null;
   }
 }

@@ -19,7 +19,7 @@ class PeritoService {
   Future<PeritoModel?> obterPerito() async {
     final prefs = await SharedPreferences.getInstance();
     final json = prefs.getString(_peritoKey);
-    
+
     if (json == null) {
       return null;
     }
@@ -47,19 +47,20 @@ class PeritoService {
     // Tentar recuperar automaticamente do diretório persistente do app
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final templatesDir = Directory('${dir.path}/templates');
-      if (!await templatesDir.exists()) {
-        return perito;
-      }
+      final diretorios = [
+        Directory('${dir.path}/templates'),
+        dir,
+      ].where((d) => d.existsSync());
 
-      final arquivos = templatesDir
-          .listSync()
-          .whereType<File>()
-          .where((f) {
+      final arquivos = <File>[];
+      for (final diretorio in diretorios) {
+        arquivos.addAll(
+          diretorio.listSync().whereType<File>().where((f) {
             final p = f.path.toLowerCase();
             return p.endsWith('.docx') || p.endsWith('.doc');
-          })
-          .toList();
+          }),
+        );
+      }
 
       if (arquivos.isEmpty) {
         return perito;
@@ -94,4 +95,3 @@ class PeritoService {
     return perito != null;
   }
 }
-

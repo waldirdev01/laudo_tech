@@ -25,7 +25,6 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
 
   List<MembroEquipeModel> _todosMembros = [];
   PeritoModel? _peritoCadastrado;
-  String? _fotografoSelecionado;
   List<String> _demaisServidoresSelecionados = [];
   bool _carregando = true;
   bool _salvando = false;
@@ -58,7 +57,6 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
 
           // Se já tem equipe selecionada, carregar
           if (equipeExistente != null) {
-            _fotografoSelecionado = equipeExistente.fotografoCriminalisticoId;
             _demaisServidoresSelecionados = List.from(
               equipeExistente.demaisServidoresIds,
             );
@@ -108,7 +106,6 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
       // Mas vamos manter o modelo para compatibilidade
       final equipe = EquipeFichaModel(
         peritoCriminalId: 'perito_cadastrado', // Identificador especial
-        fotografoCriminalisticoId: _fotografoSelecionado,
         demaisServidoresIds: _demaisServidoresSelecionados,
       );
 
@@ -216,37 +213,17 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
                           _buildMatriculaPeritoDisplay(),
                         ]),
                         const Divider(height: 1),
-                        // Linha 2: Fotógrafo Criminalístico
+                        // Linha 2: Demais Servidores
                         Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Fotógrafo Criminalístico:',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(fontWeight: FontWeight.w500),
-                              ),
-                              const SizedBox(height: 8),
-                              _buildDropdownMembro(
-                                _fotografoSelecionado,
-                                (id) =>
-                                    setState(() => _fotografoSelecionado = id),
-                                filtro: 'fotógrafo',
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Divider(height: 1),
-                        // Linha 3: Demais Servidores
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Demais Servidores Policiais (informar nome e carreira a qual pertence):',
-                                style: Theme.of(context).textTheme.bodySmall
+                                'Demais Servidores Policiais (incluindo fotógrafo criminalístico):',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
                                     ?.copyWith(fontWeight: FontWeight.w500),
                               ),
                               const SizedBox(height: 8),
@@ -254,6 +231,7 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
                             ],
                           ),
                         ),
+                        const Divider(height: 1),
                       ],
                     ),
                   ),
@@ -319,9 +297,9 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
             Text(
               'Cadastre em Configurações > Editar Perito',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 11,
-              ),
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 11,
+                  ),
             ),
           ],
         ],
@@ -353,87 +331,12 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
     );
   }
 
-  Widget _buildDropdownMembro(
-    String? selecionado,
-    Function(String?) onChanged, {
-    String? filtro,
-    bool obrigatorio = false,
-  }) {
-    // Filtrar membros se necessário
-    List<MembroEquipeModel> membrosFiltrados = _todosMembros;
-    if (filtro != null) {
-      membrosFiltrados = _todosMembros
-          .where((m) => m.cargo.toLowerCase().contains(filtro.toLowerCase()))
-          .toList();
-    }
-
-    // Adicionar opção "Nenhum" para campos opcionais
-    if (filtro != null) {
-      membrosFiltrados = [
-        MembroEquipeModel(id: '', cargo: '', nome: 'Nenhum', matricula: ''),
-        ...membrosFiltrados,
-      ];
-    }
-
-    if (membrosFiltrados.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          'Nenhum membro cadastrado. Cadastre em Configurações > Equipe',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
-    }
-
-    return DropdownButtonFormField<String>(
-      initialValue: selecionado,
-      isExpanded: true,
-      decoration: const InputDecoration(
-        border: OutlineInputBorder(),
-        isDense: true,
-      ),
-      items: membrosFiltrados.map((membro) {
-        return DropdownMenuItem<String>(
-          value: membro.id.isEmpty ? null : membro.id,
-          child: Text(
-            membro.id.isEmpty
-                ? membro.nome
-                : '${membro.nome} - ${membro.cargo}',
-            overflow: TextOverflow.ellipsis,
-          ),
-        );
-      }).toList(),
-      selectedItemBuilder: (context) {
-        return membrosFiltrados.map((membro) {
-          final texto = membro.id.isEmpty
-              ? membro.nome
-              : '${membro.nome} - ${membro.cargo}';
-          return Text(texto, overflow: TextOverflow.ellipsis);
-        }).toList();
-      },
-      onChanged: (value) => onChanged(value),
-      validator: (value) {
-        if (obrigatorio && (value == null || value.isEmpty)) {
-          return 'Selecione um membro';
-        }
-        return null;
-      },
-    );
-  }
-
   Widget _buildListaDemaisServidores() {
     final membrosDisponiveis = _todosMembros
         .where((m) => !_demaisServidoresSelecionados.contains(m.id))
         .toList();
 
-    final idsDemaisOrdenados = [..._demaisServidoresSelecionados]
-      ..sort((a, b) {
+    final idsDemaisOrdenados = [..._demaisServidoresSelecionados]..sort((a, b) {
         final na = _obterMembroPorId(a)?.nome ?? '';
         final nb = _obterMembroPorId(b)?.nome ?? '';
         return na.toLowerCase().compareTo(nb.toLowerCase());
@@ -474,8 +377,8 @@ class _SelecaoEquipeScreenState extends State<SelecaoEquipeScreen> {
             child: Text(
               'Todos os membros já foram adicionados',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           )
         else

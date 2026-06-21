@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/ficha_base_model.dart';
 import '../models/ficha_completa_model.dart';
+import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
 import 'condicoes_observacoes_screen.dart';
 
@@ -15,9 +16,9 @@ class PreservacaoScreen extends StatefulWidget {
 
 class _PreservacaoScreenState extends State<PreservacaoScreen> {
   static const String _defaultPessoasAcessaram =
-      'Não foi possível identificar, com segurança, pessoas que tenham adentrado o local antes da chegada da perícia.';
+      'Não foi possível identificar, com segurança, pessoas que tenham tido acesso ao veículo antes da chegada da perícia.';
   static const String _defaultAlteracoesObservadas =
-      'Não foram observadas alterações relevantes no local no momento do exame, ressalvadas as intervenções necessárias ao socorro e à segurança.';
+      'Não foram observadas alterações relevantes no veículo no momento do exame, ressalvadas intervenções previamente informadas e compatíveis com sua guarda ou remoção.';
 
   final _fichaService = FichaService();
   final _pessoasAcessaramController = TextEditingController();
@@ -30,6 +31,9 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
   bool? _preservacaoInidoneo;
   bool? _preservacaoParcialmenteIdoneo;
   bool _preservacaoCuriososNoPerimetro = false;
+
+  bool get _isVistoriaVeiculo =>
+      widget.ficha.tipoOcorrencia == TipoOcorrencia.vistoriaVeiculo;
 
   @override
   void initState() {
@@ -142,7 +146,7 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Preservação salva com sucesso!'),
+            content: Text('Dados de preservação salvos com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -184,7 +188,12 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Preservação'), centerTitle: true),
+      appBar: AppBar(
+        title: Text(
+          _isVistoriaVeiculo ? 'Preservação do Veiculo' : 'Preservação',
+        ),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -222,128 +231,263 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
               child: Column(
                 children: [
                   // Linha 1: Sim/Não
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                  if (_isVistoriaVeiculo)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Foi possível atestar a preservação do veículo desde o fato até a vistoria?',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Checkbox(
-                                value: _preservacaoSim ?? false,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _preservacaoSim = value;
-                                    if (value == true) {
-                                      _preservacaoNao = false;
-                                    }
-                                  });
-                                },
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: _preservacaoSim ?? false,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _preservacaoSim = value;
+                                        if (value == true) {
+                                          _preservacaoNao = false;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  const Text('Sim'),
+                                ],
                               ),
-                              const Flexible(child: Text('Sim')),
-                              const SizedBox(width: 16),
-                              Checkbox(
-                                value: _preservacaoNao ?? false,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _preservacaoNao = value;
-                                    if (value == true) {
-                                      _preservacaoSim = false;
-                                    }
-                                  });
-                                },
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: _preservacaoNao ?? false,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _preservacaoNao = value;
+                                        if (value == true) {
+                                          _preservacaoSim = false;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  const Text('Não'),
+                                ],
                               ),
-                              const Flexible(child: Text('Não')),
                             ],
                           ),
-                        ),
-                        Container(
-                          width: 1,
-                          height: 48,
-                          color: Colors.grey.shade300,
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Se não:',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Checkbox(
-                                      value: _preservacaoInidoneo ?? false,
-                                      onChanged: (_preservacaoNao ?? false)
-                                          ? (value) {
-                                              setState(() {
-                                                _preservacaoInidoneo = value;
-                                                if (value == true) {
-                                                  _preservacaoParcialmenteIdoneo =
-                                                      false;
-                                                }
-                                              });
-                                            }
-                                          : null,
-                                    ),
-                                    const Flexible(child: Text('Inidôneo')),
-                                    const SizedBox(width: 16),
-                                    Checkbox(
-                                      value:
-                                          _preservacaoParcialmenteIdoneo ??
-                                          false,
-                                      onChanged: (_preservacaoNao ?? false)
-                                          ? (value) {
-                                              setState(() {
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Se não:',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: _preservacaoInidoneo ?? false,
+                                    onChanged: (_preservacaoNao ?? false)
+                                        ? (value) {
+                                            setState(() {
+                                              _preservacaoInidoneo = value;
+                                              if (value == true) {
                                                 _preservacaoParcialmenteIdoneo =
-                                                    value;
-                                                if (value == true) {
-                                                  _preservacaoInidoneo = false;
-                                                }
-                                              });
-                                            }
-                                          : null,
-                                    ),
-                                    const Flexible(
-                                      child: Text('Parcialmente Idôneo'),
-                                    ),
-                                  ],
+                                                    false;
+                                              }
+                                            });
+                                          }
+                                        : null,
+                                  ),
+                                  const Text('Inidôneo'),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value:
+                                        _preservacaoParcialmenteIdoneo ?? false,
+                                    onChanged: (_preservacaoNao ?? false)
+                                        ? (value) {
+                                            setState(() {
+                                              _preservacaoParcialmenteIdoneo =
+                                                  value;
+                                              if (value == true) {
+                                                _preservacaoInidoneo = false;
+                                              }
+                                            });
+                                          }
+                                        : null,
+                                  ),
+                                  const Text('Parcialmente Idôneo'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: _preservacaoSim ?? false,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _preservacaoSim = value;
+                                      if (value == true) {
+                                        _preservacaoNao = false;
+                                      }
+                                    });
+                                  },
                                 ),
+                                const Flexible(child: Text('Sim')),
+                                const SizedBox(width: 16),
+                                Checkbox(
+                                  value: _preservacaoNao ?? false,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _preservacaoNao = value;
+                                      if (value == true) {
+                                        _preservacaoSim = false;
+                                      }
+                                    });
+                                  },
+                                ),
+                                const Flexible(child: Text('Não')),
                               ],
                             ),
                           ),
-                        ),
-                      ],
+                          Container(
+                            width: 1,
+                            height: 48,
+                            color: Colors.grey.shade300,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Se não:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Checkbox(
+                                        value: _preservacaoInidoneo ?? false,
+                                        onChanged: (_preservacaoNao ?? false)
+                                            ? (value) {
+                                                setState(() {
+                                                  _preservacaoInidoneo = value;
+                                                  if (value == true) {
+                                                    _preservacaoParcialmenteIdoneo =
+                                                        false;
+                                                  }
+                                                });
+                                              }
+                                            : null,
+                                      ),
+                                      const Flexible(child: Text('Inidôneo')),
+                                      const SizedBox(width: 16),
+                                      Checkbox(
+                                        value:
+                                            _preservacaoParcialmenteIdoneo ??
+                                            false,
+                                        onChanged: (_preservacaoNao ?? false)
+                                            ? (value) {
+                                                setState(() {
+                                                  _preservacaoParcialmenteIdoneo =
+                                                      value;
+                                                  if (value == true) {
+                                                    _preservacaoInidoneo =
+                                                        false;
+                                                  }
+                                                });
+                                              }
+                                            : null,
+                                      ),
+                                      const Flexible(
+                                        child: Text('Parcialmente Idôneo'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   const Divider(height: 1),
                   // Linha 2: Curiosos no perímetro
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Curiosos no perímetro:',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(fontWeight: FontWeight.w500),
+                    child: _isVistoriaVeiculo
+                        ? Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Veículo permaneceu em local de acesso restrito?',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              Checkbox(
+                                value: _preservacaoCuriososNoPerimetro,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _preservacaoCuriososNoPerimetro =
+                                        value ?? false;
+                                  });
+                                },
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Curiosos no perímetro:',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              Checkbox(
+                                value: _preservacaoCuriososNoPerimetro,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _preservacaoCuriososNoPerimetro =
+                                        value ?? false;
+                                  });
+                                },
+                              ),
+                            ],
                           ),
-                        ),
-                        Checkbox(
-                          value: _preservacaoCuriososNoPerimetro,
-                          onChanged: (value) {
-                            setState(() {
-                              _preservacaoCuriososNoPerimetro = value ?? false;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
                   ),
                   const Divider(height: 1),
                   // Linha 3: Pessoas que acessaram
@@ -353,17 +497,20 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Pessoas que acessaram:',
+                          _isVistoriaVeiculo
+                              ? 'Pessoas que tiveram acesso ao veículo:'
+                              : 'Pessoas que acessaram:',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _pessoasAcessaramController,
-                          decoration: const InputDecoration(
-                            hintText:
-                                'Descreva as pessoas que acessaram o local',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            hintText: _isVistoriaVeiculo
+                                ? 'Ex.: vítima, investigador, servidor da delegacia, guincho.'
+                                : 'Descreva as pessoas que acessaram o local',
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           maxLines: 2,
@@ -379,17 +526,20 @@ class _PreservacaoScreenState extends State<PreservacaoScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Alterações observadas:',
+                          _isVistoriaVeiculo
+                              ? 'Alterações observadas no veículo:'
+                              : 'Alterações observadas:',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _alteracoesDetectadasController,
-                          decoration: const InputDecoration(
-                            hintText:
-                                'Descreva as alterações detectadas no local',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            hintText: _isVistoriaVeiculo
+                                ? 'Descreva remoções, manuseios, reparos, limpeza ou outras alterações relevantes no veículo.'
+                                : 'Descreva as alterações detectadas no local',
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           maxLines: 4,

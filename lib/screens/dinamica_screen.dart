@@ -4,8 +4,6 @@ import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/ficha_completa_model.dart';
 import '../services/ficha_service.dart';
-import '../services/openai_service.dart';
-import '../widgets/ai_suggestion_button.dart';
 
 class DinamicaScreen extends StatefulWidget {
   final FichaCompletaModel ficha;
@@ -32,49 +30,6 @@ class _DinamicaScreenState extends State<DinamicaScreen> {
     if (widget.ficha.modusOperandi != null) {
       _dinamicaController.text = widget.ficha.modusOperandi!;
     }
-  }
-
-  String _buildAiContextDinamica() {
-    final partes = <String>[
-      'Tipo de ocorrência: ${widget.ficha.tipoOcorrencia.label}.',
-    ];
-
-    final historico = widget.ficha.dadosFichaBase?.historico?.trim();
-    if (historico != null && historico.isNotEmpty) {
-      partes.add('Histórico já registrado: $historico');
-    }
-
-    final endereco = widget.ficha.local?.endereco?.trim();
-    final municipio = widget.ficha.local?.municipio?.trim();
-    if ((endereco?.isNotEmpty ?? false) || (municipio?.isNotEmpty ?? false)) {
-      final localPartes = <String>[];
-      if (endereco != null && endereco.isNotEmpty) localPartes.add(endereco);
-      if (municipio != null && municipio.isNotEmpty) localPartes.add(municipio);
-      partes.add('Local: ${localPartes.join(', ')}.');
-    }
-
-    if (widget.ficha.cadaveres?.isNotEmpty == true) {
-      partes.add('Quantidade de cadáveres: ${widget.ficha.cadaveres!.length}.');
-    }
-
-    if (widget.ficha.veiculos?.isNotEmpty == true) {
-      partes.add('Quantidade de veículos: ${widget.ficha.veiculos!.length}.');
-    }
-
-    return partes.join('\n');
-  }
-
-  void _replaceDinamica(String text) {
-    setState(() => _dinamicaController.text = text.trim());
-  }
-
-  void _appendDinamica(String text) {
-    final atual = _dinamicaController.text.trim();
-    setState(() {
-      _dinamicaController.text = atual.isEmpty
-          ? text.trim()
-          : '$atual\n\n${text.trim()}';
-    });
   }
 
   @override
@@ -204,18 +159,6 @@ class _DinamicaScreenState extends State<DinamicaScreen> {
                       minLines: 8,
                       textInputAction: TextInputAction.newline,
                       keyboardType: TextInputType.multiline,
-                    ),
-                    const SizedBox(height: 8),
-                    AiSuggestionButton(
-                      fieldLabel: 'Dinâmica do fato',
-                      currentText: _dinamicaController.text,
-                      currentTextBuilder: () => _dinamicaController.text,
-                      contextTextBuilder: _buildAiContextDinamica,
-                      profile: AiSuggestionProfile.fromTipoOcorrencia(
-                        widget.ficha.tipoOcorrencia,
-                      ),
-                      onReplace: _replaceDinamica,
-                      onAppend: _appendDinamica,
                     ),
                   ],
                 ),

@@ -3,9 +3,8 @@ enum TipoOcorrencia {
   furtoDanoExameLocal('FURTO / DANO / EXAME DE LOCAL'),
   cvli('CVLI - CRIMES VIOLENTOS LETAIS INTENCIONAIS'),
   morteEsclarecer('MORTE A ESCLARECER'),
-  crimeTransito('CRIME DE TRÂNSITO')
-  // vistoriaVeiculo('VISTORIA EM VEÍCULO'),
-  ;
+  crimeTransito('CRIME DE TRÂNSITO'),
+  vistoriaVeiculo('VISTORIA EM VEÍCULO');
 
   final String label;
   const TipoOcorrencia(this.label);
@@ -14,5 +13,6 @@ enum TipoOcorrencia {
     furtoDanoExameLocal,
     cvli,
     crimeTransito,
+    vistoriaVeiculo,
   ];
 }

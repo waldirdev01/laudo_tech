@@ -100,6 +100,9 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   bool get _isCrimeTransito =>
       widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito;
 
+  bool get _isVistoriaVeiculo =>
+      widget.ficha.tipoOcorrencia == TipoOcorrencia.vistoriaVeiculo;
+
   @override
   void initState() {
     super.initState();
@@ -122,8 +125,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
         : (v.posicao?.label ?? '');
     _localizacaoAmbienteCtrl.text =
         (v.localizacaoAmbiente ?? '').trim().isNotEmpty
-        ? v.localizacaoAmbiente!
-        : posicaoLegada;
+            ? v.localizacaoAmbiente!
+            : posicaoLegada;
     _coordenadaFrenteXCtrl.text = v.coordenadaFrenteX ?? '';
     _coordenadaFrenteYCtrl.text = v.coordenadaFrenteY ?? '';
     _alturaFrenteCtrl.text = v.alturaFrente ?? '';
@@ -135,14 +138,14 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _alturaCentroCtrl.text = v.alturaCentro ?? '';
     _registrarCoordenadasRapido =
         _coordenadaFrenteXCtrl.text.trim().isNotEmpty ||
-        _coordenadaFrenteYCtrl.text.trim().isNotEmpty ||
-        _alturaFrenteCtrl.text.trim().isNotEmpty ||
-        _coordenadaTraseiraXCtrl.text.trim().isNotEmpty ||
-        _coordenadaTraseiraYCtrl.text.trim().isNotEmpty ||
-        _alturaTraseiraCtrl.text.trim().isNotEmpty ||
-        _coordenadaCentroXCtrl.text.trim().isNotEmpty ||
-        _coordenadaCentroYCtrl.text.trim().isNotEmpty ||
-        _alturaCentroCtrl.text.trim().isNotEmpty;
+            _coordenadaFrenteYCtrl.text.trim().isNotEmpty ||
+            _alturaFrenteCtrl.text.trim().isNotEmpty ||
+            _coordenadaTraseiraXCtrl.text.trim().isNotEmpty ||
+            _coordenadaTraseiraYCtrl.text.trim().isNotEmpty ||
+            _alturaTraseiraCtrl.text.trim().isNotEmpty ||
+            _coordenadaCentroXCtrl.text.trim().isNotEmpty ||
+            _coordenadaCentroYCtrl.text.trim().isNotEmpty ||
+            _alturaCentroCtrl.text.trim().isNotEmpty;
 
     _posicao = v.posicao;
     _posicaoLivreCtrl.text = v.posicaoLivre ?? '';
@@ -172,8 +175,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
     _bicicletaPossuiCampainha = v.bicicletaPossuiCampainha ?? false;
 
     _vestigios = List<VestigioVeiculoModel>.from(v.vestigios ?? []);
-    _metodoPosicionamentoVestigios =
-        v.metodoPosicionamentoVestigios ??
+    _metodoPosicionamentoVestigios = v.metodoPosicionamentoVestigios ??
         _inferirMetodoPosicionamentoVestigios(_vestigios);
 
     _fotosVistaVeiculoAmbiente = List<String>.from(v.fotosVistaVeiculoAmbiente);
@@ -272,12 +274,10 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           : _condicaoGeralCtrl.text.trim(),
       intensidadeDano: _intensidadeDano,
       setoresImpacto: _setoresImpacto.isEmpty ? null : _setoresImpacto.toList(),
-      tipificacoesDeformacoes: _tipificacoes.isEmpty
-          ? null
-          : _tipificacoes.toList(),
-      orientacoesDeformacoes: _orientacoes.isEmpty
-          ? null
-          : _orientacoes.toList(),
+      tipificacoesDeformacoes:
+          _tipificacoes.isEmpty ? null : _tipificacoes.toList(),
+      orientacoesDeformacoes:
+          _orientacoes.isEmpty ? null : _orientacoes.toList(),
       danosObservacoes: _danosObservacoesCtrl.text.trim().isEmpty
           ? null
           : _danosObservacoesCtrl.text.trim(),
@@ -297,8 +297,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
           : _bicicletaModeloCtrl.text.trim(),
       bicicletaElementosSinalizacao:
           _bicicletaSinalizacaoCtrl.text.trim().isEmpty
-          ? null
-          : _bicicletaSinalizacaoCtrl.text.trim(),
+              ? null
+              : _bicicletaSinalizacaoCtrl.text.trim(),
       bicicletaPossuiCampainha: _bicicletaPossuiCampainha,
       fotosVistaVeiculoAmbiente: _fotosVistaVeiculoAmbiente,
       metodoPosicionamentoVestigios: _metodoPosicionamentoVestigios,
@@ -714,7 +714,10 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(
+        messenger,
+        destino.path,
+      );
       return destino.path;
     } catch (_) {
       return null;
@@ -727,7 +730,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
   }
 
   void _salvar() {
-    if (_fotosVistaVeiculoAmbiente.isEmpty) {
+    if (_fotosVistaVeiculoAmbiente.isEmpty &&
+        widget.ficha.tipoOcorrencia != TipoOcorrencia.vistoriaVeiculo) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -738,7 +742,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
       );
       return;
     }
-    if (_localizacaoAmbienteCtrl.text.trim().isEmpty) {
+    if (!_isVistoriaVeiculo && _localizacaoAmbienteCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Informe a localização do veículo no ambiente'),
@@ -780,23 +784,23 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
         title: Text('Veículo ${widget.veiculo.numero}'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(_modoRapido ? Icons.speed : Icons.speed_outlined),
-            style: IconButton.styleFrom(
-              backgroundColor: _modoRapido
-                  ? Theme.of(context).colorScheme.primaryContainer
-                  : null,
-              foregroundColor: _modoRapido
-                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                  : null,
+          if (!_isVistoriaVeiculo)
+            IconButton(
+              icon: Icon(_modoRapido ? Icons.speed : Icons.speed_outlined),
+              style: IconButton.styleFrom(
+                backgroundColor: _modoRapido
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : null,
+                foregroundColor: _modoRapido
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : null,
+              ),
+              onPressed: () => setState(() {
+                _modoRapido = !_modoRapido;
+              }),
+              tooltip:
+                  _modoRapido ? 'Desativar modo rápido' : 'Ativar modo rápido',
             ),
-            onPressed: () => setState(() {
-              _modoRapido = !_modoRapido;
-            }),
-            tooltip: _modoRapido
-                ? 'Desativar modo rápido'
-                : 'Ativar modo rápido',
-          ),
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: _salvar,
@@ -903,28 +907,30 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                       )
                     else
                       ..._fotosVistaVeiculoAmbiente.asMap().entries.map(
-                        (e) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.image_outlined, size: 18),
-                          title: Text(
-                            _nomeArquivoFoto(e.value),
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
+                            (e) => ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading:
+                                  const Icon(Icons.image_outlined, size: 18),
+                              title: Text(
+                                _nomeArquivoFoto(e.value),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                tooltip: 'Remover foto',
+                                onPressed: () {
+                                  setState(() {
+                                    _fotosVistaVeiculoAmbiente =
+                                        List<String>.from(
+                                      _fotosVistaVeiculoAmbiente,
+                                    )..removeAt(e.key);
+                                  });
+                                },
+                              ),
+                            ),
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            tooltip: 'Remover foto',
-                            onPressed: () {
-                              setState(() {
-                                _fotosVistaVeiculoAmbiente = List<String>.from(
-                                  _fotosVistaVeiculoAmbiente,
-                                )..removeAt(e.key);
-                              });
-                            },
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -1041,263 +1047,265 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
               ),
             ],
 
-            const SizedBox(height: 16),
+            if (!_isVistoriaVeiculo) ...[
+              const SizedBox(height: 16),
 
-            // Situação e posicionamento do veículo
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _modoRapido
-                          ? 'LEGENDA DO VEÍCULO'
-                          : 'SITUAÇÃO E POSICIONAMENTO DO VEÍCULO',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _localizacaoAmbienteCtrl,
-                      decoration: InputDecoration(
-                        labelText: _modoRapido
-                            ? 'Legenda / posição do veículo *'
-                            : 'Situação e posicionamento no local *',
-                        border: const OutlineInputBorder(),
-                        hintText: _modoRapido
-                            ? 'Ex: veículo na varanda, junto ao corpo.'
-                            : 'Ex: estacionado no acostamento, sentido norte-sul, parcialmente sobre a calçada, tombado sobre o lado direito',
-                      ),
-                      maxLines: 2,
-                    ),
-                    if (!_modoRapido) ...[
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _condicaoGeralCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Condição geral',
-                          border: OutlineInputBorder(),
-                          hintText:
-                              'Ex: avarias na lateral esquerda e para-choque dianteiro deslocado',
-                        ),
-                        maxLines: 3,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    if (_modoRapido)
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Registrar coordenadas do veículo'),
-                        value: _registrarCoordenadasRapido,
-                        onChanged: (value) => setState(() {
-                          _registrarCoordenadasRapido = value;
-                          if (!value) {
-                            _coordenadaFrenteXCtrl.clear();
-                            _coordenadaFrenteYCtrl.clear();
-                            _alturaFrenteCtrl.clear();
-                            _coordenadaTraseiraXCtrl.clear();
-                            _coordenadaTraseiraYCtrl.clear();
-                            _alturaTraseiraCtrl.clear();
-                            _coordenadaCentroXCtrl.clear();
-                            _coordenadaCentroYCtrl.clear();
-                            _alturaCentroCtrl.clear();
-                          }
-                        }),
-                      ),
-                    if (!_modoRapido || _registrarCoordenadasRapido) ...[
+              // Situação e posicionamento do veículo
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Coordenadas (opcionais)',
+                        _modoRapido
+                            ? 'LEGENDA DO VEÍCULO'
+                            : 'SITUAÇÃO E POSICIONAMENTO DO VEÍCULO',
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
+                      const Divider(),
                       const SizedBox(height: 8),
-                      // Coordenadas da Frente
-                      Text(
-                        'Frente',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade400,
+                      TextFormField(
+                        controller: _localizacaoAmbienteCtrl,
+                        decoration: InputDecoration(
+                          labelText: _modoRapido
+                              ? 'Legenda / posição do veículo *'
+                              : 'Situação e posicionamento no local *',
+                          border: const OutlineInputBorder(),
+                          hintText: _modoRapido
+                              ? 'Ex: veículo na varanda, junto ao corpo.'
+                              : 'Ex: estacionado no acostamento, sentido norte-sul, parcialmente sobre a calçada, tombado sobre o lado direito',
                         ),
+                        maxLines: 2,
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _coordenadaFrenteXCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'X',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: -23,5',
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    signed: true,
-                                    decimal: true,
-                                  ),
-                            ),
+                      if (!_modoRapido) ...[
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _condicaoGeralCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Condição geral',
+                            border: OutlineInputBorder(),
+                            hintText:
+                                'Ex: avarias na lateral esquerda e para-choque dianteiro deslocado',
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _coordenadaFrenteYCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Y',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: -46,6',
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    signed: true,
-                                    decimal: true,
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _alturaFrenteCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Altura',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: 0.5 m',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Coordenadas da Traseira
-                      Text(
-                        'Traseira',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade400,
+                          maxLines: 3,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _coordenadaTraseiraXCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'X',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: -23,5',
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    signed: true,
-                                    decimal: true,
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _coordenadaTraseiraYCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Y',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: -46,6',
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    signed: true,
-                                    decimal: true,
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _alturaTraseiraCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Altura',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: 0.5 m',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Coordenadas do Centro
-                      Text(
-                        'Centro',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade400,
+                      ],
+                      const SizedBox(height: 16),
+                      if (_modoRapido)
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Registrar coordenadas do veículo'),
+                          value: _registrarCoordenadasRapido,
+                          onChanged: (value) => setState(() {
+                            _registrarCoordenadasRapido = value;
+                            if (!value) {
+                              _coordenadaFrenteXCtrl.clear();
+                              _coordenadaFrenteYCtrl.clear();
+                              _alturaFrenteCtrl.clear();
+                              _coordenadaTraseiraXCtrl.clear();
+                              _coordenadaTraseiraYCtrl.clear();
+                              _alturaTraseiraCtrl.clear();
+                              _coordenadaCentroXCtrl.clear();
+                              _coordenadaCentroYCtrl.clear();
+                              _alturaCentroCtrl.clear();
+                            }
+                          }),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _coordenadaCentroXCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'X',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: -23,5',
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    signed: true,
-                                    decimal: true,
-                                  ),
-                            ),
+                      if (!_modoRapido || _registrarCoordenadasRapido) ...[
+                        Text(
+                          'Coordenadas (opcionais)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _coordenadaCentroYCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Y',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: -46,6',
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    signed: true,
-                                    decimal: true,
-                                  ),
-                            ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Coordenadas da Frente
+                        Text(
+                          'Frente',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade400,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _alturaCentroCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'Altura',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: 'Ex: 0.5 m',
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _coordenadaFrenteXCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'X',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: -23,5',
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  signed: true,
+                                  decimal: true,
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _coordenadaFrenteYCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Y',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: -46,6',
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  signed: true,
+                                  decimal: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _alturaFrenteCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Altura',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: 0.5 m',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Coordenadas da Traseira
+                        Text(
+                          'Traseira',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade400,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _coordenadaTraseiraXCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'X',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: -23,5',
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  signed: true,
+                                  decimal: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _coordenadaTraseiraYCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Y',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: -46,6',
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  signed: true,
+                                  decimal: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _alturaTraseiraCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Altura',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: 0.5 m',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Coordenadas do Centro
+                        Text(
+                          'Centro',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _coordenadaCentroXCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'X',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: -23,5',
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  signed: true,
+                                  decimal: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _coordenadaCentroYCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Y',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: -46,6',
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  signed: true,
+                                  decimal: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _alturaCentroCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Altura',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  hintText: 'Ex: 0.5 m',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
 
             const SizedBox(height: 16),
 
@@ -1329,28 +1337,33 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                     ),
                     const Divider(),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<MetodoPosicionamentoVestigio>(
-                      initialValue: _metodoPosicionamentoVestigios,
-                      decoration: const InputDecoration(
-                        labelText: 'Método de posicionamento dos vestígios',
-                        border: OutlineInputBorder(),
-                        isDense: true,
+                    if (!_isVistoriaVeiculo) ...[
+                      DropdownButtonFormField<MetodoPosicionamentoVestigio>(
+                        initialValue: _metodoPosicionamentoVestigios,
+                        decoration: const InputDecoration(
+                          labelText: 'Método de posicionamento dos vestígios',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: MetodoPosicionamentoVestigio.values
+                            .map(
+                              (metodo) => DropdownMenuItem(
+                                value: metodo,
+                                child: Text(metodo.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(
+                            () => _metodoPosicionamentoVestigios = value,
+                          );
+                        },
                       ),
-                      items: MetodoPosicionamentoVestigio.values
-                          .map(
-                            (metodo) => DropdownMenuItem(
-                              value: metodo,
-                              child: Text(metodo.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _metodoPosicionamentoVestigios = value);
-                      },
-                    ),
-                    if (_metodoPosicionamentoVestigios ==
-                        MetodoPosicionamentoVestigio.gps) ...[
+                    ],
+                    if (!_isVistoriaVeiculo &&
+                        _metodoPosicionamentoVestigios ==
+                            MetodoPosicionamentoVestigio.gps) ...[
                       const SizedBox(height: 8),
                       Text(
                         'O GPS pode apresentar variação relevante em locais cobertos ou de difícil recepção.',
@@ -1440,7 +1453,8 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                   ),
                                 if (vestigio.localizacao != null)
                                   Text('Local: ${vestigio.localizacao}'),
-                                Text(_resumoPosicionamentoVestigio(vestigio)),
+                                if (!_isVistoriaVeiculo)
+                                  Text(_resumoPosicionamentoVestigio(vestigio)),
                                 if (vestigio.numerosFotografias?.isNotEmpty ==
                                     true)
                                   Text(
@@ -1457,12 +1471,11 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                 if (vestigio.tipoDestino != null &&
                                     vestigio.destinoId != null)
                                   FutureBuilder<dynamic>(
-                                    future:
-                                        vestigio.tipoDestino ==
+                                    future: vestigio.tipoDestino ==
                                             TipoDestinoVestigioVeiculo.unidade
                                         ? _unidadeService.listarUnidades()
                                         : _laboratorioService
-                                              .listarLaboratorios(),
+                                            .listarLaboratorios(),
                                     builder: (context, snapshot) {
                                       if (snapshot.hasData) {
                                         final lista = snapshot.data as List;
@@ -1472,8 +1485,7 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
                                         );
                                         if (items.isNotEmpty) {
                                           final item = items.first;
-                                          final nome =
-                                              vestigio.tipoDestino ==
+                                          final nome = vestigio.tipoDestino ==
                                                   TipoDestinoVestigioVeiculo
                                                       .unidade
                                               ? (item as UnidadeModel).nome
@@ -1521,8 +1533,9 @@ class _CadastroVeiculoScreenState extends State<CadastroVeiculoScreen> {
             if (!_modoRapido) ...[
               _buildCrimeTransitoSection(),
 
-              // Relacionamento com o caso (oculto em acidente de trânsito)
-              if (widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito)
+              // Relacionamento com o caso (oculto em acidente de trânsito e vistoria veicular)
+              if (widget.ficha.tipoOcorrencia == TipoOcorrencia.crimeTransito ||
+                  _isVistoriaVeiculo)
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/ficha_base_model.dart';
 import '../models/ficha_completa_model.dart';
+import '../models/tipo_ocorrencia.dart';
 import '../services/ficha_service.dart';
 import 'preservacao_screen.dart';
 
@@ -31,6 +32,9 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
   bool _isolamentoOutros = false;
   final _outrosController = TextEditingController();
 
+  bool get _isVistoriaVeiculo =>
+      widget.ficha.tipoOcorrencia == TipoOcorrencia.vistoriaVeiculo;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +53,7 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
       _isolamentoFitaZebrada = dados.isolamentoFitaZebrada ?? false;
       _isolamentoPresencaFisica = dados.isolamentoPresencaFisica ?? false;
       _observacoesController.text = dados.isolamentoObservacoes ?? '';
+      _outrosController.text = dados.isolamentoObservacoes ?? '';
 
       // Verificar se tem "outros" marcado (pode ser inferido se não tem nenhum dos outros)
       // Por enquanto, vamos deixar false e o usuário pode marcar novamente
@@ -90,9 +95,12 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
     });
 
     try {
+      final observacoesIsolamento = _isVistoriaVeiculo
+          ? _outrosController.text.trim()
+          : _observacoesController.text.trim();
+
       // Criar ou atualizar dados da ficha base
-      final fichaBase =
-          widget.ficha.dadosFichaBase?.copyWith(
+      final fichaBase = widget.ficha.dadosFichaBase?.copyWith(
             historico: widget.ficha.dadosFichaBase?.historico,
             isolamentoSim: _isolamentoSim,
             isolamentoNao: _isolamentoNao,
@@ -113,9 +121,8 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
                 widget.ficha.dadosFichaBase?.isolamentoVestigiosRecolhidos,
             isolamentoAmpliacaoPerimetro:
                 widget.ficha.dadosFichaBase?.isolamentoAmpliacaoPerimetro,
-            isolamentoObservacoes: _observacoesController.text.trim().isEmpty
-                ? null
-                : _observacoesController.text.trim(),
+            isolamentoObservacoes:
+                observacoesIsolamento.isEmpty ? null : observacoesIsolamento,
           ) ??
           FichaBaseModel(
             historico: widget.ficha.dadosFichaBase?.historico,
@@ -127,9 +134,8 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
             isolamentoCones: _isolamentoCones,
             isolamentoFitaZebrada: _isolamentoFitaZebrada,
             isolamentoPresencaFisica: _isolamentoPresencaFisica,
-            isolamentoObservacoes: _observacoesController.text.trim().isEmpty
-                ? null
-                : _observacoesController.text.trim(),
+            isolamentoObservacoes:
+                observacoesIsolamento.isEmpty ? null : observacoesIsolamento,
           );
 
       // Preservar todos os dados existentes
@@ -146,7 +152,7 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Isolamento salvo com sucesso!'),
+            content: Text('Dados de isolamento salvos com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -187,7 +193,12 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Isolamento'), centerTitle: true),
+      appBar: AppBar(
+        title: Text(
+          _isVistoriaVeiculo ? 'Isolamento do Veiculo' : 'Isolamento',
+        ),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -225,88 +236,136 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
               child: Column(
                 children: [
                   // Linha 1: Sim/Não e Total/Parcial
-                  Row(
-                    children: [
-                      // Lado esquerdo: Sim/Não
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Checkbox(
-                                value: _isolamentoSim ?? false,
-                                onChanged: (value) => _onSimChanged(value),
-                              ),
-                              const Flexible(child: Text('Sim')),
-                              const SizedBox(width: 8),
-                              Checkbox(
-                                value: _isolamentoNao ?? false,
-                                onChanged: (value) => _onNaoChanged(value),
-                              ),
-                              const Flexible(child: Text('Não')),
-                            ],
+                  if (_isVistoriaVeiculo)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'O veiculo estava sob controle/guarda formal?',
+                            style: TextStyle(fontWeight: FontWeight.w500),
                           ),
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 60,
-                        color: Colors.grey.shade300,
-                      ),
-                      // Lado direito: Total/Parcial
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              const Text(
-                                'Se sim:',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              const SizedBox(height: 8),
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Checkbox(
-                                    value: _isolamentoTotal ?? false,
-                                    onChanged: _isolamentoSim == true
-                                        ? (value) {
-                                            setState(() {
-                                              _isolamentoTotal = value ?? false;
-                                              if (value == true) {
-                                                _isolamentoParcial = false;
-                                              }
-                                            });
-                                          }
-                                        : null,
+                                    value: _isolamentoSim ?? false,
+                                    onChanged: (value) => _onSimChanged(value),
                                   ),
-                                  const Flexible(child: Text('Total')),
-                                  const SizedBox(width: 8),
+                                  const Text('Sim'),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
                                   Checkbox(
-                                    value: _isolamentoParcial ?? false,
-                                    onChanged: _isolamentoSim == true
-                                        ? (value) {
-                                            setState(() {
-                                              _isolamentoParcial =
-                                                  value ?? false;
-                                              if (value == true) {
-                                                _isolamentoTotal = false;
-                                              }
-                                            });
-                                          }
-                                        : null,
+                                    value: _isolamentoNao ?? false,
+                                    onChanged: (value) => _onNaoChanged(value),
                                   ),
-                                  const Flexible(child: Text('Parcial')),
+                                  const Text('Não'),
                                 ],
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Descreva abaixo onde o veiculo estava e quem mantinha sua guarda.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        // Lado esquerdo: Sim/Não
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: _isolamentoSim ?? false,
+                                  onChanged: (value) => _onSimChanged(value),
+                                ),
+                                const Flexible(child: Text('Sim')),
+                                const SizedBox(width: 8),
+                                Checkbox(
+                                  value: _isolamentoNao ?? false,
+                                  onChanged: (value) => _onNaoChanged(value),
+                                ),
+                                const Flexible(child: Text('Não')),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 60,
+                          color: Colors.grey.shade300,
+                        ),
+                        // Lado direito: Total/Parcial
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Se sim:',
+                                  style: TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Checkbox(
+                                      value: _isolamentoTotal ?? false,
+                                      onChanged: _isolamentoSim == true
+                                          ? (value) {
+                                              setState(() {
+                                                _isolamentoTotal =
+                                                    value ?? false;
+                                                if (value == true) {
+                                                  _isolamentoParcial = false;
+                                                }
+                                              });
+                                            }
+                                          : null,
+                                    ),
+                                    const Flexible(child: Text('Total')),
+                                    const SizedBox(width: 8),
+                                    Checkbox(
+                                      value: _isolamentoParcial ?? false,
+                                      onChanged: _isolamentoSim == true
+                                          ? (value) {
+                                              setState(() {
+                                                _isolamentoParcial =
+                                                    value ?? false;
+                                                if (value == true) {
+                                                  _isolamentoTotal = false;
+                                                }
+                                              });
+                                            }
+                                          : null,
+                                    ),
+                                    const Flexible(child: Text('Parcial')),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   const Divider(height: 1),
                   // Linha 2: Meios utilizados e observações
                   Padding(
@@ -314,80 +373,87 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Meios utilizados e observações:',
-                          style: TextStyle(fontWeight: FontWeight.w500),
+                        Text(
+                          _isVistoriaVeiculo
+                              ? 'Situacao do veiculo na vistoria:'
+                              : 'Meios utilizados e observações:',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 12),
-                        // Checkboxes dos meios
-                        Wrap(
-                          spacing: 16,
-                          runSpacing: 12,
-                          children: [
-                            CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              title: const Text('Presença física'),
-                              value: _isolamentoPresencaFisica,
-                              onChanged: (value) {
-                                setState(() {
-                                  _isolamentoPresencaFisica = value ?? false;
-                                });
-                              },
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                            CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              title: const Text('Viatura'),
-                              value: _isolamentoViatura,
-                              onChanged: (value) {
-                                setState(() {
-                                  _isolamentoViatura = value ?? false;
-                                });
-                              },
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                            CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              title: const Text('Cone'),
-                              value: _isolamentoCones,
-                              onChanged: (value) {
-                                setState(() {
-                                  _isolamentoCones = value ?? false;
-                                });
-                              },
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                            CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              title: const Text('Fita zebrada'),
-                              value: _isolamentoFitaZebrada,
-                              onChanged: (value) {
-                                setState(() {
-                                  _isolamentoFitaZebrada = value ?? false;
-                                });
-                              },
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                            CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              title: const Text('Outros'),
-                              value: _isolamentoOutros,
-                              onChanged: (value) {
-                                setState(() {
-                                  _isolamentoOutros = value ?? false;
-                                });
-                              },
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                          ],
-                        ),
-                        // Campo de texto para "Outros"
-                        if (_isolamentoOutros) ...[
+                        if (!_isVistoriaVeiculo) ...[
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 12,
+                            children: [
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text('Presença física'),
+                                value: _isolamentoPresencaFisica,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isolamentoPresencaFisica = value ?? false;
+                                  });
+                                },
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              ),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text('Viatura'),
+                                value: _isolamentoViatura,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isolamentoViatura = value ?? false;
+                                  });
+                                },
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              ),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text('Cone'),
+                                value: _isolamentoCones,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isolamentoCones = value ?? false;
+                                  });
+                                },
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              ),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text('Fita zebrada'),
+                                value: _isolamentoFitaZebrada,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isolamentoFitaZebrada = value ?? false;
+                                  });
+                                },
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              ),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text('Outros'),
+                                value: _isolamentoOutros,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _isolamentoOutros = value ?? false;
+                                  });
+                                },
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (!_isVistoriaVeiculo && _isolamentoOutros) ...[
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _outrosController,
@@ -399,20 +465,31 @@ class _IsolamentoScreenState extends State<IsolamentoScreen> {
                             maxLines: 2,
                           ),
                         ],
-                        const SizedBox(height: 16),
-                        // Campo de observações
-                        TextFormField(
-                          controller: _observacoesController,
-                          decoration: const InputDecoration(
-                            labelText: 'Observações',
-                            hintText: 'Digite observações adicionais...',
-                            border: OutlineInputBorder(),
+                        if (_isVistoriaVeiculo)
+                          TextFormField(
+                            controller: _outrosController,
+                            decoration: const InputDecoration(
+                              hintText:
+                                  'Ex.: O veiculo estava no patio da Delegacia, cercado e com acesso restrito. Ou: o veiculo foi apresentado pela propria vitima para a vistoria.',
+                              border: OutlineInputBorder(),
+                            ),
+                            maxLines: 4,
                           ),
-                          maxLines: null,
-                          minLines: 4,
-                          textInputAction: TextInputAction.newline,
-                          keyboardType: TextInputType.multiline,
-                        ),
+                        if (!_isVistoriaVeiculo) ...[
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _observacoesController,
+                            decoration: const InputDecoration(
+                              labelText: 'Observações',
+                              hintText: 'Digite observações adicionais...',
+                              border: OutlineInputBorder(),
+                            ),
+                            maxLines: null,
+                            minLines: 4,
+                            textInputAction: TextInputAction.newline,
+                            keyboardType: TextInputType.multiline,
+                          ),
+                        ],
                       ],
                     ),
                   ),

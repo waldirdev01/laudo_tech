@@ -8,9 +8,7 @@ import '../constants/evidencias_cadaver_regioes.dart';
 import '../constants/tipos_barba_referencia.dart';
 import '../models/cadaver_model.dart';
 import '../models/ficha_completa_model.dart';
-import '../services/openai_service.dart';
 import '../services/photo_backup_service.dart';
-import '../widgets/ai_suggestion_button.dart';
 import 'lesao_cadaver_form_screen.dart';
 
 class CadastroCadaverScreen extends StatefulWidget {
@@ -86,7 +84,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   EstadoRigidez? _rigidezMandibula;
   EstadoRigidez? _rigidezMemSuperior;
   EstadoRigidez? _rigidezMemInferior;
-  EstadoHipostase? _hipostaseEstado;
   bool? _hipostaseCompativeis;
   bool? _hipostasePresente;
 
@@ -107,13 +104,15 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   final _obsLesoesDefesaCtrl = TextEditingController();
   List<String> _fotosLesoesDefesa = [];
 
+  ModoVestesCadaver _modoVestes = ModoVestesCadaver.umaAUma;
+  final _descricaoVestesGeraisCtrl = TextEditingController();
+  List<String> _fotosVestesGerais = [];
   List<VesteCadaverModel> _vestes = [];
   List<TatuagemMarcaCorporalModel> _tatuagensMarcasLista = [];
 
   // Fotos dos exames (paths locais)
   List<String> _fotosVistaCadaversAmbiente = [];
   List<String> _fotosPosicaoEncontrada = [];
-  List<String> _fotosHipostaseSecrecoes = [];
   List<String> _fotosTatuagens = [];
 
   final _imagePicker = ImagePicker();
@@ -181,11 +180,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _rigidezMemSuperior = c.rigidezMemSuperior;
     _rigidezMemInferior = c.rigidezMemInferior;
     _hipostasePosicaoCtrl.text = c.hipostasePosicao ?? '';
-    _hipostaseEstado = c.hipostaseEstado;
     _hipostaseCompativeis = c.hipostaseCompativeis;
-    _hipostasePresente =
-        (c.hipostasePosicao?.trim().isNotEmpty == true) ||
-        c.hipostaseEstado != null ||
+    _hipostasePresente = (c.hipostasePosicao?.trim().isNotEmpty == true) ||
         c.hipostaseCompativeis != null;
 
     _secrecaoNasal = c.secrecaoNasal;
@@ -196,8 +192,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _secrecaoAnalTipoCtrl.text = c.secrecaoAnalTipo ?? '';
     _secrecaoPenianaVaginal = c.secrecaoPenianaVaginal;
     _secrecaoPenianaVaginalTipoCtrl.text = c.secrecaoPenianaVaginalTipo ?? '';
-    _secrecoesPresentes =
-        c.secrecaoNasal == true ||
+    _secrecoesPresentes = c.secrecaoNasal == true ||
         c.secrecaoOral == true ||
         c.secrecaoAnal == true ||
         c.secrecaoPenianaVaginal == true;
@@ -215,13 +210,15 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       ..addAll(c.membrosExaminadosDefesa);
     _obsLesoesDefesaCtrl.text = c.observacoesLesoesDefesa ?? '';
     _fotosLesoesDefesa = List<String>.from(c.fotosLesoesDefesa);
+    _modoVestes = c.modoVestes ?? ModoVestesCadaver.umaAUma;
+    _descricaoVestesGeraisCtrl.text = c.descricaoVestesGerais ?? '';
+    _fotosVestesGerais = List<String>.from(c.fotosVestesGerais ?? const []);
     _vestes = List<VesteCadaverModel>.from(c.vestes ?? []);
 
     _fotosVistaCadaversAmbiente = List<String>.from(
       c.fotosVistaCadaversAmbiente,
     );
     _fotosPosicaoEncontrada = List<String>.from(c.fotosPosicaoEncontrada);
-    _fotosHipostaseSecrecoes = List<String>.from(c.fotosHipostaseSecrecoes);
     _fotosTatuagens = List<String>.from(c.fotosTatuagens);
   }
 
@@ -258,6 +255,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     _secrecaoPenianaVaginalTipoCtrl.dispose();
     _outrasObservacoesCtrl.dispose();
     _obsLesoesDefesaCtrl.dispose();
+    _descricaoVestesGeraisCtrl.dispose();
     _tatuagensMarcasCtrl.dispose();
     _pertencesCtrl.dispose();
     super.dispose();
@@ -265,21 +263,18 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
 
   CadaverModel _construirCadaver() {
     return widget.cadaver.copyWith(
-      numeroLaudoCadaverico: _laudoCtrl.text.trim().isEmpty
-          ? null
-          : _laudoCtrl.text.trim(),
-      nomeDaVitima: _nomeCtrl.text.trim().isEmpty
-          ? null
-          : _nomeCtrl.text.trim(),
+      numeroLaudoCadaverico:
+          _laudoCtrl.text.trim().isEmpty ? null : _laudoCtrl.text.trim(),
+      nomeDaVitima:
+          _nomeCtrl.text.trim().isEmpty ? null : _nomeCtrl.text.trim(),
       documentoIdentificacao: _documentoCtrl.text.trim().isEmpty
           ? null
           : _documentoCtrl.text.trim(),
       dataNascimento: _nascimentoCtrl.text.trim().isEmpty
           ? null
           : _nascimentoCtrl.text.trim(),
-      filiacao: _filiacaoCtrl.text.trim().isEmpty
-          ? null
-          : _filiacaoCtrl.text.trim(),
+      filiacao:
+          _filiacaoCtrl.text.trim().isEmpty ? null : _filiacaoCtrl.text.trim(),
       faixaEtaria: _faixaEtaria,
       sexo: _sexo,
       compleicao: _compleicao,
@@ -345,41 +340,33 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       rigidezMandibula: _rigidezMandibula,
       rigidezMemSuperior: _rigidezMemSuperior,
       rigidezMemInferior: _rigidezMemInferior,
-      hipostasePosicao:
-          _hipostasePresente == true &&
+      hipostasePosicao: _hipostasePresente == true &&
               _hipostasePosicaoCtrl.text.trim().isNotEmpty
           ? _hipostasePosicaoCtrl.text.trim()
           : null,
-      hipostaseEstado: _hipostasePresente == true ? _hipostaseEstado : null,
-      hipostaseCompativeis: _hipostasePresente == true
-          ? _hipostaseCompativeis
-          : null,
+      hipostaseCompativeis:
+          _hipostasePresente == true ? _hipostaseCompativeis : null,
       secrecaoNasal: _secrecoesPresentes == true ? _secrecaoNasal : null,
-      secrecaoNasalTipo:
-          (_secrecoesPresentes == true &&
+      secrecaoNasalTipo: (_secrecoesPresentes == true &&
               _secrecaoNasal == true &&
               _secrecaoNasalTipoCtrl.text.trim().isNotEmpty)
           ? _secrecaoNasalTipoCtrl.text.trim()
           : null,
       secrecaoOral: _secrecoesPresentes == true ? _secrecaoOral : null,
-      secrecaoOralTipo:
-          (_secrecoesPresentes == true &&
+      secrecaoOralTipo: (_secrecoesPresentes == true &&
               _secrecaoOral == true &&
               _secrecaoOralTipoCtrl.text.trim().isNotEmpty)
           ? _secrecaoOralTipoCtrl.text.trim()
           : null,
       secrecaoAnal: _secrecoesPresentes == true ? _secrecaoAnal : null,
-      secrecaoAnalTipo:
-          (_secrecoesPresentes == true &&
+      secrecaoAnalTipo: (_secrecoesPresentes == true &&
               _secrecaoAnal == true &&
               _secrecaoAnalTipoCtrl.text.trim().isNotEmpty)
           ? _secrecaoAnalTipoCtrl.text.trim()
           : null,
-      secrecaoPenianaVaginal: _secrecoesPresentes == true
-          ? _secrecaoPenianaVaginal
-          : null,
-      secrecaoPenianaVaginalTipo:
-          (_secrecoesPresentes == true &&
+      secrecaoPenianaVaginal:
+          _secrecoesPresentes == true ? _secrecaoPenianaVaginal : null,
+      secrecaoPenianaVaginalTipo: (_secrecoesPresentes == true &&
               _secrecaoPenianaVaginal == true &&
               _secrecaoPenianaVaginalTipoCtrl.text.trim().isNotEmpty)
           ? _secrecaoPenianaVaginalTipoCtrl.text.trim()
@@ -394,32 +381,39 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
           ? null
           : _obsLesoesDefesaCtrl.text.trim(),
       fotosLesoesDefesa: _fotosLesoesDefesa,
-      vestes: _vestes,
+      modoVestes: _modoVestes,
+      descricaoVestesGerais: _modoVestes == ModoVestesCadaver.geral &&
+              _descricaoVestesGeraisCtrl.text.trim().isNotEmpty
+          ? _descricaoVestesGeraisCtrl.text.trim()
+          : null,
+      fotosVestesGerais: _modoVestes == ModoVestesCadaver.geral
+          ? (_fotosVestesGerais.isEmpty ? const [] : _fotosVestesGerais)
+          : const [],
+      vestes: _modoVestes == ModoVestesCadaver.geral
+          ? const []
+          : (_modoVestes == ModoVestesCadaver.completa
+              ? (_vestes.isEmpty ? const [] : [_vestes.first])
+              : _vestes),
       fotosVistaCadaversAmbiente: _fotosVistaCadaversAmbiente,
       fotosPosicaoEncontrada: _fotosPosicaoEncontrada,
-      fotosHipostaseSecrecoes:
-          (_hipostasePresente == true || _secrecoesPresentes == true)
-          ? _fotosHipostaseSecrecoes
-          : const [],
       fotosTatuagens: _tatuagensMarcasLista.isNotEmpty
           ? _tatuagensMarcasLista
-                .expand((t) => t.fotosPaths)
-                .where((p) => p.trim().isNotEmpty)
-                .toSet()
-                .toList()
+              .expand((t) => t.fotosPaths)
+              .where((p) => p.trim().isNotEmpty)
+              .toSet()
+              .toList()
           : _fotosTatuagens,
       tatuagensMarcas: _tatuagensMarcasLista.isNotEmpty
           ? _tatuagensMarcasLista
-                .map((t) => t.descricao?.trim())
-                .whereType<String>()
-                .where((d) => d.isNotEmpty)
-                .join('; ')
+              .map((t) => t.descricao?.trim())
+              .whereType<String>()
+              .where((d) => d.isNotEmpty)
+              .join('; ')
           : (_tatuagensMarcasCtrl.text.trim().isEmpty
-                ? null
-                : _tatuagensMarcasCtrl.text.trim()),
-      tatuagensMarcasLista: _tatuagensMarcasLista.isEmpty
-          ? null
-          : _tatuagensMarcasLista,
+              ? null
+              : _tatuagensMarcasCtrl.text.trim()),
+      tatuagensMarcasLista:
+          _tatuagensMarcasLista.isEmpty ? null : _tatuagensMarcasLista,
       pertences: _pertencesCtrl.text.trim().isEmpty
           ? null
           : _pertencesCtrl.text.trim(),
@@ -442,11 +436,38 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(
+          messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> _adicionarFotoVestesGeraisCamera() async {
+    final foto = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 75,
+      maxWidth: 2048,
+      maxHeight: 2048,
+    );
+    if (foto == null || !mounted) return;
+    final path = await _persistirFotoCadaver(foto, 'vestes_gerais');
+    if (path == null) return;
+    setState(() => _fotosVestesGerais = [path]);
+  }
+
+  Future<void> _adicionarFotoVestesGeraisGaleria() async {
+    final fotos = await _imagePicker.pickMultiImage(
+      imageQuality: 75,
+      maxWidth: 2048,
+      maxHeight: 2048,
+    );
+    if (fotos.isEmpty || !mounted) return;
+    final foto = fotos.first;
+    final path = await _persistirFotoCadaver(foto, 'vestes_gerais');
+    if (path == null) return;
+    setState(() => _fotosVestesGerais = [path]);
   }
 
   void _salvar() {
@@ -514,9 +535,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   ? Theme.of(context).colorScheme.onPrimaryContainer
                   : null,
             ),
-            tooltip: _modoRapido
-                ? 'Desativar modo rápido'
-                : 'Ativar modo rápido',
+            tooltip:
+                _modoRapido ? 'Desativar modo rápido' : 'Ativar modo rápido',
             onPressed: () {
               setState(() {
                 final novoModoRapido = !_modoRapido;
@@ -790,8 +810,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                     Text(
                       _textoTipoBarbaSelecionado(),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                     const SizedBox(height: 12),
 
@@ -951,25 +972,25 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
           )
         else
           ...paths.asMap().entries.map(
-            (e) => ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.image_outlined, size: 18),
-              title: Text(
-                _nomeArquivoFoto(e.value),
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13),
+                (e) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.image_outlined, size: 18),
+                  title: Text(
+                    _nomeArquivoFoto(e.value),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Remover foto',
+                    onPressed: () {
+                      final nova = List<String>.from(paths)..removeAt(e.key);
+                      onChanged(nova);
+                    },
+                  ),
+                ),
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                tooltip: 'Remover foto',
-                onPressed: () {
-                  final nova = List<String>.from(paths)..removeAt(e.key);
-                  onChanged(nova);
-                },
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -1447,96 +1468,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
 
           const SizedBox(height: 16),
 
-          // Manchas de Hipóstase
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'MANCHAS DE HIPÓSTASE',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  const Text('Há manchas de hipóstase?'),
-                  RadioGroup<bool>(
-                    groupValue: _hipostasePresente,
-                    onChanged: (v) => setState(() {
-                      _hipostasePresente = v;
-                      if (v == false) {
-                        _hipostasePosicaoCtrl.clear();
-                        _hipostaseEstado = null;
-                        _hipostaseCompativeis = null;
-                      }
-                    }),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: RadioListTile<bool>(
-                            title: const Text('Sim'),
-                            value: true,
-                          ),
-                        ),
-                        Expanded(
-                          child: RadioListTile<bool>(
-                            title: const Text('Não'),
-                            value: false,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_hipostasePresente == true) ...[
-                    TextFormField(
-                      controller: _hipostasePosicaoCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Posição',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDropdown<EstadoHipostase>(
-                      label: 'Estado',
-                      value: _hipostaseEstado,
-                      items: EstadoHipostase.values,
-                      onChanged: (v) => setState(() => _hipostaseEstado = v),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Compatíveis:'),
-                    RadioGroup<bool>(
-                      groupValue: _hipostaseCompativeis,
-                      onChanged: (v) =>
-                          setState(() => _hipostaseCompativeis = v),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: RadioListTile<bool>(
-                              title: const Text('Sim'),
-                              value: true,
-                            ),
-                          ),
-                          Expanded(
-                            child: RadioListTile<bool>(
-                              title: const Text('Não'),
-                              value: false,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
           // Secreções
           Card(
             child: Padding(
@@ -1606,19 +1537,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         setState(() => _secrecaoPenianaVaginal = v);
                       },
                       _secrecaoPenianaVaginalTipoCtrl,
-                    ),
-                  ],
-                  if (_hipostasePresente == true ||
-                      _secrecoesPresentes == true) ...[
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    _buildSecaoFotos(
-                      titulo: 'Fotos (manchas de hipóstase e secreções)',
-                      paths: _fotosHipostaseSecrecoes,
-                      onChanged: (v) =>
-                          setState(() => _fotosHipostaseSecrecoes = v),
-                      obrigatorio: false,
                     ),
                   ],
                 ],
@@ -1910,19 +1828,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       ),
                       maxLines: 2,
                     ),
-                    const SizedBox(height: 8),
-                    AiSuggestionButton(
-                      fieldLabel: 'Observações sobre lesões de defesa',
-                      currentText: _obsLesoesDefesaCtrl.text,
-                      currentTextBuilder: () => _obsLesoesDefesaCtrl.text,
-                      profile: AiSuggestionProfile.cvli,
-                      contextTextBuilder: _buildAiContextLesoesDefesa,
-                      imagePathsBuilder: () => _fotosLesoesDefesa,
-                      onReplace: (text) =>
-                          _replaceControllerText(_obsLesoesDefesaCtrl, text),
-                      onAppend: (text) =>
-                          _appendControllerText(_obsLesoesDefesaCtrl, text),
-                    ),
                     const SizedBox(height: 12),
                     _buildSecaoFotos(
                       titulo: 'Fotos dos membros',
@@ -1943,116 +1848,235 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
 
   /// Aba 2: Vestes — exame das roupas antes da retirada.
   Widget _buildVestesTab() {
+    final modoCompleta = _modoVestes == ModoVestesCadaver.completa;
+    final modoGeral = _modoVestes == ModoVestesCadaver.geral;
+    final vestesExibidas = modoCompleta
+        ? (_vestes.isEmpty ? const <VesteCadaverModel>[] : [_vestes.first])
+        : _vestes;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Examine e registre as vestes antes da retirada (fotos opcionais por peça).',
+            modoGeral
+                ? 'Registre uma descrição geral das vestes e uma foto única do conjunto.'
+                : modoCompleta
+                    ? 'Registre a veste completa em um único cadastro.'
+                    : 'Examine e registre as vestes antes da retirada (fotos opcionais por peça).',
             style: TextStyle(
               fontSize: 13,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
-          // Lista de Vestes
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'VESTES',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Descrição geral'),
+                selected: modoGeral,
+                onSelected: (_) {
+                  setState(() => _modoVestes = ModoVestesCadaver.geral);
+                },
+              ),
+              ChoiceChip(
+                label: const Text('Descrição completa'),
+                selected: modoCompleta,
+                onSelected: (_) {
+                  setState(() => _modoVestes = ModoVestesCadaver.completa);
+                },
+              ),
+              ChoiceChip(
+                label: const Text('Uma a uma'),
+                selected: _modoVestes == ModoVestesCadaver.umaAUma,
+                onSelected: (_) {
+                  setState(() => _modoVestes = ModoVestesCadaver.umaAUma);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (modoGeral) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Descrição geral das vestes',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: _adicionarVeste,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _descricaoVestesGeraisCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição geral',
+                        hintText:
+                            'Descreva o conjunto das vestes em um único texto...',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 5,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Foto única do conjunto',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _adicionarFotoVestesGeraisCamera,
+                          icon: const Icon(Icons.photo_camera),
+                          label: const Text('Câmera'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _adicionarFotoVestesGeraisGaleria,
+                          icon: const Icon(Icons.photo_library),
+                          label: const Text('Galeria'),
+                        ),
+                        if (_fotosVestesGerais.isNotEmpty)
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() => _fotosVestesGerais = []);
+                            },
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Remover foto'),
+                          ),
+                      ],
+                    ),
+                    if (_fotosVestesGerais.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(_fotosVestesGerais.first),
+                          width: double.infinity,
+                          height: 220,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ],
-                  ),
-                  const Divider(),
-                  if (_vestes.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('Nenhuma veste registrada'),
-                      ),
-                    )
-                  else
-                    ...List.generate(_vestes.length, (index) {
-                      final veste = _vestes[index];
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(child: Text('${veste.numero}')),
-                          title: Text(
-                            _modoRapido
-                                ? ((veste.notas ?? '').trim().isNotEmpty
-                                      ? veste.notas!.trim()
-                                      : 'Veste ${veste.numero}')
-                                : (veste.tipoMarca ?? 'Veste ${veste.numero}'),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (_modoRapido &&
-                                  (veste.notas ?? '').trim().isNotEmpty)
-                                Text('Legenda: ${veste.notas!.trim()}'),
-                              if (veste.cor != null) Text('Cor: ${veste.cor}'),
-                              if (veste.fotosPaths.isNotEmpty)
-                                Text(
-                                  '${veste.fotosPaths.length} foto(s)',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                ),
-                              Wrap(
-                                spacing: 4,
-                                runSpacing: 4,
-                                children: [
-                                  if (veste.sujidades == true)
-                                    const Chip(
-                                      label: Text('Sujidades'),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                  if (veste.sangue == true)
-                                    const Chip(
-                                      label: Text('Sangue'),
-                                      backgroundColor: Colors.red,
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          isThreeLine: true,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete),
-                            onPressed: () {
-                              setState(() {
-                                _vestes.removeAt(index);
-                              });
-                            },
-                          ),
-                          onTap: () => _editarVeste(index),
-                        ),
-                      );
-                    }),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ] else ...[
+            // Lista de Vestes
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'VESTES',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        if (!modoCompleta || _vestes.isEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            onPressed: _adicionarVeste,
+                          )
+                        else
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _editarVeste(0),
+                          ),
+                      ],
+                    ),
+                    const Divider(),
+                    if (vestesExibidas.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('Nenhuma veste registrada'),
+                        ),
+                      )
+                    else
+                      ...List.generate(vestesExibidas.length, (index) {
+                        final veste = vestesExibidas[index];
+                        return Card(
+                          child: ListTile(
+                            leading:
+                                CircleAvatar(child: Text('${veste.numero}')),
+                            title: Text(
+                              _modoRapido
+                                  ? ((veste.notas ?? '').trim().isNotEmpty
+                                      ? veste.notas!.trim()
+                                      : 'Veste ${veste.numero}')
+                                  : (veste.tipoMarca ??
+                                      'Veste ${veste.numero}'),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_modoRapido &&
+                                    (veste.notas ?? '').trim().isNotEmpty)
+                                  Text('Legenda: ${veste.notas!.trim()}'),
+                                if (veste.cor != null)
+                                  Text('Cor: ${veste.cor}'),
+                                if (veste.fotosPaths.isNotEmpty)
+                                  Text(
+                                    '${veste.fotosPaths.length} foto(s)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                                Wrap(
+                                  spacing: 4,
+                                  runSpacing: 4,
+                                  children: [
+                                    if (veste.sujidades == true)
+                                      const Chip(
+                                        label: Text('Sujidades'),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    if (veste.sangue == true)
+                                      const Chip(
+                                        label: Text('Sangue'),
+                                        backgroundColor: Colors.red,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            isThreeLine: true,
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () {
+                                setState(() {
+                                  _vestes.remove(veste);
+                                });
+                              },
+                            ),
+                            onTap: () => _editarVeste(index),
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           const SizedBox(height: 16),
 
@@ -2180,35 +2204,6 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
     return 'Lesão em ${lesao.regiao}';
   }
 
-  String _buildAiContextLesoesDefesa() {
-    final partes = <String>[
-      'Contexto: lesões de defesa no cadáver ${widget.cadaver.numero}.',
-    ];
-
-    if (_membrosExaminadosDefesa.isNotEmpty) {
-      partes.add('Membros examinados: ${_membrosExaminadosDefesa.join(', ')}.');
-    }
-
-    if (_ausenciaLesoesDefesa) {
-      partes.add('Foi marcada ausência de lesões de defesa.');
-    }
-
-    return partes.join('\n');
-  }
-
-  void _replaceControllerText(TextEditingController controller, String text) {
-    setState(() => controller.text = text.trim());
-  }
-
-  void _appendControllerText(TextEditingController controller, String text) {
-    final atual = controller.text.trim();
-    setState(() {
-      controller.text = atual.isEmpty
-          ? text.trim()
-          : '$atual\n\n${text.trim()}';
-    });
-  }
-
   static const String _assetCorpoMasculino = 'assets/images/corpo_homem.png';
   static const String _assetCorpoFeminino = 'assets/images/corpo_mulher.png';
   static const String _assetBarba = 'assets/images/barba.png';
@@ -2240,7 +2235,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       Expanded(
                         child: Text(
                           'EVIDÊNCIAS NO CADÁVER — Numeração',
-                          style: Theme.of(sheetContext).textTheme.titleMedium
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -2292,7 +2289,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'Toque em uma região para preencher o campo.',
-                          style: Theme.of(sheetContext).textTheme.bodySmall
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .bodySmall
                               ?.copyWith(
                                 color: Theme.of(
                                   sheetContext,
@@ -2305,7 +2304,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'Vista anterior (frente)',
-                          style: Theme.of(sheetContext).textTheme.titleSmall
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .titleSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: Theme.of(
@@ -2334,7 +2335,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           'Vista posterior (costas)',
-                          style: Theme.of(sheetContext).textTheme.titleSmall
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .titleSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: Theme.of(
@@ -2407,7 +2410,9 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       Expanded(
                         child: Text(
                           'Tipos de barba (referência)',
-                          style: Theme.of(sheetContext).textTheme.titleMedium
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -2440,10 +2445,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                   child: Text(
                     'Use o gesto de pinça para zoom. Toque no tipo desejado abaixo para preencher.',
                     style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(
-                        sheetContext,
-                      ).colorScheme.onSurfaceVariant,
-                    ),
+                          color: Theme.of(
+                            sheetContext,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2504,8 +2509,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                       child: Text(
                         titulo,
                         style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                     ),
                     IconButton(
@@ -2530,8 +2535,8 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
                         child: Text(
                           'Imagem não encontrada.',
                           style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(ctx).colorScheme.error,
-                          ),
+                                color: Theme.of(ctx).colorScheme.error,
+                              ),
                         ),
                       ),
                     ),
@@ -2582,6 +2587,10 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   }
 
   Future<void> _adicionarVeste() async {
+    if (_modoVestes == ModoVestesCadaver.completa && _vestes.isNotEmpty) {
+      await _editarVeste(0);
+      return;
+    }
     final proximoNumero = _vestes.isEmpty
         ? 1
         : _vestes.map((v) => v.numero).reduce((a, b) => a > b ? a : b) + 1;
@@ -2591,6 +2600,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
           fichaId: widget.ficha.id,
           cadaverNumero: widget.cadaver.numero,
           numeroVeste: proximoNumero,
+          descricaoCompleta: _modoVestes == ModoVestesCadaver.completa,
           modoRapido: _modoRapido,
         ),
       ),
@@ -2607,6 +2617,7 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
           cadaverNumero: widget.cadaver.numero,
           numeroVeste: _vestes[index].numero,
           vesteExistente: _vestes[index],
+          descricaoCompleta: _modoVestes == ModoVestesCadaver.completa,
           modoRapido: _modoRapido,
         ),
       ),
@@ -2629,16 +2640,16 @@ class _CadastroCadaverScreenState extends State<CadastroCadaverScreen>
   }
 
   Future<void> _editarTatuagemMarca(int index) async {
-    final resultado = await Navigator.of(context)
-        .push<TatuagemMarcaCorporalModel>(
-          MaterialPageRoute(
-            builder: (ctx) => CadastroTatuagemMarcaScreen(
-              fichaId: widget.ficha.id,
-              cadaverNumero: widget.cadaver.numero,
-              existente: _tatuagensMarcasLista[index],
-            ),
-          ),
-        );
+    final resultado =
+        await Navigator.of(context).push<TatuagemMarcaCorporalModel>(
+      MaterialPageRoute(
+        builder: (ctx) => CadastroTatuagemMarcaScreen(
+          fichaId: widget.ficha.id,
+          cadaverNumero: widget.cadaver.numero,
+          existente: _tatuagensMarcasLista[index],
+        ),
+      ),
+    );
     if (!mounted || resultado == null) return;
     setState(() => _tatuagensMarcasLista[index] = resultado);
   }
@@ -2649,6 +2660,7 @@ class CadastroVesteScreen extends StatefulWidget {
   final int cadaverNumero;
   final int numeroVeste;
   final VesteCadaverModel? vesteExistente;
+  final bool descricaoCompleta;
   final bool modoRapido;
 
   const CadastroVesteScreen({
@@ -2657,6 +2669,7 @@ class CadastroVesteScreen extends StatefulWidget {
     required this.cadaverNumero,
     required this.numeroVeste,
     this.vesteExistente,
+    this.descricaoCompleta = false,
     this.modoRapido = false,
   });
 
@@ -2684,7 +2697,6 @@ class CadastroTatuagemMarcaScreen extends StatefulWidget {
 class _CadastroTatuagemMarcaScreenState
     extends State<CadastroTatuagemMarcaScreen> {
   final _descricaoCtrl = TextEditingController();
-  final _numerosFotosCtrl = TextEditingController();
   final _imagePicker = ImagePicker();
   List<String> _fotos = [];
 
@@ -2692,33 +2704,13 @@ class _CadastroTatuagemMarcaScreenState
   void initState() {
     super.initState();
     _descricaoCtrl.text = widget.existente?.descricao ?? '';
-    if (widget.existente?.numerosFotografias.isNotEmpty == true) {
-      _numerosFotosCtrl.text = widget.existente!.numerosFotografias
-          .map((n) => n.toString().padLeft(2, '0'))
-          .join(', ');
-    }
     _fotos = List<String>.from(widget.existente?.fotosPaths ?? const []);
   }
 
   @override
   void dispose() {
     _descricaoCtrl.dispose();
-    _numerosFotosCtrl.dispose();
     super.dispose();
-  }
-
-  List<int> _parseNumerosFotografia(String raw) {
-    final partes = raw
-        .split(RegExp(r'[,;\s]+'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty);
-    final nums = <int>{};
-    for (final parte in partes) {
-      final n = int.tryParse(parte);
-      if (n != null && n > 0) nums.add(n);
-    }
-    final lista = nums.toList()..sort();
-    return lista;
   }
 
   Future<String?> _persistirFoto(XFile arquivo) async {
@@ -2737,7 +2729,8 @@ class _CadastroTatuagemMarcaScreenState
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(
+          messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -2751,13 +2744,11 @@ class _CadastroTatuagemMarcaScreenState
 
   void _salvar() {
     final item = TatuagemMarcaCorporalModel(
-      id:
-          widget.existente?.id ??
+      id: widget.existente?.id ??
           DateTime.now().microsecondsSinceEpoch.toString(),
       descricao: _descricaoCtrl.text.trim().isEmpty
           ? null
           : _descricaoCtrl.text.trim(),
-      numerosFotografias: _parseNumerosFotografia(_numerosFotosCtrl.text),
       fotosPaths: List<String>.from(_fotos),
     );
     Navigator.of(context).pop(item);
@@ -2786,16 +2777,6 @@ class _CadastroTatuagemMarcaScreenState
                 border: OutlineInputBorder(),
               ),
               maxLines: 4,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _numerosFotosCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Nº da(s) fotografia(s)',
-                hintText: 'Ex.: 12, 13',
-                border: OutlineInputBorder(),
-              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -2950,7 +2931,8 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
       );
       final bytes = await arquivo.readAsBytes();
       await destino.writeAsBytes(bytes);
-      await PhotoBackupService.saveToGalleryWithFeedback(messenger, destino.path);
+      await PhotoBackupService.saveToGalleryWithFeedback(
+          messenger, destino.path);
       return destino.path;
     } catch (_) {
       return null;
@@ -2960,47 +2942,6 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
   String _nomeArquivoFoto(String path) {
     final idx = path.lastIndexOf(Platform.pathSeparator);
     return idx >= 0 ? path.substring(idx + 1) : path;
-  }
-
-  String _buildAiContextVeste() {
-    final partes = <String>[
-      'Contexto: descrição de veste do cadáver ${widget.cadaverNumero}.',
-      'Número da veste: ${widget.numeroVeste}.',
-    ];
-
-    if (_tipoMarcaCtrl.text.trim().isNotEmpty) {
-      partes.add('Tipo/marca: ${_tipoMarcaCtrl.text.trim()}.');
-    }
-    if (_corCtrl.text.trim().isNotEmpty) {
-      partes.add('Cor: ${_corCtrl.text.trim()}.');
-    }
-    if (_sujidades != null) {
-      partes.add('Sujidades: ${_sujidades! ? 'sim' : 'não'}.');
-    }
-    if (_sangue != null) {
-      partes.add('Sangue: ${_sangue! ? 'sim' : 'não'}.');
-    }
-    if (_bolsos != null) {
-      partes.add('Possui bolsos: ${_bolsos! ? 'sim' : 'não'}.');
-    }
-    if (_bolsos == true && _bolsosVazios != null) {
-      partes.add('Bolsos vazios: ${_bolsosVazios! ? 'sim' : 'não'}.');
-    }
-
-    return partes.join('\n');
-  }
-
-  void _replaceNotas(String text) {
-    setState(() => _notasCtrl.text = text.trim());
-  }
-
-  void _appendNotas(String text) {
-    final atual = _notasCtrl.text.trim();
-    setState(() {
-      _notasCtrl.text = atual.isEmpty
-          ? text.trim()
-          : '$atual\n\n${text.trim()}';
-    });
   }
 
   Widget _buildSecaoFotos() {
@@ -3099,24 +3040,25 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
 
   void _salvar() {
     final veste = VesteCadaverModel(
-      id:
-          widget.vesteExistente?.id ??
+      id: widget.vesteExistente?.id ??
           DateTime.now().microsecondsSinceEpoch.toString(),
       numero: widget.numeroVeste,
-      tipoMarca: widget.modoRapido
+      tipoMarca: widget.modoRapido || widget.descricaoCompleta
           ? null
           : _tipoMarcaCtrl.text.trim().isEmpty
-          ? null
-          : _tipoMarcaCtrl.text.trim(),
-      cor: widget.modoRapido
+              ? null
+              : _tipoMarcaCtrl.text.trim(),
+      cor: widget.modoRapido || widget.descricaoCompleta
           ? null
           : _corCtrl.text.trim().isEmpty
-          ? null
-          : _corCtrl.text.trim(),
-      sujidades: widget.modoRapido ? null : _sujidades,
-      sangue: widget.modoRapido ? null : _sangue,
-      bolsos: widget.modoRapido ? null : _bolsos,
-      bolsosVazios: widget.modoRapido ? null : _bolsosVazios,
+              ? null
+              : _corCtrl.text.trim(),
+      sujidades:
+          widget.modoRapido || widget.descricaoCompleta ? null : _sujidades,
+      sangue: widget.modoRapido || widget.descricaoCompleta ? null : _sangue,
+      bolsos: widget.modoRapido || widget.descricaoCompleta ? null : _bolsos,
+      bolsosVazios:
+          widget.modoRapido || widget.descricaoCompleta ? null : _bolsosVazios,
       notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
       fotosPaths: List<String>.from(_fotosVeste),
     );
@@ -3128,9 +3070,13 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.vesteExistente == null
-              ? 'Nova Veste Nº ${widget.numeroVeste}'
-              : 'Editar Veste Nº ${widget.numeroVeste}',
+          widget.descricaoCompleta
+              ? (widget.vesteExistente == null
+                  ? 'Nova Veste Completa Nº ${widget.numeroVeste}'
+                  : 'Editar Veste Completa Nº ${widget.numeroVeste}')
+              : widget.vesteExistente == null
+                  ? 'Nova Veste Nº ${widget.numeroVeste}'
+                  : 'Editar Veste Nº ${widget.numeroVeste}',
         ),
       ),
       body: SingleChildScrollView(
@@ -3138,11 +3084,11 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!widget.modoRapido) ...[
+            if (!widget.modoRapido && !widget.descricaoCompleta) ...[
               TextField(
                 controller: _tipoMarcaCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Tipo e marca',
+                  labelText: 'Tipo',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -3274,29 +3220,23 @@ class _CadastroVesteScreenState extends State<CadastroVesteScreen> {
             TextField(
               controller: _notasCtrl,
               decoration: InputDecoration(
-                labelText: widget.modoRapido ? 'Legenda' : 'Notas',
+                labelText: widget.descricaoCompleta
+                    ? 'Descrição da veste completa'
+                    : widget.modoRapido
+                        ? 'Legenda'
+                        : 'Notas',
+                hintText: widget.descricaoCompleta
+                    ? 'Descreva a veste completa em um único texto...'
+                    : null,
                 border: OutlineInputBorder(),
               ),
-              maxLines: 2,
+              maxLines: widget.descricaoCompleta ? 5 : 2,
             ),
-            if (!widget.modoRapido) ...[
-              const SizedBox(height: 8),
-              AiSuggestionButton(
-                fieldLabel: 'Notas da veste',
-                currentText: _notasCtrl.text,
-                currentTextBuilder: () => _notasCtrl.text,
-                profile: AiSuggestionProfile.cvli,
-                contextTextBuilder: _buildAiContextVeste,
-                imagePathsBuilder: () => _fotosVeste,
-                onReplace: _replaceNotas,
-                onAppend: _appendNotas,
-              ),
-            ],
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
             _buildSecaoFotos(),
-            if (widget.modoRapido) ...[
+            if (widget.modoRapido && !widget.descricaoCompleta) ...[
               const SizedBox(height: 8),
               Text(
                 'A legenda será usada na lista de vestes. A numeração da fotografia será preenchida automaticamente no laudo.',
